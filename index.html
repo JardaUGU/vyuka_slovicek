@@ -189,7 +189,7 @@
     .opt-btn.correct { background: var(--col-green) !important; border-color: #fff; }
     .opt-btn.wrong { background: var(--col-red) !important; border-color: #fff; }
 
-    /* VELKÁ TLAČÍTKA SKLÁDÁNÍ (DVOUŘÁDKOVÁ PODPORA) */
+    /* VELKÁ TLAČÍTKA SKLÁDÁNÍ */
     .slots-row, .letters-row {
       display: flex;
       justify-content: center;
@@ -329,7 +329,7 @@
   const API_URL = "https://script.google.com/macros/s/AKfycbxaxBIXP-ECpWstcqRDw8RuT_ds6UwcplU_3pZ9_-ksELN5FVeGt5EHjjexkJVmx1FR_w/exec";
 
   let appData = { users: [], vocab: [], quizzes: [], sequences: [] };
-  let currentUser = JSON.parse(localStorage.getItem("cur_user") || '{"name":"Honzík","grade":9,"goal":25,"stars":0}');
+  let currentUser = JSON.parse(localStorage.getItem("cur_user") || '{"name":"Táta","grade":99,"goal":30,"stars":0}');
   let filterGradeOnly = true;
 
   let currentScreen = "SELECT_USER";
@@ -382,7 +382,7 @@
   }
 
   function updateFooter() {
-    document.getElementById("footer-user").innerText = `${currentUser.name} (${currentUser.grade}. tř.)`;
+    document.getElementById("footer-user").innerText = `${currentUser.name} (${currentUser.grade <= 9 ? currentUser.grade + '. tř.' : 'Dospělý'})`;
     document.getElementById("footer-goal").innerText = `Hvězdy: ${currentUser.stars}/${currentUser.goal} ★`;
   }
 
@@ -418,7 +418,6 @@
     }
   }
 
-  // Zápis do Google Sheets POUZE u Zkoušení z hlavy (Varianta B)
   async function saveWordMasteryToGoogle(lessonId, foreignWord, masteryLevel) {
     try {
       const fd = new URLSearchParams();
@@ -486,22 +485,30 @@
       `;
     }
 
-    // VÝBĚR PŘEDMĚTU
+    // VÝBĚR PŘEDMĚTU (HEBREJŠTINA SE ZOBRAZÍ POUZE PRO DOSPĚLÉHO - ROČNÍK 99)
     else if (currentScreen === "SELECT_SUBJECT") {
       bSubj.style.display = "none";
       bTopic.style.display = "none";
+
+      const showHebrew = currentUser.grade >= 99 || !filterGradeOnly;
+
       main.innerHTML = `
         <div class="grid-2">
           <div class="tile" onclick="chooseSubject('CZ')"><h2>Český jazyk</h2><p>Slovní druhy, pády, I/Y, básničky</p></div>
           <div class="tile" onclick="chooseSubject('EN')"><h2>Angličtina</h2><p>Project 1 & slovíčka</p></div>
           <div class="tile" onclick="chooseSubject('DE')"><h2>Němčina</h2><p>Barvy, čísla, věty, členy</p></div>
-          <div class="tile" onclick="chooseSubject('HE')"><h2>Hebrejština</h2><p>Jonáš 1, text Tanachu</p></div>
           <div class="tile" onclick="chooseSubject('PRV')"><h2>Prvouka & čas</h2><p>Dny, měsíce, abeceda</p></div>
+          ${showHebrew ? `
+            <div class="tile" style="border-color:var(--col-yellow);" onclick="chooseSubject('HE')">
+              <h2 style="color:var(--col-yellow);">Hebrejština</h2>
+              <p>Jonáš 1, text Tanachu</p>
+            </div>
+          ` : ''}
         </div>
       `;
     }
 
-    // VÝBĚR TÉMATU
+    // VÝBĚR TÉMATU S FILTREM ROČNÍKU
     else if (currentScreen === "SELECT_TOPIC") {
       bSubj.style.display = "flex";
       bSubj.innerText = selectedSubject;
@@ -509,9 +516,9 @@
 
       let html = `
         <div class="filter-bar">
-          <span>Filtr (${currentUser.grade}. tř.):</span>
+          <span>Filtr (${currentUser.grade <= 9 ? currentUser.grade + '. tř.' : 'Dospělý'}):</span>
           <button class="toggle-btn ${filterGradeOnly ? 'on' : ''}" onclick="filterGradeOnly=!filterGradeOnly;renderScreen();">
-            ${filterGradeOnly ? 'Jen pro mou třídu' : 'Zobrazit vše'}
+            ${filterGradeOnly ? 'Jen pro mě' : 'Zobrazit vše'}
           </button>
         </div>
         <div style="display:flex;flex-direction:column;gap:8px;">
@@ -526,7 +533,7 @@
           html += `<div class="tile" style="flex-direction:row;justify-content:space-between;padding:12px;" onclick="selectTopic('VOCAB', ${idx})">
             <div style="text-align:left;">
               <h2>${l.title}</h2>
-              <p>Lekce od ${l.minGrade}. třídy</p>
+              <p>Lekce od ${l.minGrade <= 9 ? l.minGrade + '. třídy' : 'Dospělý'}</p>
             </div>
             <span style="color:var(--col-active-tab);font-weight:bold;">${l.words.length} slov</span>
           </div>`;
@@ -540,7 +547,7 @@
           html += `<div class="tile" style="flex-direction:row;justify-content:space-between;padding:12px;" onclick="selectTopic('QUIZ', ${idx})">
             <div style="text-align:left;">
               <h2>${q.title}</h2>
-              <p>Kvíz od ${q.minGrade}. třídy</p>
+              <p>Kvíz od ${q.minGrade <= 9 ? q.minGrade + '. třídy' : 'Dospělý'}</p>
             </div>
             <span style="color:var(--col-active-tab);font-weight:bold;">${q.questions.length} ot.</span>
           </div>`;
@@ -554,7 +561,7 @@
           html += `<div class="tile" style="flex-direction:row;justify-content:space-between;padding:12px;" onclick="selectTopic('SEQ', ${idx})">
             <div style="text-align:left;">
               <h2>${s.title}</h2>
-              <p>Řada na čas od ${s.minGrade}. třídy</p>
+              <p>Řada na čas od ${s.minGrade <= 9 ? s.minGrade + '. třídy' : 'Dospělý'}</p>
             </div>
             <span style="color:var(--col-active-tab);font-weight:bold;">${s.count} položek</span>
           </div>`;
@@ -562,14 +569,14 @@
       });
 
       if (countShown === 0) {
-        html += `<div style="text-align:center;padding:25px;color:var(--col-text-muted);">Pro ${currentUser.grade}. třídu tu zatím není specifické téma. Klikněte na "Zobrazit vše".</div>`;
+        html += `<div style="text-align:center;padding:25px;color:var(--col-text-muted);">Pro tento profil tu není specifické téma. Klikněte nahoře na "Zobrazit vše".</div>`;
       }
 
       html += '</div>';
       main.innerHTML = html;
     }
 
-    // VÝBĚR HRY
+    // VÝBĚR HRY (PEXESO SE ZOBRAZUJE POUZE U SLOVÍČEK - VOCAB!)
     else if (currentScreen === "SELECT_GAME") {
       const topic = getActiveTopic();
       bSubj.style.display = "flex";
@@ -583,10 +590,12 @@
           <div class="tile" onclick="startGame('SCRAMBLE')"><h2>3. Skládání</h2><p>Trénink písmen (velká tlačítka)</p></div>
           <div class="tile" onclick="startGame('MISSING')"><h2>4. Doplň písmeno</h2><p>Doplň chybějící znak</p></div>
         </div>
-        <div class="tile" style="margin-top:10px;padding:14px;border-color:var(--col-yellow);" onclick="setScreen('SELECT_PEXESO_SIZE')">
-          <h2 style="color:var(--col-yellow);">🃏 5. PEXESO</h2>
-          <p>Hledej dvojice (slovo ↔ překlad)</p>
-        </div>
+        ${currentTopicType === 'VOCAB' ? `
+          <div class="tile" style="margin-top:10px;padding:14px;border-color:var(--col-yellow);" onclick="setScreen('SELECT_PEXESO_SIZE')">
+            <h2 style="color:var(--col-yellow);">🃏 5. PEXESO</h2>
+            <p>Hledej dvojice (slovo ↔ překlad)</p>
+          </div>
+        ` : ''}
       `;
     }
 
@@ -724,7 +733,6 @@
     if (selectedGame === "SEQ") initSequence();
   }
 
-  // ZKOUŠENÍ Z HLAVY: Zde se testuje reálná paměť a mění se Google Sheets skóre
   function pickNextAdaptiveWord() {
     const topic = getActiveTopic();
     vQuizRevealed = false;
@@ -768,7 +776,7 @@
       saveWordMasteryToGoogle(topic.id, w.foreign, vMastery[vCurrentWord]);
     } else {
       sndErr();
-      vMastery[vCurrentWord] = 0; // Chyba v testu z hlavy vrátí slovo na nulu
+      vMastery[vCurrentWord] = 0;
       saveWordMasteryToGoogle(topic.id, w.foreign, 0);
     }
 
@@ -776,12 +784,8 @@
     renderActiveGame();
   }
 
-  // ==========================================
-  // SKLÁDÁNÍ SLOV: TRÉNINK ZE VŠECH SLOV (VARIANTA B)
-  // ==========================================
   function initScramble() {
     const topic = getActiveTopic();
-    // Pokud je balíček prázdný, zamícháme všechna slova z lekce
     if (!scrambleDeck || scrambleDeck.length === 0) {
       scrambleDeck = topic.words.map((_, i) => i).sort(() => Math.random() - 0.5);
     }
@@ -819,7 +823,7 @@
       }
     } else {
       sndErr();
-      scrambleHadMistake = true; // Tréninková chyba – NESMAŽE slovo v tabulce!
+      scrambleHadMistake = true;
     }
     renderActiveGame();
   }
@@ -829,9 +833,6 @@
     renderActiveGame();
   }
 
-  // ==========================================
-  // DOPLŇOVÁNÍ PÍSMENE: TRÉNINK ZE VŠECH SLOV
-  // ==========================================
   function initMissing() {
     const topic = getActiveTopic();
     if (!missingDeck || missingDeck.length === 0) {
@@ -875,13 +876,9 @@
     renderActiveGame();
   }
 
-  // ==========================================
-  // PEXESO (HLEDÁNÍ DVOJIC SLOVO - PŘEKLAD)
-  // ==========================================
   function initPexeso() {
     const topic = getActiveTopic();
     const count = Math.min(pexesoPairCount, topic.words.length);
-    // Výběr náhodných slov pro pexeso
     const shuffledWords = [...topic.words].sort(() => Math.random() - 0.5).slice(0, count);
 
     pexesoCards = [];
@@ -932,9 +929,6 @@
     }
   }
 
-  // ==========================================
-  // VYKRESLOVÁNÍ AKTIVNÍ HRY
-  // ==========================================
   function renderActiveGame() {
     const main = document.getElementById("main-content");
     const topic = getActiveTopic();
@@ -954,7 +948,7 @@
       `;
     }
 
-    // 2. ADAPTIVNÍ ZKOUŠENÍ (JEDINÉ MĚNÍ TABULKU)
+    // 2. ADAPTIVNÍ ZKOUŠENÍ
     else if (selectedGame === "ADAPTIVE") {
       const w = topic.words[vCurrentWord];
       const mVal = vMastery[vCurrentWord] || 0;
@@ -979,7 +973,7 @@
       `;
     }
 
-    // 3. SKLÁDÁNÍ SLOVA (VELKÁ TLAČÍTKA + DVĚ ŘADY)
+    // 3. SKLÁDÁNÍ SLOVA
     else if (selectedGame === "SCRAMBLE") {
       const w = topic.words[vCurrentWord];
       const targetGraphemes = getGraphemes(w.foreign);
@@ -1096,7 +1090,7 @@
       `;
     }
 
-    // 7. POSLOUPNOSTI NA ČAS (S NAPOVÍDÁNÍM)
+    // 7. POSLOUPNOSTI NA ČAS (MĚSÍCE, DNY, VERŠE)
     else if (selectedGame === "SEQ") {
       const isFinished = seqTargetIdx >= topic.items.length;
       const targetWord = topic.items[seqTargetIdx];
