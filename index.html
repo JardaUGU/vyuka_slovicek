@@ -84,6 +84,7 @@
       border-radius: 6px;
       font-size: 13px;
       font-weight: 500;
+      cursor: pointer;
     }
     .badge.active { background: var(--col-active-tab); border-color: #fff; }
     .spacer { flex: 1; }
@@ -197,8 +198,9 @@
       flex-wrap: wrap;
     }
     .letter-slot {
-      width: 44px;
+      min-width: 44px;
       height: 48px;
+      padding: 0 6px;
       background: var(--col-card);
       border: 1px solid var(--col-active-tab);
       border-radius: 6px;
@@ -210,8 +212,9 @@
     }
     .letter-slot.filled { background: #143c28; border-color: var(--col-green); color: var(--col-green); }
     .letter-tile {
-      width: 44px;
+      min-width: 44px;
       height: 48px;
+      padding: 0 6px;
       background: var(--col-card);
       border: 1px solid var(--col-active-tab);
       border-radius: 6px;
@@ -222,6 +225,7 @@
       font-weight: bold;
       cursor: pointer;
     }
+    .letter-tile.hebrew { font-family: 'Tinos', serif; font-size: 28px; }
     .letter-tile.used { background: #181c24; border-color: #282d37; color: #4b5563; cursor: default; }
 
     .filter-bar {
@@ -251,8 +255,8 @@
   <header>
     <div id="btn-back" class="nav-btn" onclick="goBack()">&lt;</div>
     <div id="badge-user" class="badge" onclick="setScreen('SELECT_USER')">Uživatel</div>
-    <div id="badge-subj" class="badge" style="display:none;">Předmět</div>
-    <div id="badge-topic" class="badge" style="display:none;">Téma</div>
+    <div id="badge-subj" class="badge" style="display:none;" onclick="setScreen('SELECT_TOPIC')">Předmět</div>
+    <div id="badge-topic" class="badge" style="display:none;" onclick="setScreen('SELECT_GAME')">Téma</div>
     <div class="spacer"></div>
     <div class="nav-btn" onclick="syncData()" title="Synchronizovat">🔄</div>
   </header>
@@ -274,7 +278,7 @@
   const API_URL = "https://script.google.com/macros/s/AKfycbxaxBIXP-ECpWstcqRDw8RuT_ds6UwcplU_3pZ9_-ksELN5FVeGt5EHjjexkJVmx1FR_w/exec";
 
   let appData = { users: [], vocab: [], quizzes: [], sequences: [] };
-  let currentUser = JSON.parse(localStorage.getItem("cur_user") || '{"name":"Pavel","grade":5,"goal":15,"stars":0}');
+  let currentUser = JSON.parse(localStorage.getItem("cur_user") || '{"name":"Honzík","grade":9,"goal":25,"stars":0}');
   let filterGradeOnly = true;
 
   let currentScreen = "SELECT_USER";
@@ -309,7 +313,6 @@
     localStorage.setItem("cur_user", JSON.stringify(currentUser));
     updateFooter();
 
-    // Odeslání do Google Sheets (list Aktivita a Uzivatele)
     try {
       const fd = new URLSearchParams();
       fd.append("action", "log_activity");
@@ -345,7 +348,6 @@
         appData = json;
         localStorage.setItem("app_data", JSON.stringify(json));
         document.getElementById("status-info").innerText = "Data aktuální";
-        // Aktualizace uživatele ze serveru
         const foundU = appData.users.find(u => u.name === currentUser.name);
         if (foundU) {
           currentUser.goal = foundU.goal;
@@ -397,7 +399,7 @@
 
     bUser.innerText = currentUser.name;
 
-    // 1. VÝBĚR ŽÁKA
+    // VÝBĚR ŽÁKA
     if (currentScreen === "SELECT_USER") {
       bSubj.style.display = "none";
       bTopic.style.display = "none";
@@ -413,7 +415,7 @@
         <h2 style="font-size:18px;margin-bottom:12px;text-align:center;color:var(--col-yellow);">Kdo se jde učit?</h2>
         <div class="grid-2">
           ${uList.map(u => `
-            <div class="tile ${currentUser.name === u.name ? 'active' : ''}" style="${currentUser.name === u.name ? 'border-color:var(--col-green);background:#142838;' : ''}" onclick="selectUser('${u.name}', ${u.grade}, ${u.goal})">
+            <div class="tile" style="${currentUser.name === u.name ? 'border-color:var(--col-green);background:#142838;' : ''}" onclick="selectUser('${u.name}', ${u.grade}, ${u.goal})">
               <h2>${u.name}</h2>
               <p>${u.grade <= 9 ? u.grade + '. třída ZŠ' : 'Dospělý'}</p>
               <p style="color:var(--col-yellow);margin-top:4px;">Cíl: ${u.goal} ★</p>
@@ -423,7 +425,7 @@
       `;
     }
 
-    // 2. VÝBĚR PŘEDMĚTU
+    // VÝBĚR PŘEDMĚTU
     else if (currentScreen === "SELECT_SUBJECT") {
       bSubj.style.display = "none";
       bTopic.style.display = "none";
@@ -432,13 +434,13 @@
           <div class="tile" onclick="chooseSubject('CZ')"><h2>Český jazyk</h2><p>Slovní druhy, pády, I/Y, básničky</p></div>
           <div class="tile" onclick="chooseSubject('EN')"><h2>Angličtina</h2><p>Project 1 & slovíčka</p></div>
           <div class="tile" onclick="chooseSubject('DE')"><h2>Němčina</h2><p>Barvy, čísla, věty, členy</p></div>
-          <div class="tile" onclick="chooseSubject('HE')"><h2>Hebrejština</h2><p>Jonáš 1, kořeny, text Tanachu</p></div>
+          <div class="tile" onclick="chooseSubject('HE')"><h2>Hebrejština</h2><p>Jonáš 1, text Tanachu</p></div>
           <div class="tile" onclick="chooseSubject('PRV')"><h2>Prvouka & čas</h2><p>Dny, měsíce, abeceda</p></div>
         </div>
       `;
     }
 
-    // 3. VÝBĚR TÉMATU S FILTREM ROČNÍKU
+    // VÝBĚR TÉMATU
     else if (currentScreen === "SELECT_TOPIC") {
       bSubj.style.display = "flex";
       bSubj.innerText = selectedSubject;
@@ -446,7 +448,7 @@
 
       let html = `
         <div class="filter-bar">
-          <span>Filtr ročníku (${currentUser.grade}. tř.):</span>
+          <span>Filtr (${currentUser.grade}. tř.):</span>
           <button class="toggle-btn ${filterGradeOnly ? 'on' : ''}" onclick="filterGradeOnly=!filterGradeOnly;renderScreen();">
             ${filterGradeOnly ? 'Jen pro mou třídu' : 'Zobrazit vše'}
           </button>
@@ -456,7 +458,6 @@
 
       let countShown = 0;
 
-      // Slovíčka
       appData.vocab.forEach((l, idx) => {
         if (l.lang.toUpperCase() === selectedSubject) {
           if (filterGradeOnly && l.minGrade > currentUser.grade) return;
@@ -471,7 +472,6 @@
         }
       });
 
-      // Kvízy
       appData.quizzes.forEach((q, idx) => {
         if (q.subject.toUpperCase() === selectedSubject) {
           if (filterGradeOnly && q.minGrade > currentUser.grade) return;
@@ -486,7 +486,6 @@
         }
       });
 
-      // Posloupnosti
       appData.sequences.forEach((s, idx) => {
         if (s.category.toUpperCase() === selectedSubject) {
           if (filterGradeOnly && s.minGrade > currentUser.grade) return;
@@ -502,14 +501,14 @@
       });
 
       if (countShown === 0) {
-        html += `<div style="text-align:center;padding:25px;color:var(--col-text-muted);">Pro ${currentUser.grade}. třídu tu zatím není specifické téma. Klikněte nahoře na "Zobrazit vše".</div>`;
+        html += `<div style="text-align:center;padding:25px;color:var(--col-text-muted);">Pro ${currentUser.grade}. třídu tu zatím není specifické téma. Klikněte na "Zobrazit vše".</div>`;
       }
 
       html += '</div>';
       main.innerHTML = html;
     }
 
-    // 4. VÝBĚR HRY
+    // VÝBĚR HRY
     else if (currentScreen === "SELECT_GAME") {
       const topic = getActiveTopic();
       bSubj.style.display = "flex";
@@ -519,14 +518,14 @@
       main.innerHTML = `
         <div class="grid-2">
           <div class="tile" onclick="startGame('CARDS')"><h2>1. Karty</h2><p>Prohlížení a čtení</p></div>
-          <div class="tile" onclick="startGame('ADAPTIVE')"><h2>2. Zkoušení</h2><p>Chytré okno po 3 slovech</p></div>
-          <div class="tile" onclick="startGame('SCRAMBLE')"><h2>3. Skládání</h2><p>Rozsypaná písmena</p></div>
-          <div class="tile" onclick="startGame('MISSING')"><h2>4. Doplň písmeno</h2><p>Vyber chybějící</p></div>
+          <div class="tile" onclick="startGame('ADAPTIVE')"><h2>2. Zkoušení</h2><p>Adaptivní test (chyby se vrací)</p></div>
+          <div class="tile" onclick="startGame('SCRAMBLE')"><h2>3. Skládání</h2><p>Skládej ze střepů (bez uvíznutí)</p></div>
+          <div class="tile" onclick="startGame('MISSING')"><h2>4. Doplň písmeno</h2><p>Doplň chybějící znak</p></div>
         </div>
       `;
     }
 
-    // 5. SAMOTNÁ HRA
+    // SAMOTNÁ HRA
     else if (currentScreen === "PLAYING") {
       const topic = getActiveTopic();
       bSubj.style.display = "flex";
@@ -565,17 +564,22 @@
   }
 
   // ==========================================
-  // HERNÍ ENGINE S NAPOVÍDÁNÍM
+  // ADAPTIVNÍ SPRÁVA SLOVÍČEK & SPOLEČNÝ BAZÉN
   // ==========================================
+  let vMastery = {};      // wordIdx -> 0, 1, 2
+  let vActivePool = 3;    // kolik slov je otevřeno
+  let vCurrentWord = 0;   // index aktuálního slova
   let vCardIdx = 0;
-  let vActivePool = 3;
-  let vMastery = {};
-  let vQuizCur = 0;
   let vQuizRevealed = false;
 
-  let scrambleCur = 0;
   let scramblePlaced = [];
   let scrambleLetters = [];
+  let scrambleHadMistake = false;
+  let scrambleDone = false;
+
+  let missingSlot = 0;
+  let missingChoices = [];
+  let missingChosen = -1;
 
   let qCurStep = 0;
   let qAnswered = false;
@@ -587,23 +591,89 @@
   let seqHintActive = false;
   let seqInactivityTimer = null;
 
+  // Rozdělení textu na grafémy (udrží hebrejské písmeno a tečky/nikkud jako jeden dílek!)
+  function getGraphemes(str) {
+    if (window.Intl && Intl.Segmenter) {
+      const segmenter = new Intl.Segmenter('und', { granularity: 'grapheme' });
+      return Array.from(segmenter.segment(str), s => s.segment);
+    }
+    return str.split('');
+  }
+
+  // Inicializace stavu při vstupu do hry
   function initGameState() {
     const topic = getActiveTopic();
-    if (selectedGame === "CARDS") vCardIdx = 0;
-    if (selectedGame === "ADAPTIVE") {
+    if (currentTopicType === "VOCAB") {
       vMastery = {};
-      let learnedCount = 0;
+      let masteredCount = 0;
       topic.words.forEach((w, i) => {
         const m = Number(w.mastery || 0);
         vMastery[i] = m;
-        if (m >= 2) learnedCount++;
+        if (m >= 2) masteredCount++;
       });
-      vActivePool = Math.min(topic.words.length, Math.max(3, learnedCount + 3));
-      nextAdaptiveWord();
+      // Otevřeme všechna naučená slova plus 3 nenaučená
+      vActivePool = Math.min(topic.words.length, Math.max(3, masteredCount + 3));
+      pickNextVocabWord();
+
+      if (selectedGame === "CARDS") vCardIdx = 0;
+      if (selectedGame === "SCRAMBLE") initScramble();
+      if (selectedGame === "MISSING") initMissing();
     }
-    if (selectedGame === "SCRAMBLE") initScramble();
     if (selectedGame === "QUIZ") { qCurStep = 0; qAnswered = false; }
     if (selectedGame === "SEQ") initSequence();
+  }
+
+  // VÝBĚR DALŠÍHO SLOVA (CHYTRÝ LEITNER)
+  function pickNextVocabWord() {
+    const topic = getActiveTopic();
+    const unmastered = [];
+    const mastered = [];
+
+    for (let i = 0; i < vActivePool; i++) {
+      if ((vMastery[i] || 0) < 2) unmastered.push(i);
+      else mastered.push(i);
+    }
+
+    // Pokud jsou všechna slova v otevřeném okně naučena, otevřeme další z lekce!
+    if (unmastered.length === 0 && vActivePool < topic.words.length) {
+      vActivePool = Math.min(topic.words.length, vActivePool + 2);
+      for (let i = 0; i < vActivePool; i++) {
+        if ((vMastery[i] || 0) < 2) unmastered.push(i);
+      }
+    }
+
+    // 80% šance na slovo s chybou/neprocvičené, 20% na zopakování
+    if (unmastered.length > 0 && (Math.random() < 0.8 || mastered.length === 0)) {
+      vCurrentWord = unmastered[Math.floor(Math.random() * unmastered.length)];
+    } else if (mastered.length > 0) {
+      vCurrentWord = mastered[Math.floor(Math.random() * mastered.length)];
+    } else {
+      vCurrentWord = 0;
+    }
+  }
+
+  // Zaznamenání výsledku (úspěch / chyba) a synchronizace
+  function recordWordResult(isSuccess) {
+    const topic = getActiveTopic();
+    const w = topic.words[vCurrentWord];
+
+    if (isSuccess) {
+      sndOk();
+      addReward(1, topic.title);
+      vMastery[vCurrentWord] = Math.min(2, (vMastery[vCurrentWord] || 0) + 1);
+
+      // Pokud dosáhlo úrovně 2 a jsou v lekci další slova, rozšíříme okno
+      if (vMastery[vCurrentWord] >= 2 && vActivePool < topic.words.length) {
+        vActivePool++;
+        sndFanfare();
+      }
+      saveWordMasteryToGoogle(topic.id, w.foreign, vMastery[vCurrentWord]);
+    } else {
+      sndErr();
+      // CHYBA: slovo padá na nulu a zůstává v prioritním zkoušení!
+      vMastery[vCurrentWord] = 0;
+      saveWordMasteryToGoogle(topic.id, w.foreign, 0);
+    }
   }
 
   function renderActiveGame() {
@@ -611,7 +681,7 @@
     const topic = getActiveTopic();
     const isHebrew = selectedSubject === "HE";
 
-    // KARTY
+    // 1. KARTY
     if (selectedGame === "CARDS") {
       const w = topic.words[vCardIdx];
       main.innerHTML = `
@@ -625,13 +695,13 @@
       `;
     }
 
-    // ADAPTIVNÍ ZKOUŠENÍ
+    // 2. ADAPTIVNÍ ZKOUŠENÍ
     else if (selectedGame === "ADAPTIVE") {
-      const w = topic.words[vQuizCur];
-      const mVal = vMastery[vQuizCur] || 0;
+      const w = topic.words[vCurrentWord];
+      const mVal = vMastery[vCurrentWord] || 0;
       main.innerHTML = `
         <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--col-text-muted);">
-          <span>Zvládnuto: ${mVal}/2 ★</span>
+          <span>Naučeno: ${mVal}/2 ★</span>
           <span>Aktivní okno: ${vActivePool} z ${topic.words.length}</span>
         </div>
         <div class="prompt-box" style="color:#fff;margin-top:6px;">${w.czech}</div>
@@ -650,34 +720,76 @@
       `;
     }
 
-    // SKLÁDÁNÍ SLOVA
+    // 3. SKLÁDÁNÍ SLOVA (SCRAMBLE S EVIDENCÍ CHYB)
     else if (selectedGame === "SCRAMBLE") {
-      const w = topic.words[scrambleCur];
-      const isDone = scramblePlaced.length === w.foreign.length;
+      const w = topic.words[vCurrentWord];
+      const mVal = vMastery[vCurrentWord] || 0;
+      const targetGraphemes = getGraphemes(w.foreign);
+
       main.innerHTML = `
-        <div class="prompt-box" style="font-size:20px;color:#fff;">Slož: <b>${w.czech}</b></div>
-        <div class="slots-row">
-          ${w.foreign.split('').map((ch, i) => `
+        <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--col-text-muted);">
+          <span>Naučeno: ${mVal}/2 ★ ${scrambleHadMistake ? '<b style="color:var(--col-red);">(s chybou)</b>' : ''}</span>
+          <span>Okno: ${vActivePool} z ${topic.words.length}</span>
+        </div>
+        <div class="prompt-box" style="font-size:20px;color:#fff;margin-top:6px;">Slož: <b>${w.czech}</b></div>
+        <div class="slots-row ${isHebrew ? 'hebrew-text' : ''}">
+          ${targetGraphemes.map((ch, i) => `
             <div class="letter-slot ${i < scramblePlaced.length ? 'filled' : ''}">
               ${i < scramblePlaced.length ? scramblePlaced[i] : '_'}
             </div>
           `).join('')}
         </div>
-        ${!isDone ? `
+        ${!scrambleDone ? `
           <div class="letters-row">
             ${scrambleLetters.map((item, idx) => `
-              <div class="letter-tile ${item.used ? 'used' : ''}" onclick="clickScrambleLetter(${idx})">
+              <div class="letter-tile ${isHebrew ? 'hebrew' : ''} ${item.used ? 'used' : ''}" onclick="clickScrambleLetter(${idx})">
                 ${item.ch}
               </div>
             `).join('')}
           </div>
         ` : `
-          <div class="action-btn green" onclick="nextScramble()">VÝBORNĚ! DALŠÍ SLOVO</div>
+          <div style="text-align:center;color:var(--col-active-tab);margin-bottom:6px;">[ ${w.pron || ''} ]</div>
+          <div class="action-btn ${scrambleHadMistake ? 'red' : 'green'}" onclick="nextScrambleStep()">
+            ${scrambleHadMistake ? 'CHYBA -> SLOVO SE BRZY VRÁTÍ (DALŠÍ)' : 'VÝBORNĚ! DALŠÍ SLOVO ➔'}
+          </div>
         `}
       `;
     }
 
-    // KVÍZ
+    // 4. DOPLŇOVÁNÍ PÍSMENE
+    else if (selectedGame === "MISSING") {
+      const w = topic.words[vCurrentWord];
+      const mVal = vMastery[vCurrentWord] || 0;
+      const letters = getGraphemes(w.foreign);
+
+      let maskedWord = "";
+      letters.forEach((ch, idx) => {
+        if (idx === missingSlot) {
+          maskedWord += missingChosen === -1 ? " [ _ ] " : ` [ ${ch} ] `;
+        } else {
+          maskedWord += ch + " ";
+        }
+      });
+
+      main.innerHTML = `
+        <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--col-text-muted);">
+          <span>Naučeno: ${mVal}/2 ★</span>
+          <span>Okno: ${vActivePool} z ${topic.words.length}</span>
+        </div>
+        <div class="prompt-box" style="font-size:20px;color:#fff;margin-top:6px;">Doplň: <b>${w.czech}</b></div>
+        <div class="prompt-box ${isHebrew ? 'hebrew-text' : ''}">${maskedWord}</div>
+        <div class="grid-2">
+          ${missingChoices.map((ch, i) => {
+            const isCorrect = ch === letters[missingSlot];
+            const cls = missingChosen !== -1 ? (isCorrect ? 'correct' : (i === missingChosen ? 'wrong' : '')) : '';
+            return `<div class="opt-btn ${isHebrew ? 'hebrew' : ''} ${cls}" onclick="clickMissingOption(${i})">${ch}</div>`;
+          }).join('')}
+        </div>
+        ${missingChosen !== -1 ? `<div class="action-btn" onclick="nextMissingStep()">DALŠÍ ➔</div>` : ''}
+      `;
+    }
+
+    // 5. KVÍZ
     else if (selectedGame === "QUIZ") {
       const q = topic.questions[qCurStep];
       main.innerHTML = `
@@ -694,7 +806,7 @@
       `;
     }
 
-    // POSLOUPNOSTI NA ČAS (S NÁPOVĚDOU A PODPOROU CHYB)
+    // 6. POSLOUPNOSTI NA ČAS (S NAPOVÍDÁNÍM)
     else if (selectedGame === "SEQ") {
       const isFinished = seqTargetIdx >= topic.items.length;
       const targetWord = topic.items[seqTargetIdx];
@@ -726,6 +838,7 @@
     }
   }
 
+  // KARTY
   function vCardPrev() {
     const topic = getActiveTopic();
     vCardIdx = (vCardIdx + topic.words.length - 1) % topic.words.length;
@@ -737,66 +850,97 @@
     renderActiveGame();
   }
 
-  function nextAdaptiveWord() {
-    vQuizRevealed = false;
-    const topic = getActiveTopic();
-    const cand = [];
-    for (let i = 0; i < vActivePool; i++) {
-      if ((vMastery[i] || 0) < 2) cand.push(i);
-    }
-    if (cand.length === 0 || (Math.random() < 0.25 && vActivePool > 1)) {
-      vQuizCur = Math.floor(Math.random() * vActivePool);
-    } else {
-      vQuizCur = cand[Math.floor(Math.random() * cand.length)];
-    }
-  }
-
+  // ADAPTIVNÍ ZKOUŠENÍ
   function answerAdaptive(known) {
-    const topic = getActiveTopic();
-    const w = topic.words[vQuizCur];
-    if (known) {
-      sndOk();
-      addReward(1, topic.title);
-      vMastery[vQuizCur] = (vMastery[vQuizCur] || 0) + 1;
-      if (vMastery[vQuizCur] >= 2 && vActivePool < topic.words.length) {
-        vActivePool++;
-        sndFanfare();
-      }
-      saveWordMasteryToGoogle(topic.id, w.foreign, vMastery[vQuizCur]);
-    } else {
-      sndErr();
-      vMastery[vQuizCur] = 0;
-      saveWordMasteryToGoogle(topic.id, w.foreign, 0);
-    }
-    nextAdaptiveWord();
+    recordWordResult(known);
+    vQuizRevealed = false;
+    pickNextVocabWord();
     renderActiveGame();
   }
 
+  // SKLÁDÁNÍ SLOVA (SCRAMBLE)
   function initScramble() {
     const topic = getActiveTopic();
-    scrambleCur = Math.floor(Math.random() * vActivePool);
-    const w = topic.words[scrambleCur];
+    const w = topic.words[vCurrentWord];
     scramblePlaced = [];
-    scrambleLetters = w.foreign.split('').map(ch => ({ ch, used: false })).sort(() => Math.random() - 0.5);
+    scrambleHadMistake = false;
+    scrambleDone = false;
+
+    const graphemes = getGraphemes(w.foreign);
+    scrambleLetters = graphemes.map(ch => ({ ch, used: false })).sort(() => Math.random() - 0.5);
   }
+
   function clickScrambleLetter(idx) {
+    if (scrambleDone) return;
     const topic = getActiveTopic();
     const item = scrambleLetters[idx];
     if (item.used) return;
-    const w = topic.words[scrambleCur];
-    const expected = w.foreign[scramblePlaced.length];
+
+    const w = topic.words[vCurrentWord];
+    const targetGraphemes = getGraphemes(w.foreign);
+    const expected = targetGraphemes[scramblePlaced.length];
+
     if (item.ch === expected) {
       sndOk();
       item.used = true;
       scramblePlaced.push(item.ch);
-      if (scramblePlaced.length === w.foreign.length) addReward(1, topic.title);
+
+      if (scramblePlaced.length === targetGraphemes.length) {
+        scrambleDone = true;
+        // Evidujeme úspěch nebo chybu podle toho, jestli se během skládání spletl!
+        recordWordResult(!scrambleHadMistake);
+      }
     } else {
       sndErr();
+      scrambleHadMistake = true; // Zaznamenána chyba!
     }
     renderActiveGame();
   }
-  function nextScramble() { initScramble(); renderActiveGame(); }
 
+  function nextScrambleStep() {
+    pickNextVocabWord();
+    initScramble();
+    renderActiveGame();
+  }
+
+  // DOPLŇOVÁNÍ PÍSMENE
+  function initMissing() {
+    const topic = getActiveTopic();
+    const w = topic.words[vCurrentWord];
+    const letters = getGraphemes(w.foreign);
+    missingSlot = Math.floor(Math.random() * letters.length);
+    const correctCh = letters[missingSlot];
+    missingChosen = -1;
+
+    // Generování 3 možností
+    const alphabet = "abcdefghijklmnopqrstuvwxyz";
+    missingChoices = [correctCh];
+    while (missingChoices.length < 3) {
+      let r = alphabet[Math.floor(Math.random() * alphabet.length)];
+      if (!missingChoices.includes(r)) missingChoices.push(r);
+    }
+    missingChoices.sort(() => Math.random() - 0.5);
+  }
+
+  function clickMissingOption(idx) {
+    if (missingChosen !== -1) return;
+    missingChosen = idx;
+    const topic = getActiveTopic();
+    const w = topic.words[vCurrentWord];
+    const letters = getGraphemes(w.foreign);
+    const isCorrect = missingChoices[idx] === letters[missingSlot];
+
+    recordWordResult(isCorrect);
+    renderActiveGame();
+  }
+
+  function nextMissingStep() {
+    pickNextVocabWord();
+    initMissing();
+    renderActiveGame();
+  }
+
+  // KVÍZ
   function clickQuizOpt(idx) {
     if (qAnswered) return;
     const topic = getActiveTopic();
@@ -814,13 +958,10 @@
     else renderActiveGame();
   }
 
-  // ==========================================
-  // SEQUENCE ENGINE S CHYTRÝM NAPOVÍDÁNÍM
-  // ==========================================
+  // SEKVENČNÍ HRA S NÁPOVĚDOU
   function resetInactivityTimer() {
     if (seqInactivityTimer) clearTimeout(seqInactivityTimer);
     seqInactivityTimer = setTimeout(() => {
-      // Po 3 sekundách nečinnosti se aktivuje nápověda
       seqHintActive = true;
       renderActiveGame();
     }, 3000);
@@ -869,7 +1010,6 @@
       }
       renderActiveGame();
     } else {
-      // Chyba: tlačítko blikne červeně a IHNED se aktivuje nápověda
       sndErr();
       if (btnEl) {
         btnEl.classList.add("wrong");
