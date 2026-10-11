@@ -39,7 +39,7 @@
       width: 100vw;
       max-width: 680px;
       height: 100vh;
-      max-height: 600px;
+      max-height: 560px;
       background-color: var(--col-bg);
       display: flex;
       flex-direction: column;
@@ -48,7 +48,7 @@
       overflow: hidden;
       box-shadow: 0 10px 25px rgba(0,0,0,0.6);
     }
-    @media (max-width: 680px), (max-height: 600px) {
+    @media (max-width: 680px), (max-height: 560px) {
       #app-container { border-radius: 0; border: none; max-width: 100vw; max-height: 100vh; }
     }
     header {
@@ -236,7 +236,7 @@
     .opt-btn.correct { background: var(--col-green) !important; border-color: #fff; }
     .opt-btn.wrong { background: var(--col-red) !important; border-color: #fff; }
 
-    /* Velká tlačítka skládání (dvouřádkové) */
+    /* Velká tlačítka skládání */
     .slots-row, .letters-row {
       display: flex;
       justify-content: center;
@@ -279,7 +279,7 @@
     .letter-tile.hebrew { font-family: 'Tinos', serif; font-size: 32px; }
     .letter-tile.used { background: #181c24; border-color: #282d37; color: #4b5563; cursor: default; box-shadow: none; }
 
-    /* PEXESO STYLY (VĚTŠÍ NA MOBILU) */
+    /* Pexeso mřížka */
     .pexeso-grid {
       display: grid;
       gap: 10px;
@@ -298,7 +298,7 @@
       text-align: center;
       padding: 8px 4px;
       cursor: pointer;
-      font-size: 17px;
+      font-size: 16px;
       font-weight: bold;
       transition: transform 0.15s, background 0.15s, border-color 0.15s;
       color: #fff;
@@ -352,7 +352,7 @@
 
   <footer>
     <div id="footer-user">Žák: --</div>
-    <div id="footer-goal">Cíl: 0/15 ★</div>
+    <div id="footer-goal">Cíl dnes: 0 / 15 min ⏱️</div>
     <div id="status-info">Online</div>
   </footer>
 </div>
@@ -361,7 +361,7 @@
   const API_URL = "https://script.google.com/macros/s/AKfycbxaxBIXP-ECpWstcqRDw8RuT_ds6UwcplU_3pZ9_-ksELN5FVeGt5EHjjexkJVmx1FR_w/exec";
 
   let appData = { users: [], vocab: [], quizzes: [], sequences: [] };
-  let currentUser = JSON.parse(localStorage.getItem("cur_user") || '{"name":"Honzík","grade":9,"goal":25,"stars":0,"targetMinutes":15}');
+  let currentUser = JSON.parse(localStorage.getItem("cur_user") || '{"name":"Pavel","grade":5,"targetMinutes":15,"stars":0}');
   let filterGradeOnly = true;
 
   let currentScreen = "SELECT_USER";
@@ -383,12 +383,10 @@
     }
   }
 
-  // Záchyt všech dotyků / kliknutí pro aktivitu
   window.addEventListener('click', registerUserAction, true);
   window.addEventListener('touchstart', registerUserAction, true);
 
   setInterval(() => {
-    // Čas se počítá POUZE uvnitř samotné hry
     if (currentScreen === "PLAYING") {
       const idleTime = Date.now() - lastUserActivityTime;
       if (idleTime < 15000) {
@@ -406,6 +404,7 @@
 
   function updateStudyTimerUI() {
     const box = document.getElementById("study-timer");
+    const footerGoal = document.getElementById("footer-goal");
     if (!box) return;
 
     const targetSec = (currentUser.targetMinutes || 15) * 60;
@@ -414,6 +413,11 @@
       const sec = s % 60;
       return `${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
     };
+
+    const spentMin = Math.floor(todaySecondsStudied / 60);
+    if (footerGoal) {
+      footerGoal.innerText = `Cíl: ${spentMin} / ${currentUser.targetMinutes || 15} min ⏱️`;
+    }
 
     if (currentScreen !== "PLAYING" || isTimerPaused) {
       box.className = "study-timer-box paused";
@@ -474,7 +478,6 @@
 
   function updateFooter() {
     document.getElementById("footer-user").innerText = `${currentUser.name} (${currentUser.grade <= 9 ? currentUser.grade + '. tř.' : 'Dospělý'})`;
-    document.getElementById("footer-goal").innerText = `Hvězdy: ${currentUser.stars}/${currentUser.goal} ★`;
   }
 
   async function loadData() {
@@ -499,7 +502,7 @@
         document.getElementById("status-info").innerText = "Data aktuální";
         const foundU = appData.users.find(u => u.name === currentUser.name);
         if (foundU) {
-          currentUser.goal = foundU.goal;
+          currentUser.targetMinutes = foundU.targetMinutes || foundU.goal || 15;
           currentUser.grade = foundU.grade;
         }
         renderScreen();
@@ -557,21 +560,21 @@
       bSubj.style.display = "none";
       bTopic.style.display = "none";
       const uList = (appData.users && appData.users.length) ? appData.users : [
-        {name: "Daniel", grade: 2, goal: 10, targetMinutes: 10},
-        {name: "Pavel", grade: 5, goal: 15, targetMinutes: 15},
-        {name: "Míša", grade: 7, goal: 20, targetMinutes: 20},
-        {name: "Honzík", grade: 9, goal: 25, targetMinutes: 25},
-        {name: "Táta", grade: 99, goal: 30, targetMinutes: 30}
+        {name: "Daniel", grade: 2, targetMinutes: 10},
+        {name: "Pavel", grade: 5, targetMinutes: 15},
+        {name: "Míša", grade: 7, targetMinutes: 20},
+        {name: "Honzík", grade: 9, targetMinutes: 25},
+        {name: "Táta", grade: 99, targetMinutes: 30}
       ];
 
       main.innerHTML = `
         <h2 style="font-size:18px;margin-bottom:12px;text-align:center;color:var(--col-yellow);">Kdo se jde učit?</h2>
         <div class="grid-2">
           ${uList.map(u => `
-            <div class="tile" style="${currentUser.name === u.name ? 'border-color:var(--col-green);background:#142838;' : ''}" onclick="selectUser('${u.name}', ${u.grade}, ${u.goal}, ${u.targetMinutes||15})">
+            <div class="tile" style="${currentUser.name === u.name ? 'border-color:var(--col-green);background:#142838;' : ''}" onclick="selectUser('${u.name}', ${u.grade}, ${u.targetMinutes||15})">
               <h2>${u.name}</h2>
               <p>${u.grade <= 9 ? u.grade + '. třída ZŠ' : 'Dospělý'}</p>
-              <p style="color:var(--col-yellow);margin-top:4px;">Cíl: ${u.goal} ★ | ⏱️ ${u.targetMinutes||15} min</p>
+              <p style="color:var(--col-yellow);margin-top:4px;">⏱️ Cíl: ${u.targetMinutes||15} minut</p>
             </div>
           `).join('')}
         </div>
@@ -587,9 +590,9 @@
 
       main.innerHTML = `
         <div class="grid-2">
+          <div class="tile" onclick="chooseSubject('EN')"><h2>Angličtina</h2><p>Lekce ročníků & slovesa A1-B2</p></div>
+          <div class="tile" onclick="chooseSubject('DE')"><h2>Němčina</h2><p>Lekce, barvy, věty, členy</p></div>
           <div class="tile" onclick="chooseSubject('CZ')"><h2>Český jazyk</h2><p>Slovní druhy, pády, I/Y, básničky</p></div>
-          <div class="tile" onclick="chooseSubject('EN')"><h2>Angličtina</h2><p>Project 1 & slovíčka</p></div>
-          <div class="tile" onclick="chooseSubject('DE')"><h2>Němčina</h2><p>Barvy, čísla, věty, členy</p></div>
           <div class="tile" onclick="chooseSubject('PRV')"><h2>Prvouka & čas</h2><p>Dny, měsíce, abeceda</p></div>
           ${showHebrew ? `
             <div class="tile" style="border-color:var(--col-yellow);" onclick="chooseSubject('HE')">
@@ -601,7 +604,7 @@
       `;
     }
 
-    // 3. VÝBĚR TÉMATU S FILTREM ROČNÍKU
+    // 3. VÝBĚR TÉMATU
     else if (currentScreen === "SELECT_TOPIC") {
       bSubj.style.display = "flex";
       bSubj.innerText = selectedSubject;
@@ -619,6 +622,7 @@
 
       let countShown = 0;
 
+      // Slovíčkové lekce
       appData.vocab.forEach((l, idx) => {
         if (l.lang.toUpperCase() === selectedSubject) {
           if (filterGradeOnly && l.minGrade > currentUser.grade) return;
@@ -626,13 +630,14 @@
           html += `<div class="tile" style="flex-direction:row;justify-content:space-between;padding:12px;" onclick="selectTopic('VOCAB', ${idx})">
             <div style="text-align:left;">
               <h2>${l.title}</h2>
-              <p>Lekce od ${l.minGrade <= 9 ? l.minGrade + '. třídy' : 'Dospělý'}</p>
+              <p>Úroveň od ${l.minGrade <= 9 ? l.minGrade + '. třídy' : 'Dospělý'}</p>
             </div>
             <span style="color:var(--col-active-tab);font-weight:bold;">${l.words.length} slov</span>
           </div>`;
         }
       });
 
+      // Kvízy
       appData.quizzes.forEach((q, idx) => {
         if (q.subject.toUpperCase() === selectedSubject) {
           if (filterGradeOnly && q.minGrade > currentUser.grade) return;
@@ -647,6 +652,7 @@
         }
       });
 
+      // Posloupnosti
       appData.sequences.forEach((s, idx) => {
         if (s.category.toUpperCase() === selectedSubject) {
           if (filterGradeOnly && s.minGrade > currentUser.grade) return;
@@ -669,7 +675,7 @@
       main.innerHTML = html;
     }
 
-    // 4. VÝBĚR HRY (PEXESO POUZE PRO SLOVÍČKA)
+    // 4. VÝBĚR HRY
     else if (currentScreen === "SELECT_GAME") {
       const topic = getActiveTopic();
       bSubj.style.display = "flex";
@@ -680,7 +686,7 @@
         <div class="grid-2">
           <div class="tile" onclick="startGame('CARDS')"><h2>1. Karty</h2><p>Prohlížení a čtení</p></div>
           <div class="tile" onclick="startGame('ADAPTIVE')"><h2>2. Zkoušení</h2><p>Konec až při naučení na 2 ★</p></div>
-          <div class="tile" onclick="startGame('SCRAMBLE')"><h2>3. Skládání</h2><p>Trénink písmen (velká tlačítka)</p></div>
+          <div class="tile" onclick="startGame('SCRAMBLE')"><h2>3. Skládání</h2><p>Trénink pravopisu</p></div>
           <div class="tile" onclick="startGame('MISSING')"><h2>4. Doplň písmeno</h2><p>Doplň chybějící znak</p></div>
         </div>
         ${currentTopicType === 'VOCAB' ? `
@@ -720,8 +726,8 @@
     }
   }
 
-  function selectUser(name, grade, goal, targetMinutes) {
-    currentUser = { name, grade, goal, targetMinutes, stars: 0 };
+  function selectUser(name, grade, targetMinutes) {
+    currentUser = { name, grade, targetMinutes, stars: 0 };
     localStorage.setItem("cur_user", JSON.stringify(currentUser));
     todaySecondsStudied = Number(localStorage.getItem(`time_${new Date().toDateString()}_${currentUser.name}`) || 0);
     setScreen("SELECT_SUBJECT");
@@ -817,7 +823,6 @@
     if (selectedGame === "SEQ") initSequence();
   }
 
-  // Součet bodů pro bargraf u zkoušení
   function getMasteryStats() {
     const topic = getActiveTopic();
     if (!topic || !topic.words) return { current: 0, total: 1, masteredCount: 0, totalWords: 1 };
@@ -836,15 +841,13 @@
     };
   }
 
-  // ZKOUŠENÍ Z HLAVY: Zde se testuje reálná paměť a cvičení KONČÍ AŽ VE CHVÍLI, KDY JSOU VŠECHNA SLOVA NAUČENA NA 2!
   function pickNextAdaptiveWord() {
     const topic = getActiveTopic();
     vQuizRevealed = false;
 
-    // Kontrola, zda jsou všechna slova lekce naučena na 2
     const stats = getMasteryStats();
     if (stats.masteredCount >= stats.totalWords) {
-      vCurrentWord = -1; // VŠECHNO HOTOVO!
+      vCurrentWord = -1;
       return;
     }
 
@@ -856,7 +859,6 @@
       else mastered.push(i);
     }
 
-    // Pokud jsou všechna slova v aktuálním okně na 2, otevřeme další z lekce
     if (unmastered.length === 0 && vActivePool < topic.words.length) {
       vActivePool = Math.min(topic.words.length, vActivePool + 2);
       for (let i = 0; i < vActivePool; i++) {
@@ -864,7 +866,6 @@
       }
     }
 
-    // 80% šance na slovo, které ještě není na 2, 20% na zopakování
     if (unmastered.length > 0 && (Math.random() < 0.8 || mastered.length === 0)) {
       vCurrentWord = unmastered[Math.floor(Math.random() * unmastered.length)];
     } else if (mastered.length > 0) {
@@ -889,7 +890,7 @@
       saveWordMasteryToGoogle(topic.id, w.foreign, vMastery[vCurrentWord]);
     } else {
       sndErr();
-      vMastery[vCurrentWord] = 0; // Chyba v testu z hlavy vrátí slovo na nulu!
+      vMastery[vCurrentWord] = 0;
       saveWordMasteryToGoogle(topic.id, w.foreign, 0);
     }
 
@@ -897,7 +898,6 @@
     renderActiveGame();
   }
 
-  // SKLÁDÁNÍ SLOV
   function initScramble() {
     const topic = getActiveTopic();
     if (!scrambleDeck || scrambleDeck.length === 0) {
@@ -948,7 +948,6 @@
     renderActiveGame();
   }
 
-  // DOPLŇOVÁNÍ PÍSMENE
   function initMissing() {
     const topic = getActiveTopic();
     if (!missingDeck || missingDeck.length === 0) {
@@ -993,7 +992,6 @@
     renderActiveGame();
   }
 
-  // PEXESO
   function initPexeso() {
     const topic = getActiveTopic();
     const count = Math.min(pexesoPairCount, topic.words.length);
@@ -1051,7 +1049,6 @@
     }
   }
 
-  // VYKRESLOVÁNÍ HRY
   function renderActiveGame() {
     const main = document.getElementById("main-content");
     const topic = getActiveTopic();
@@ -1079,12 +1076,11 @@
       `;
     }
 
-    // 2. ADAPTIVNÍ ZKOUŠENÍ: KONEC AŽ PŘI 100% NAUČENÍ (VŠECHNA SLOVA NA 2)
+    // 2. ADAPTIVNÍ ZKOUŠENÍ: KONEC AŽ PŘI 100% NAUČENÍ (VŠECHNA SLOVA NA 2 ★)
     else if (selectedGame === "ADAPTIVE") {
       const stats = getMasteryStats();
       const pct = Math.round((stats.current / stats.total) * 100);
 
-      // KONTROLA DOKONČENÍ CELÉ LEKCE
       if (stats.masteredCount >= stats.totalWords) {
         main.innerHTML = `
           <div style="text-align:center;padding:30px 10px;">
@@ -1113,7 +1109,7 @@
         </div>
         <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--col-text-muted);margin-bottom:4px;">
           <span>Slovo: ${mVal}/2 ★</span>
-          <span>Aktivní okno: ${vActivePool} z ${topic.words.length}</span>
+          <span>Otevřená skupina: ${vActivePool} z ${topic.words.length}</span>
         </div>
         <div class="prompt-box" style="color:#fff;margin-top:2px;">${w.czech}</div>
         <div class="prompt-box ${isHebrew ? 'hebrew-text' : ''}" style="color:${vQuizRevealed ? 'var(--col-yellow)' : 'var(--col-text-muted)'};">
@@ -1131,7 +1127,7 @@
       `;
     }
 
-    // 3. SKLÁDÁNÍ SLOVA (BARGRAF POČTU CVIČENÍ)
+    // 3. SKLÁDÁNÍ SLOVA
     else if (selectedGame === "SCRAMBLE") {
       const w = topic.words[vCurrentWord];
       const targetGraphemes = getGraphemes(w.foreign);
@@ -1164,13 +1160,13 @@
         ` : `
           <div style="text-align:center;color:var(--col-active-tab);margin-bottom:6px;">[ ${w.pron || ''} ]</div>
           <div class="action-btn ${scrambleHadMistake ? 'red' : 'green'}" onclick="nextScrambleStep()">
-            ${scrambleHadMistake ? 'CHYBA ➔ DALŠÍ' : 'SPRÁVNĚ! ➔ DALŠÍ SLOVO'}
+            ${scrambleHadMistake ? 'DOKONČENO S CHYBOU ➔ DALŠÍ' : 'SPRÁVNĚ! ➔ DALŠÍ SLOVO'}
           </div>
         `}
       `;
     }
 
-    // 4. DOPLŇOVÁNÍ PÍSMENE (BARGRAF POČTU CVIČENÍ)
+    // 4. DOPLŇOVÁNÍ PÍSMENE
     else if (selectedGame === "MISSING") {
       const w = topic.words[vCurrentWord];
       const letters = getGraphemes(w.foreign);
@@ -1206,7 +1202,7 @@
       `;
     }
 
-    // 5. PEXESO (VĚTŠÍ NA MOBILU)
+    // 5. PEXESO
     else if (selectedGame === "PEXESO") {
       const totalPairs = Math.min(pexesoPairCount, topic.words.length);
       const isComplete = pexesoMatched.length === totalPairs;
