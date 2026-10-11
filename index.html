@@ -39,7 +39,7 @@
       width: 100vw;
       max-width: 680px;
       height: 100vh;
-      max-height: 560px;
+      max-height: 600px;
       background-color: var(--col-bg);
       display: flex;
       flex-direction: column;
@@ -48,7 +48,7 @@
       overflow: hidden;
       box-shadow: 0 10px 25px rgba(0,0,0,0.6);
     }
-    @media (max-width: 680px), (max-height: 560px) {
+    @media (max-width: 680px), (max-height: 600px) {
       #app-container { border-radius: 0; border: none; max-width: 100vw; max-height: 100vh; }
     }
     header {
@@ -89,7 +89,7 @@
     .badge.active { background: var(--col-active-tab); border-color: #fff; }
     .spacer { flex: 1; }
 
-    /* Ukazatel času v hlavičce */
+    /* Ukazatel času s detekcí aktivity */
     .study-timer-box {
       background: #101c2e;
       border: 1px solid var(--col-card-border);
@@ -105,6 +105,10 @@
       border-color: var(--col-yellow);
       color: var(--col-yellow);
       background: #2d2605;
+    }
+    .study-timer-box.paused {
+      border-color: var(--col-orange);
+      color: var(--col-orange);
     }
 
     main {
@@ -148,25 +152,36 @@
     .tile h2 { font-size: 18px; color: #fff; margin-bottom: 4px; }
     .tile p { font-size: 12px; color: var(--col-text-muted); }
 
-    /* Progress bar cvičení */
-    .exercise-progress-bar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
+    /* Bargraf (Progress bar) */
+    .bargraph-container {
       background: #111a2a;
       border: 1px solid var(--col-card-border);
       border-radius: 8px;
-      padding: 6px 12px;
+      padding: 6px 10px;
       margin-bottom: 8px;
-      font-size: 13px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .bargraph-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
       font-weight: bold;
     }
-    .progress-pill {
-      background: var(--col-card);
-      border: 1px solid var(--col-active-tab);
-      padding: 2px 8px;
-      border-radius: 12px;
-      color: var(--col-yellow);
+    .bargraph-track {
+      width: 100%;
+      height: 10px;
+      background: #1e293b;
+      border-radius: 5px;
+      overflow: hidden;
+      border: 1px solid #334155;
+    }
+    .bargraph-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--col-active-tab), var(--col-green));
+      border-radius: 5px;
+      transition: width 0.3s ease;
     }
 
     .prompt-box {
@@ -216,16 +231,8 @@
       justify-content: center;
       transition: background 0.15s, border-color 0.15s;
     }
-    .opt-btn.hebrew {
-      font-family: 'Tinos', serif;
-      direction: rtl;
-      font-size: 26px;
-    }
-    .opt-btn.hint {
-      background: #4d4411 !important;
-      border-color: var(--col-yellow) !important;
-      color: var(--col-yellow) !important;
-    }
+    .opt-btn.hebrew { font-family: 'Tinos', serif; direction: rtl; font-size: 26px; }
+    .opt-btn.hint { background: #4d4411 !important; border-color: var(--col-yellow) !important; color: var(--col-yellow) !important; }
     .opt-btn.correct { background: var(--col-green) !important; border-color: #fff; }
     .opt-btn.wrong { background: var(--col-red) !important; border-color: #fff; }
 
@@ -234,7 +241,7 @@
       display: flex;
       justify-content: center;
       gap: 8px;
-      margin: 10px auto;
+      margin: 8px auto;
       flex-wrap: wrap;
       max-width: 580px;
     }
@@ -272,35 +279,36 @@
     .letter-tile.hebrew { font-family: 'Tinos', serif; font-size: 32px; }
     .letter-tile.used { background: #181c24; border-color: #282d37; color: #4b5563; cursor: default; box-shadow: none; }
 
-    /* Pexeso mřížka */
+    /* PEXESO STYLY (VĚTŠÍ NA MOBILU) */
     .pexeso-grid {
       display: grid;
-      gap: 8px;
+      gap: 10px;
       width: 100%;
-      height: 100%;
-      max-height: 380px;
-      margin: auto 0;
+      flex: 1;
+      min-height: 360px;
+      margin: 4px 0;
     }
     .pexeso-card {
       background: var(--col-card);
       border: 2px solid var(--col-card-border);
-      border-radius: 8px;
+      border-radius: 10px;
       display: flex;
       align-items: center;
       justify-content: center;
       text-align: center;
-      padding: 6px;
+      padding: 8px 4px;
       cursor: pointer;
-      font-size: 16px;
+      font-size: 17px;
       font-weight: bold;
       transition: transform 0.15s, background 0.15s, border-color 0.15s;
       color: #fff;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.3);
     }
-    .pexeso-card:active { transform: scale(0.96); }
-    .pexeso-card.hidden { background: #121c2c; color: var(--col-text-muted); font-size: 24px; }
+    .pexeso-card:active { transform: scale(0.95); }
+    .pexeso-card.hidden { background: #121c2c; color: var(--col-text-muted); font-size: 28px; }
     .pexeso-card.flipped { background: #1d3557; border-color: var(--col-active-tab); color: #fff; }
     .pexeso-card.matched { background: #143c28; border-color: var(--col-green); color: var(--col-green); cursor: default; }
-    .pexeso-card.hebrew { font-family: 'Tinos', serif; direction: rtl; font-size: 22px; }
+    .pexeso-card.hebrew { font-family: 'Tinos', serif; direction: rtl; font-size: 26px; }
 
     .filter-bar {
       display: flex;
@@ -332,7 +340,7 @@
     <div id="badge-subj" class="badge" style="display:none;" onclick="setScreen('SELECT_TOPIC')">Předmět</div>
     <div id="badge-topic" class="badge" style="display:none;" onclick="setScreen('SELECT_GAME')">Téma</div>
     <div class="spacer"></div>
-    <div id="study-timer" class="study-timer-box" title="Čas učení dnes">⏱️ 00:00 / 15:00</div>
+    <div id="study-timer" class="study-timer-box" title="Čas studia dnes">⏱️ 00:00 / 15:00</div>
     <div class="nav-btn" onclick="syncData()" title="Synchronizovat">🔄</div>
   </header>
 
@@ -362,15 +370,37 @@
   let currentTopicIndex = -1;
   let selectedGame = "";
 
-  // 1. STAV PROGRESU CVIČENÍ (Cíl např. 10 bodů, při chybě klesá)
-  const EXERCISE_TARGET = 10;
-  let exerciseScore = 0;
-
-  // 2. STOPKY ČASU UČENÍ (POVINNÝ + BONUSOVÝ ČAS)
+  // 1. ČASOVÝ MONITOR: ČAS BĚŽÍ POUZE PŘI AKTIVNÍM HRANÍ, PAUZA PO 15 SEKUNDÁCH NEČINNOSTI
   let todaySecondsStudied = Number(localStorage.getItem(`time_${new Date().toDateString()}_${currentUser.name}`) || 0);
+  let lastUserActivityTime = Date.now();
+  let isTimerPaused = false;
+
+  function registerUserAction() {
+    lastUserActivityTime = Date.now();
+    if (isTimerPaused) {
+      isTimerPaused = false;
+      updateStudyTimerUI();
+    }
+  }
+
+  // Záchyt všech dotyků / kliknutí pro aktivitu
+  window.addEventListener('click', registerUserAction, true);
+  window.addEventListener('touchstart', registerUserAction, true);
+
   setInterval(() => {
-    todaySecondsStudied++;
-    localStorage.setItem(`time_${new Date().toDateString()}_${currentUser.name}`, todaySecondsStudied);
+    // Čas se počítá POUZE uvnitř samotné hry
+    if (currentScreen === "PLAYING") {
+      const idleTime = Date.now() - lastUserActivityTime;
+      if (idleTime < 15000) {
+        todaySecondsStudied++;
+        localStorage.setItem(`time_${new Date().toDateString()}_${currentUser.name}`, todaySecondsStudied);
+        isTimerPaused = false;
+      } else {
+        isTimerPaused = true;
+      }
+    } else {
+      isTimerPaused = true;
+    }
     updateStudyTimerUI();
   }, 1000);
 
@@ -385,23 +415,26 @@
       return `${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
     };
 
-    if (todaySecondsStudied < targetSec) {
-      box.classList.remove("bonus");
+    if (currentScreen !== "PLAYING" || isTimerPaused) {
+      box.className = "study-timer-box paused";
+      box.innerText = `⏸️ ${format(todaySecondsStudied)} / ${format(targetSec)}`;
+    } else if (todaySecondsStudied < targetSec) {
+      box.className = "study-timer-box";
       box.innerText = `⏱️ ${format(todaySecondsStudied)} / ${format(targetSec)}`;
     } else {
       const bonusSec = todaySecondsStudied - targetSec;
-      box.classList.add("bonus");
+      box.className = "study-timer-box bonus";
       box.innerText = `★ BONUS: +${format(bonusSec)}`;
     }
   }
 
-  // 4. PEXESO STAV S POČÍTADLEM POKUSŮ
+  // Pexeso stav
   let pexesoPairCount = 4;
   let pexesoCards = [];
   let pexesoFlipped = [];
   let pexesoMatched = [];
   let pexesoLocked = false;
-  let pexesoAttempts = 0; // Počet otočení
+  let pexesoAttempts = 0;
 
   // Zvuky
   const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -498,6 +531,7 @@
 
   function setScreen(scr) {
     currentScreen = scr;
+    registerUserAction();
     renderScreen();
   }
 
@@ -506,32 +540,6 @@
     if (currentTopicType === "QUIZ") return appData.quizzes[currentTopicIndex];
     if (currentTopicType === "SEQ") return appData.sequences[currentTopicIndex];
     return null;
-  }
-
-  // 2. AUTOMATICKÝ PŘECHOD NA DALŠÍ AKTIVITU V ŘADĚ
-  function checkAutoAdvanceActivity() {
-    if (exerciseScore >= EXERCISE_TARGET) {
-      sndFanfare();
-      addReward(3, getActiveTopic().title);
-
-      const gameSequence = ['CARDS', 'ADAPTIVE', 'SCRAMBLE', 'MISSING', 'PEXESO'];
-      const curIdx = gameSequence.indexOf(selectedGame);
-
-      setTimeout(() => {
-        if (curIdx !== -1 && curIdx < gameSequence.length - 1) {
-          const nextGame = gameSequence[curIdx + 1];
-          if (nextGame === 'PEXESO') {
-            startPexesoGame(4);
-          } else {
-            startGame(nextGame);
-          }
-        } else {
-          setScreen("SELECT_GAME");
-        }
-      }, 1200);
-      return true;
-    }
-    return false;
   }
 
   function renderScreen() {
@@ -661,7 +669,7 @@
       main.innerHTML = html;
     }
 
-    // 4. VÝBĚR HRY
+    // 4. VÝBĚR HRY (PEXESO POUZE PRO SLOVÍČKA)
     else if (currentScreen === "SELECT_GAME") {
       const topic = getActiveTopic();
       bSubj.style.display = "flex";
@@ -671,14 +679,14 @@
       main.innerHTML = `
         <div class="grid-2">
           <div class="tile" onclick="startGame('CARDS')"><h2>1. Karty</h2><p>Prohlížení a čtení</p></div>
-          <div class="tile" onclick="startGame('ADAPTIVE')"><h2>2. Zkoušení</h2><p>Test z hlavy (mění skóre)</p></div>
+          <div class="tile" onclick="startGame('ADAPTIVE')"><h2>2. Zkoušení</h2><p>Konec až při naučení na 2 ★</p></div>
           <div class="tile" onclick="startGame('SCRAMBLE')"><h2>3. Skládání</h2><p>Trénink písmen (velká tlačítka)</p></div>
           <div class="tile" onclick="startGame('MISSING')"><h2>4. Doplň písmeno</h2><p>Doplň chybějící znak</p></div>
         </div>
         ${currentTopicType === 'VOCAB' ? `
           <div class="tile" style="margin-top:10px;padding:14px;border-color:var(--col-yellow);" onclick="setScreen('SELECT_PEXESO_SIZE')">
             <h2 style="color:var(--col-yellow);">🃏 5. PEXESO</h2>
-            <p>Hledej dvojice (slovo ↔ překlad)</p>
+            <p>Hledej dvojice (velké karty)</p>
           </div>
         ` : ''}
       `;
@@ -737,7 +745,6 @@
 
   function startGame(game) {
     selectedGame = game;
-    exerciseScore = 0; // Reset počítadla série
     initGameState();
     setScreen("PLAYING");
   }
@@ -763,11 +770,13 @@
   let scrambleLetters = [];
   let scrambleHadMistake = false;
   let scrambleDone = false;
+  let scrambleSolvedCount = 0;
 
   let missingDeck = [];
   let missingSlot = 0;
   let missingChoices = [];
   let missingChosen = -1;
+  let missingSolvedCount = 0;
 
   let qCurStep = 0;
   let qAnswered = false;
@@ -801,16 +810,44 @@
 
       if (selectedGame === "CARDS") vCardIdx = 0;
       if (selectedGame === "ADAPTIVE") pickNextAdaptiveWord();
-      if (selectedGame === "SCRAMBLE") { scrambleDeck = []; initScramble(); }
-      if (selectedGame === "MISSING") { missingDeck = []; initMissing(); }
+      if (selectedGame === "SCRAMBLE") { scrambleDeck = []; scrambleSolvedCount = 0; initScramble(); }
+      if (selectedGame === "MISSING") { missingDeck = []; missingSolvedCount = 0; initMissing(); }
     }
     if (selectedGame === "QUIZ") { qCurStep = 0; qAnswered = false; }
     if (selectedGame === "SEQ") initSequence();
   }
 
+  // Součet bodů pro bargraf u zkoušení
+  function getMasteryStats() {
+    const topic = getActiveTopic();
+    if (!topic || !topic.words) return { current: 0, total: 1, masteredCount: 0, totalWords: 1 };
+    let current = 0;
+    let masteredCount = 0;
+    topic.words.forEach((_, i) => {
+      const m = vMastery[i] || 0;
+      current += m;
+      if (m >= 2) masteredCount++;
+    });
+    return {
+      current: current,
+      total: topic.words.length * 2,
+      masteredCount: masteredCount,
+      totalWords: topic.words.length
+    };
+  }
+
+  // ZKOUŠENÍ Z HLAVY: Zde se testuje reálná paměť a cvičení KONČÍ AŽ VE CHVÍLI, KDY JSOU VŠECHNA SLOVA NAUČENA NA 2!
   function pickNextAdaptiveWord() {
     const topic = getActiveTopic();
     vQuizRevealed = false;
+
+    // Kontrola, zda jsou všechna slova lekce naučena na 2
+    const stats = getMasteryStats();
+    if (stats.masteredCount >= stats.totalWords) {
+      vCurrentWord = -1; // VŠECHNO HOTOVO!
+      return;
+    }
+
     const unmastered = [];
     const mastered = [];
 
@@ -819,6 +856,7 @@
       else mastered.push(i);
     }
 
+    // Pokud jsou všechna slova v aktuálním okně na 2, otevřeme další z lekce
     if (unmastered.length === 0 && vActivePool < topic.words.length) {
       vActivePool = Math.min(topic.words.length, vActivePool + 2);
       for (let i = 0; i < vActivePool; i++) {
@@ -826,6 +864,7 @@
       }
     }
 
+    // 80% šance na slovo, které ještě není na 2, 20% na zopakování
     if (unmastered.length > 0 && (Math.random() < 0.8 || mastered.length === 0)) {
       vCurrentWord = unmastered[Math.floor(Math.random() * unmastered.length)];
     } else if (mastered.length > 0) {
@@ -841,7 +880,7 @@
 
     if (known) {
       sndOk();
-      exerciseScore = Math.min(EXERCISE_TARGET, exerciseScore + 1); // 1. POSTUP VPŘED
+      addReward(1, topic.title);
       vMastery[vCurrentWord] = Math.min(2, (vMastery[vCurrentWord] || 0) + 1);
 
       if (vMastery[vCurrentWord] >= 2 && vActivePool < topic.words.length) {
@@ -850,18 +889,15 @@
       saveWordMasteryToGoogle(topic.id, w.foreign, vMastery[vCurrentWord]);
     } else {
       sndErr();
-      exerciseScore = Math.max(0, exerciseScore - 1); // 1. PŘI CHYBĚ KLESNE O 1 ZPĚT!
-      vMastery[vCurrentWord] = 0;
+      vMastery[vCurrentWord] = 0; // Chyba v testu z hlavy vrátí slovo na nulu!
       saveWordMasteryToGoogle(topic.id, w.foreign, 0);
     }
 
-    // 2. Kontrola, zda je splněno 10/10 a přejde se automaticky na další hru
-    if (!checkAutoAdvanceActivity()) {
-      pickNextAdaptiveWord();
-      renderActiveGame();
-    }
+    pickNextAdaptiveWord();
+    renderActiveGame();
   }
 
+  // SKLÁDÁNÍ SLOV
   function initScramble() {
     const topic = getActiveTopic();
     if (!scrambleDeck || scrambleDeck.length === 0) {
@@ -894,11 +930,10 @@
 
       if (scramblePlaced.length === targetGraphemes.length) {
         scrambleDone = true;
+        scrambleSolvedCount++;
         if (!scrambleHadMistake) {
-          exerciseScore = Math.min(EXERCISE_TARGET, exerciseScore + 1); // +1 bod
+          addReward(1, topic.title);
           sndFanfare();
-        } else {
-          exerciseScore = Math.max(0, exerciseScore - 1); // Chyba vrátí skóre o 1 zpět!
         }
       }
     } else {
@@ -909,12 +944,11 @@
   }
 
   function nextScrambleStep() {
-    if (!checkAutoAdvanceActivity()) {
-      initScramble();
-      renderActiveGame();
-    }
+    initScramble();
+    renderActiveGame();
   }
 
+  // DOPLŇOVÁNÍ PÍSMENE
   function initMissing() {
     const topic = getActiveTopic();
     if (!missingDeck || missingDeck.length === 0) {
@@ -946,22 +980,20 @@
 
     if (isCorrect) {
       sndOk();
-      exerciseScore = Math.min(EXERCISE_TARGET, exerciseScore + 1);
+      missingSolvedCount++;
+      addReward(1, topic.title);
     } else {
       sndErr();
-      exerciseScore = Math.max(0, exerciseScore - 1); // Chyba srazí postup o 1
     }
     renderActiveGame();
   }
 
   function nextMissingStep() {
-    if (!checkAutoAdvanceActivity()) {
-      initMissing();
-      renderActiveGame();
-    }
+    initMissing();
+    renderActiveGame();
   }
 
-  // 4. PEXESO S POČÍTADLEM POKUSŮ A EFEKTIVITOU
+  // PEXESO
   function initPexeso() {
     const topic = getActiveTopic();
     const count = Math.min(pexesoPairCount, topic.words.length);
@@ -977,7 +1009,7 @@
     pexesoFlipped = [];
     pexesoMatched = [];
     pexesoLocked = false;
-    pexesoAttempts = 0; // Reset pokusů
+    pexesoAttempts = 0;
   }
 
   function clickPexesoCard(index) {
@@ -989,7 +1021,7 @@
     renderActiveGame();
 
     if (pexesoFlipped.length === 2) {
-      pexesoAttempts++; // Každé 2 otočené karty = 1 pokus
+      pexesoAttempts++;
       const idx1 = pexesoFlipped[0];
       const idx2 = pexesoFlipped[1];
       const card1 = pexesoCards[idx1];
@@ -1002,7 +1034,6 @@
 
         if (pexesoMatched.length === Math.min(pexesoPairCount, getActiveTopic().words.length)) {
           sndFanfare();
-          // Ochrana proti zběsilému klikání: Plná odměna jen při rozumném počtu pokusů
           const maxIdealAttempts = pexesoPairCount * 2;
           const starsEarned = (pexesoAttempts <= maxIdealAttempts) ? (pexesoPairCount >= 6 ? 4 : 2) : 1;
           addReward(starsEarned, getActiveTopic().title);
@@ -1020,9 +1051,7 @@
     }
   }
 
-  // ==========================================
-  // VYKRESLOVÁNÍ
-  // ==========================================
+  // VYKRESLOVÁNÍ HRY
   function renderActiveGame() {
     const main = document.getElementById("main-content");
     const topic = getActiveTopic();
@@ -1031,10 +1060,14 @@
     // 1. KARTY
     if (selectedGame === "CARDS") {
       const w = topic.words[vCardIdx];
+      const pct = Math.round(((vCardIdx + 1) / topic.words.length) * 100);
       main.innerHTML = `
-        <div class="exercise-progress-bar">
-          <span>Prohlížení karet</span>
-          <span class="progress-pill">${vCardIdx+1} / ${Math.min(EXERCISE_TARGET, topic.words.length)}</span>
+        <div class="bargraph-container">
+          <div class="bargraph-header">
+            <span>Prohlížení karet: ${vCardIdx + 1} z ${topic.words.length}</span>
+            <span style="color:var(--col-active-tab);">${pct} %</span>
+          </div>
+          <div class="bargraph-track"><div class="bargraph-fill" style="width:${pct}%;"></div></div>
         </div>
         <div class="prompt-box ${isHebrew ? 'hebrew-text' : ''}">${w.foreign}</div>
         <div class="prompt-box" style="color:#fff;font-size:22px;">${w.czech}</div>
@@ -1046,26 +1079,51 @@
       `;
     }
 
-    // 2. ADAPTIVNÍ ZKOUŠENÍ
+    // 2. ADAPTIVNÍ ZKOUŠENÍ: KONEC AŽ PŘI 100% NAUČENÍ (VŠECHNA SLOVA NA 2)
     else if (selectedGame === "ADAPTIVE") {
+      const stats = getMasteryStats();
+      const pct = Math.round((stats.current / stats.total) * 100);
+
+      // KONTROLA DOKONČENÍ CELÉ LEKCE
+      if (stats.masteredCount >= stats.totalWords) {
+        main.innerHTML = `
+          <div style="text-align:center;padding:30px 10px;">
+            <h2 style="color:var(--col-green);font-size:26px;margin-bottom:12px;">LEKCE KOMPLETNĚ ZVLÁDNUTA! 🎉</h2>
+            <p style="font-size:18px;color:#fff;margin-bottom:8px;">Všech ${stats.totalWords} slov umíš na 2 ★!</p>
+            <div class="bargraph-container" style="margin:20px auto;max-width:320px;">
+              <div class="bargraph-header"><span>Naučeno: 100 %</span><span style="color:var(--col-green);">${stats.current}/${stats.total} bodů</span></div>
+              <div class="bargraph-track"><div class="bargraph-fill" style="width:100%;background:var(--col-green);"></div></div>
+            </div>
+            <div class="action-btn green" onclick="setScreen('SELECT_GAME')">ZPĚT DO MENU HRY ➔</div>
+          </div>
+        `;
+        return;
+      }
+
       const w = topic.words[vCurrentWord];
       const mVal = vMastery[vCurrentWord] || 0;
+
       main.innerHTML = `
-        <div class="exercise-progress-bar">
-          <span>Test z hlavy (Cíl do postupu)</span>
-          <span class="progress-pill" style="color:${exerciseScore > 0 ? 'var(--col-green)' : 'var(--col-yellow)'};">
-            ${exerciseScore} / ${EXERCISE_TARGET}
-          </span>
+        <div class="bargraph-container">
+          <div class="bargraph-header">
+            <span>Učení: ${stats.masteredCount} z ${stats.totalWords} naučeno (${stats.current}/${stats.total} b.)</span>
+            <span style="color:var(--col-green);">${pct} %</span>
+          </div>
+          <div class="bargraph-track"><div class="bargraph-fill" style="width:${pct}%;"></div></div>
         </div>
-        <div class="prompt-box" style="color:#fff;">${w.czech}</div>
+        <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--col-text-muted);margin-bottom:4px;">
+          <span>Slovo: ${mVal}/2 ★</span>
+          <span>Aktivní okno: ${vActivePool} z ${topic.words.length}</span>
+        </div>
+        <div class="prompt-box" style="color:#fff;margin-top:2px;">${w.czech}</div>
         <div class="prompt-box ${isHebrew ? 'hebrew-text' : ''}" style="color:${vQuizRevealed ? 'var(--col-yellow)' : 'var(--col-text-muted)'};">
           ${vQuizRevealed ? w.foreign : '[ ? ? ? ]'}
         </div>
         ${vQuizRevealed ? `
           <div style="text-align:center;color:var(--col-active-tab);margin-bottom:8px;">[ ${w.pron || ''} ]</div>
           <div class="grid-2">
-            <div class="action-btn red" onclick="answerAdaptive(false)">Nevěděl (-1 bod)</div>
-            <div class="action-btn green" onclick="answerAdaptive(true)">Věděl jsem (+1 bod)</div>
+            <div class="action-btn red" onclick="answerAdaptive(false)">Nevěděl jsem (0 ★)</div>
+            <div class="action-btn green" onclick="answerAdaptive(true)">Věděl jsem (+1 ★)</div>
           </div>
         ` : `
           <div class="action-btn" onclick="vQuizRevealed=true;renderActiveGame();">ZKONTROLOVAT</div>
@@ -1073,17 +1131,19 @@
       `;
     }
 
-    // 3. SKLÁDÁNÍ SLOVA
+    // 3. SKLÁDÁNÍ SLOVA (BARGRAF POČTU CVIČENÍ)
     else if (selectedGame === "SCRAMBLE") {
       const w = topic.words[vCurrentWord];
       const targetGraphemes = getGraphemes(w.foreign);
+      const pct = Math.min(100, Math.round((scrambleSolvedCount / topic.words.length) * 100));
 
       main.innerHTML = `
-        <div class="exercise-progress-bar">
-          <span>Skládání slov (bez chyby)</span>
-          <span class="progress-pill" style="color:${exerciseScore > 0 ? 'var(--col-green)' : 'var(--col-yellow)'};">
-            ${exerciseScore} / ${EXERCISE_TARGET}
-          </span>
+        <div class="bargraph-container">
+          <div class="bargraph-header">
+            <span>Vyřešeno: ${scrambleSolvedCount} z ${topic.words.length} slov</span>
+            <span style="color:var(--col-yellow);">${pct} %</span>
+          </div>
+          <div class="bargraph-track"><div class="bargraph-fill" style="width:${pct}%;"></div></div>
         </div>
         <div class="prompt-box" style="font-size:22px;color:#fff;margin-top:4px;">Slož: <b>${w.czech}</b></div>
         <div class="slots-row ${isHebrew ? 'hebrew-text' : ''}">
@@ -1104,16 +1164,17 @@
         ` : `
           <div style="text-align:center;color:var(--col-active-tab);margin-bottom:6px;">[ ${w.pron || ''} ]</div>
           <div class="action-btn ${scrambleHadMistake ? 'red' : 'green'}" onclick="nextScrambleStep()">
-            ${scrambleHadMistake ? 'CHYBA (-1 BOD) ➔ DALŠÍ' : 'SPRÁVNĚ (+1 BOD) ➔ DALŠÍ'}
+            ${scrambleHadMistake ? 'CHYBA ➔ DALŠÍ' : 'SPRÁVNĚ! ➔ DALŠÍ SLOVO'}
           </div>
         `}
       `;
     }
 
-    // 4. DOPLŇOVÁNÍ PÍSMENE
+    // 4. DOPLŇOVÁNÍ PÍSMENE (BARGRAF POČTU CVIČENÍ)
     else if (selectedGame === "MISSING") {
       const w = topic.words[vCurrentWord];
       const letters = getGraphemes(w.foreign);
+      const pct = Math.min(100, Math.round((missingSolvedCount / topic.words.length) * 100));
 
       let maskedWord = "";
       letters.forEach((ch, idx) => {
@@ -1125,11 +1186,12 @@
       });
 
       main.innerHTML = `
-        <div class="exercise-progress-bar">
-          <span>Doplňování znaku</span>
-          <span class="progress-pill" style="color:${exerciseScore > 0 ? 'var(--col-green)' : 'var(--col-yellow)'};">
-            ${exerciseScore} / ${EXERCISE_TARGET}
-          </span>
+        <div class="bargraph-container">
+          <div class="bargraph-header">
+            <span>Doplněno: ${missingSolvedCount} z ${topic.words.length} slov</span>
+            <span style="color:var(--col-yellow);">${pct} %</span>
+          </div>
+          <div class="bargraph-track"><div class="bargraph-fill" style="width:${pct}%;"></div></div>
         </div>
         <div class="prompt-box" style="font-size:20px;color:#fff;margin-top:4px;">Doplň: <b>${w.czech}</b></div>
         <div class="prompt-box ${isHebrew ? 'hebrew-text' : ''}">${maskedWord}</div>
@@ -1144,16 +1206,19 @@
       `;
     }
 
-    // 5. PEXESO
+    // 5. PEXESO (VĚTŠÍ NA MOBILU)
     else if (selectedGame === "PEXESO") {
       const totalPairs = Math.min(pexesoPairCount, topic.words.length);
       const isComplete = pexesoMatched.length === totalPairs;
       const cols = 4;
 
       main.innerHTML = `
-        <div class="exercise-progress-bar">
-          <span>Dvojice: ${pexesoMatched.length} / ${totalPairs}</span>
-          <span class="progress-pill">Pokusy: ${pexesoAttempts}</span>
+        <div class="bargraph-container">
+          <div class="bargraph-header">
+            <span>Pexeso: ${pexesoMatched.length} / ${totalPairs} dvojic</span>
+            <span style="color:var(--col-yellow);">Pokusy: ${pexesoAttempts}</span>
+          </div>
+          <div class="bargraph-track"><div class="bargraph-fill" style="width:${(pexesoMatched.length / totalPairs) * 100}%;"></div></div>
         </div>
         ${!isComplete ? `
           <div class="pexeso-grid" style="grid-template-columns: repeat(${cols}, 1fr);">
@@ -1186,10 +1251,14 @@
     // 6. KVÍZ
     else if (selectedGame === "QUIZ") {
       const q = topic.questions[qCurStep];
+      const pct = Math.round(((qCurStep + 1) / topic.questions.length) * 100);
       main.innerHTML = `
-        <div class="exercise-progress-bar">
-          <span>Kvíz</span>
-          <span class="progress-pill">${qCurStep+1} / ${topic.questions.length}</span>
+        <div class="bargraph-container">
+          <div class="bargraph-header">
+            <span>Kvíz: ${qCurStep + 1} z ${topic.questions.length}</span>
+            <span style="color:var(--col-active-tab);">${pct} %</span>
+          </div>
+          <div class="bargraph-track"><div class="bargraph-fill" style="width:${pct}%;"></div></div>
         </div>
         <div class="prompt-box" style="font-size:20px;color:#fff;">${q.prompt}</div>
         <div class="grid-2" style="margin-top:10px;">
@@ -1207,11 +1276,15 @@
     else if (selectedGame === "SEQ") {
       const isFinished = seqTargetIdx >= topic.items.length;
       const targetWord = topic.items[seqTargetIdx];
+      const pct = Math.round((seqTargetIdx / topic.items.length) * 100);
 
       main.innerHTML = `
-        <div class="exercise-progress-bar">
-          <span>Položka ${Math.min(seqTargetIdx+1, topic.items.length)} / ${topic.items.length} ${seqHintActive ? '<b style="color:var(--col-yellow);">[NÁPOVĚDA]</b>' : ''}</span>
-          <span id="seq-timer" class="progress-pill">0.0 s</span>
+        <div class="bargraph-container">
+          <div class="bargraph-header">
+            <span>Položka ${Math.min(seqTargetIdx + 1, topic.items.length)} z ${topic.items.length} ${seqHintActive ? '<b style="color:var(--col-yellow);">[NÁPOVĚDA]</b>' : ''}</span>
+            <span id="seq-timer" style="color:var(--col-yellow);font-weight:bold;">0.0 s</span>
+          </div>
+          <div class="bargraph-track"><div class="bargraph-fill" style="width:${pct}%;"></div></div>
         </div>
         <div class="prompt-box ${isHebrew ? 'hebrew-text' : ''}" style="margin:8px 0;min-height:56px;color:#fff;font-size:22px;">
           ${topic.items.slice(0, seqTargetIdx).join(' ')} 
@@ -1242,14 +1315,8 @@
   }
   function vCardNext() {
     const topic = getActiveTopic();
-    vCardIdx = vCardIdx + 1;
-    if (vCardIdx >= Math.min(EXERCISE_TARGET, topic.words.length)) {
-      // Po prohlédnutí 10 karet automaticky přejde na zkoušení!
-      exerciseScore = EXERCISE_TARGET;
-      checkAutoAdvanceActivity();
-    } else {
-      renderActiveGame();
-    }
+    vCardIdx = (vCardIdx + 1) % topic.words.length;
+    renderActiveGame();
   }
 
   function clickQuizOpt(idx) {
