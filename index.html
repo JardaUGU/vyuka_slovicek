@@ -1051,4 +1051,287 @@
       const w = topic.words[vCurrentWord];
       const mVal = vMastery[vCurrentWord] || 0;
       main.innerHTML = `
-        <div class="exer
+        <div class="exercise-progress-bar">
+          <span>Test z hlavy (Cíl do postupu)</span>
+          <span class="progress-pill" style="color:${exerciseScore > 0 ? 'var(--col-green)' : 'var(--col-yellow)'};">
+            ${exerciseScore} / ${EXERCISE_TARGET}
+          </span>
+        </div>
+        <div class="prompt-box" style="color:#fff;">${w.czech}</div>
+        <div class="prompt-box ${isHebrew ? 'hebrew-text' : ''}" style="color:${vQuizRevealed ? 'var(--col-yellow)' : 'var(--col-text-muted)'};">
+          ${vQuizRevealed ? w.foreign : '[ ? ? ? ]'}
+        </div>
+        ${vQuizRevealed ? `
+          <div style="text-align:center;color:var(--col-active-tab);margin-bottom:8px;">[ ${w.pron || ''} ]</div>
+          <div class="grid-2">
+            <div class="action-btn red" onclick="answerAdaptive(false)">Nevěděl (-1 bod)</div>
+            <div class="action-btn green" onclick="answerAdaptive(true)">Věděl jsem (+1 bod)</div>
+          </div>
+        ` : `
+          <div class="action-btn" onclick="vQuizRevealed=true;renderActiveGame();">ZKONTROLOVAT</div>
+        `}
+      `;
+    }
+
+    // 3. SKLÁDÁNÍ SLOVA
+    else if (selectedGame === "SCRAMBLE") {
+      const w = topic.words[vCurrentWord];
+      const targetGraphemes = getGraphemes(w.foreign);
+
+      main.innerHTML = `
+        <div class="exercise-progress-bar">
+          <span>Skládání slov (bez chyby)</span>
+          <span class="progress-pill" style="color:${exerciseScore > 0 ? 'var(--col-green)' : 'var(--col-yellow)'};">
+            ${exerciseScore} / ${EXERCISE_TARGET}
+          </span>
+        </div>
+        <div class="prompt-box" style="font-size:22px;color:#fff;margin-top:4px;">Slož: <b>${w.czech}</b></div>
+        <div class="slots-row ${isHebrew ? 'hebrew-text' : ''}">
+          ${targetGraphemes.map((ch, i) => `
+            <div class="letter-slot ${i < scramblePlaced.length ? 'filled' : ''}">
+              ${i < scramblePlaced.length ? scramblePlaced[i] : '_'}
+            </div>
+          `).join('')}
+        </div>
+        ${!scrambleDone ? `
+          <div class="letters-row">
+            ${scrambleLetters.map((item, idx) => `
+              <div class="letter-tile ${isHebrew ? 'hebrew' : ''} ${item.used ? 'used' : ''}" onclick="clickScrambleLetter(${idx})">
+                ${item.ch}
+              </div>
+            `).join('')}
+          </div>
+        ` : `
+          <div style="text-align:center;color:var(--col-active-tab);margin-bottom:6px;">[ ${w.pron || ''} ]</div>
+          <div class="action-btn ${scrambleHadMistake ? 'red' : 'green'}" onclick="nextScrambleStep()">
+            ${scrambleHadMistake ? 'CHYBA (-1 BOD) ➔ DALŠÍ' : 'SPRÁVNĚ (+1 BOD) ➔ DALŠÍ'}
+          </div>
+        `}
+      `;
+    }
+
+    // 4. DOPLŇOVÁNÍ PÍSMENE
+    else if (selectedGame === "MISSING") {
+      const w = topic.words[vCurrentWord];
+      const letters = getGraphemes(w.foreign);
+
+      let maskedWord = "";
+      letters.forEach((ch, idx) => {
+        if (idx === missingSlot) {
+          maskedWord += missingChosen === -1 ? " [ _ ] " : ` [ ${ch} ] `;
+        } else {
+          maskedWord += ch + " ";
+        }
+      });
+
+      main.innerHTML = `
+        <div class="exercise-progress-bar">
+          <span>Doplňování znaku</span>
+          <span class="progress-pill" style="color:${exerciseScore > 0 ? 'var(--col-green)' : 'var(--col-yellow)'};">
+            ${exerciseScore} / ${EXERCISE_TARGET}
+          </span>
+        </div>
+        <div class="prompt-box" style="font-size:20px;color:#fff;margin-top:4px;">Doplň: <b>${w.czech}</b></div>
+        <div class="prompt-box ${isHebrew ? 'hebrew-text' : ''}">${maskedWord}</div>
+        <div class="grid-2">
+          ${missingChoices.map((ch, i) => {
+            const isCorrect = ch === letters[missingSlot];
+            const cls = missingChosen !== -1 ? (isCorrect ? 'correct' : (i === missingChosen ? 'wrong' : '')) : '';
+            return `<div class="opt-btn ${isHebrew ? 'hebrew' : ''} ${cls}" onclick="clickMissingOption(${i})">${ch}</div>`;
+          }).join('')}
+        </div>
+        ${missingChosen !== -1 ? `<div class="action-btn" onclick="nextMissingStep()">DALŠÍ ➔</div>` : ''}
+      `;
+    }
+
+    // 5. PEXESO
+    else if (selectedGame === "PEXESO") {
+      const totalPairs = Math.min(pexesoPairCount, topic.words.length);
+      const isComplete = pexesoMatched.length === totalPairs;
+      const cols = 4;
+
+      main.innerHTML = `
+        <div class="exercise-progress-bar">
+          <span>Dvojice: ${pexesoMatched.length} / ${totalPairs}</span>
+          <span class="progress-pill">Pokusy: ${pexesoAttempts}</span>
+        </div>
+        ${!isComplete ? `
+          <div class="pexeso-grid" style="grid-template-columns: repeat(${cols}, 1fr);">
+            ${pexesoCards.map((c, i) => {
+              const isMatched = pexesoMatched.includes(c.wordIdx);
+              const isFlipped = pexesoFlipped.includes(i);
+              let cls = isMatched ? 'matched' : (isFlipped ? 'flipped' : 'hidden');
+              if (c.isForeign && isHebrew) cls += ' hebrew';
+              return `
+                <div class="pexeso-card ${cls}" onclick="clickPexesoCard(${i})">
+                  ${isMatched || isFlipped ? c.text : '❓'}
+                </div>
+              `;
+            }).join('')}
+          </div>
+        ` : `
+          <div style="text-align:center;padding:30px 10px;">
+            <h2 style="color:var(--col-green);font-size:26px;margin-bottom:8px;">VÝBORNĚ! PEXESO SPLNĚNO!</h2>
+            <p style="color:var(--col-yellow);font-size:18px;margin-bottom:6px;">Hotovo za ${pexesoAttempts} pokusů!</p>
+            <p style="color:var(--col-text-muted);font-size:14px;margin-bottom:20px;">
+              ${pexesoAttempts <= totalPairs * 2 ? 'Skvělá paměť! Žádné zbytečné klikání.' : 'Příště zkus klikat rozvážněji a méně naslepo!'}
+            </p>
+            <div class="action-btn green" onclick="initPexeso();renderActiveGame();">HRÁT ZNOVU ➔</div>
+            <div class="action-btn" style="margin-top:10px;" onclick="setScreen('SELECT_PEXESO_SIZE')">ZMĚNIT VELIKOST PEXESA</div>
+          </div>
+        `}
+      `;
+    }
+
+    // 6. KVÍZ
+    else if (selectedGame === "QUIZ") {
+      const q = topic.questions[qCurStep];
+      main.innerHTML = `
+        <div class="exercise-progress-bar">
+          <span>Kvíz</span>
+          <span class="progress-pill">${qCurStep+1} / ${topic.questions.length}</span>
+        </div>
+        <div class="prompt-box" style="font-size:20px;color:#fff;">${q.prompt}</div>
+        <div class="grid-2" style="margin-top:10px;">
+          ${q.options.map((opt, i) => `
+            <div class="opt-btn ${qAnswered ? (i === q.correctIdx ? 'correct' : 'wrong') : ''}" onclick="clickQuizOpt(${i})">
+              ${opt}
+            </div>
+          `).join('')}
+        </div>
+        ${qAnswered ? `<div class="action-btn" onclick="nextQuizStep()">DALŠÍ ➔</div>` : ''}
+      `;
+    }
+
+    // 7. POSLOUPNOSTI NA ČAS
+    else if (selectedGame === "SEQ") {
+      const isFinished = seqTargetIdx >= topic.items.length;
+      const targetWord = topic.items[seqTargetIdx];
+
+      main.innerHTML = `
+        <div class="exercise-progress-bar">
+          <span>Položka ${Math.min(seqTargetIdx+1, topic.items.length)} / ${topic.items.length} ${seqHintActive ? '<b style="color:var(--col-yellow);">[NÁPOVĚDA]</b>' : ''}</span>
+          <span id="seq-timer" class="progress-pill">0.0 s</span>
+        </div>
+        <div class="prompt-box ${isHebrew ? 'hebrew-text' : ''}" style="margin:8px 0;min-height:56px;color:#fff;font-size:22px;">
+          ${topic.items.slice(0, seqTargetIdx).join(' ')} 
+          <span style="color:var(--col-yellow);">${seqHintActive ? `[ ${targetWord}! ]` : '[ ??? ]'}</span>
+        </div>
+        ${!isFinished ? `
+          <div class="grid-2">
+            ${seqSlots.map((itemIdx, slot) => {
+              const isHintSlot = (seqHintActive && itemIdx === seqTargetIdx);
+              return `
+                <div id="seq-btn-${slot}" class="opt-btn ${isHebrew ? 'hebrew' : ''} ${isHintSlot ? 'hint' : ''}" onclick="clickSeqSlot(${slot})">
+                  ${itemIdx !== -1 ? topic.items[itemIdx] : ''}
+                </div>
+              `;
+            }).join('')}
+          </div>
+        ` : `
+          <div class="action-btn green" onclick="initSequence();renderActiveGame();">DOKONČENO! HRÁT ZNOVU</div>
+        `}
+      `;
+    }
+  }
+
+  function vCardPrev() {
+    const topic = getActiveTopic();
+    vCardIdx = (vCardIdx + topic.words.length - 1) % topic.words.length;
+    renderActiveGame();
+  }
+  function vCardNext() {
+    const topic = getActiveTopic();
+    vCardIdx = vCardIdx + 1;
+    if (vCardIdx >= Math.min(EXERCISE_TARGET, topic.words.length)) {
+      // Po prohlédnutí 10 karet automaticky přejde na zkoušení!
+      exerciseScore = EXERCISE_TARGET;
+      checkAutoAdvanceActivity();
+    } else {
+      renderActiveGame();
+    }
+  }
+
+  function clickQuizOpt(idx) {
+    if (qAnswered) return;
+    const topic = getActiveTopic();
+    const q = topic.questions[qCurStep];
+    qAnswered = true;
+    if (idx === q.correctIdx) { sndOk(); addReward(1, topic.title); }
+    else sndErr();
+    renderActiveGame();
+  }
+  function nextQuizStep() {
+    const topic = getActiveTopic();
+    qCurStep++;
+    qAnswered = false;
+    if (qCurStep >= topic.questions.length) setScreen("SELECT_TOPIC");
+    else renderActiveGame();
+  }
+
+  function resetInactivityTimer() {
+    if (seqInactivityTimer) clearTimeout(seqInactivityTimer);
+    seqInactivityTimer = setTimeout(() => {
+      seqHintActive = true;
+      renderActiveGame();
+    }, 3000);
+  }
+
+  function initSequence() {
+    const topic = getActiveTopic();
+    seqTargetIdx = 0;
+    seqHintActive = false;
+    seqSlots = [-1, -1, -1, -1];
+    seqSlots[0] = 0;
+    if (topic.items.length > 1) seqSlots[1] = 1;
+    for (let s = 2; s < Math.min(4, topic.items.length); s++) seqSlots[s] = s;
+    seqSlots.sort(() => Math.random() - 0.5);
+
+    seqStartTime = Date.now();
+    if (seqTimerInterval) clearInterval(seqTimerInterval);
+    seqTimerInterval = setInterval(() => {
+      const el = document.getElementById("seq-timer");
+      if (el && seqTargetIdx < topic.items.length) {
+        el.innerText = ((Date.now() - seqStartTime) / 1000).toFixed(1) + " s";
+      }
+    }, 100);
+
+    resetInactivityTimer();
+  }
+
+  function clickSeqSlot(slot) {
+    const topic = getActiveTopic();
+    const btnEl = document.getElementById(`seq-btn-${slot}`);
+
+    if (seqSlots[slot] === seqTargetIdx) {
+      sndOk();
+      seqTargetIdx++;
+      seqHintActive = false;
+
+      if (seqTargetIdx >= topic.items.length) {
+        clearInterval(seqTimerInterval);
+        if (seqInactivityTimer) clearTimeout(seqInactivityTimer);
+        sndFanfare();
+        addReward(3, topic.title);
+      } else {
+        const next = seqTargetIdx + 1;
+        seqSlots[slot] = next < topic.items.length ? next : -1;
+        resetInactivityTimer();
+      }
+      renderActiveGame();
+    } else {
+      sndErr();
+      if (btnEl) {
+        btnEl.classList.add("wrong");
+        setTimeout(() => { if (btnEl) btnEl.classList.remove("wrong"); }, 250);
+      }
+      seqHintActive = true;
+      resetInactivityTimer();
+      renderActiveGame();
+    }
+  }
+
+  loadData();
+</script>
+</body>
+</html>
