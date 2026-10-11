@@ -39,7 +39,7 @@
       width: 100vw;
       max-width: 680px;
       height: 100vh;
-      max-height: 540px;
+      max-height: 560px;
       background-color: var(--col-bg);
       display: flex;
       flex-direction: column;
@@ -48,7 +48,7 @@
       overflow: hidden;
       box-shadow: 0 10px 25px rgba(0,0,0,0.6);
     }
-    @media (max-width: 680px), (max-height: 540px) {
+    @media (max-width: 680px), (max-height: 560px) {
       #app-container { border-radius: 0; border: none; max-width: 100vw; max-height: 100vh; }
     }
     header {
@@ -88,6 +88,25 @@
     }
     .badge.active { background: var(--col-active-tab); border-color: #fff; }
     .spacer { flex: 1; }
+
+    /* Ukazatel času v hlavičce */
+    .study-timer-box {
+      background: #101c2e;
+      border: 1px solid var(--col-card-border);
+      padding: 4px 8px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .study-timer-box.bonus {
+      border-color: var(--col-yellow);
+      color: var(--col-yellow);
+      background: #2d2605;
+    }
+
     main {
       flex: 1;
       padding: 12px;
@@ -128,6 +147,27 @@
     .tile:active { transform: scale(0.97); border-color: #fff; }
     .tile h2 { font-size: 18px; color: #fff; margin-bottom: 4px; }
     .tile p { font-size: 12px; color: var(--col-text-muted); }
+
+    /* Progress bar cvičení */
+    .exercise-progress-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: #111a2a;
+      border: 1px solid var(--col-card-border);
+      border-radius: 8px;
+      padding: 6px 12px;
+      margin-bottom: 8px;
+      font-size: 13px;
+      font-weight: bold;
+    }
+    .progress-pill {
+      background: var(--col-card);
+      border: 1px solid var(--col-active-tab);
+      padding: 2px 8px;
+      border-radius: 12px;
+      color: var(--col-yellow);
+    }
 
     .prompt-box {
       background: var(--col-card);
@@ -189,7 +229,7 @@
     .opt-btn.correct { background: var(--col-green) !important; border-color: #fff; }
     .opt-btn.wrong { background: var(--col-red) !important; border-color: #fff; }
 
-    /* VELKÁ TLAČÍTKA SKLÁDÁNÍ */
+    /* Velká tlačítka skládání (dvouřádkové) */
     .slots-row, .letters-row {
       display: flex;
       justify-content: center;
@@ -232,7 +272,7 @@
     .letter-tile.hebrew { font-family: 'Tinos', serif; font-size: 32px; }
     .letter-tile.used { background: #181c24; border-color: #282d37; color: #4b5563; cursor: default; box-shadow: none; }
 
-    /* PEXESO STYLY */
+    /* Pexeso mřížka */
     .pexeso-grid {
       display: grid;
       gap: 8px;
@@ -257,27 +297,10 @@
       color: #fff;
     }
     .pexeso-card:active { transform: scale(0.96); }
-    .pexeso-card.hidden {
-      background: #121c2c;
-      color: var(--col-text-muted);
-      font-size: 24px;
-    }
-    .pexeso-card.flipped {
-      background: #1d3557;
-      border-color: var(--col-active-tab);
-      color: #fff;
-    }
-    .pexeso-card.matched {
-      background: #143c28;
-      border-color: var(--col-green);
-      color: var(--col-green);
-      cursor: default;
-    }
-    .pexeso-card.hebrew {
-      font-family: 'Tinos', serif;
-      direction: rtl;
-      font-size: 22px;
-    }
+    .pexeso-card.hidden { background: #121c2c; color: var(--col-text-muted); font-size: 24px; }
+    .pexeso-card.flipped { background: #1d3557; border-color: var(--col-active-tab); color: #fff; }
+    .pexeso-card.matched { background: #143c28; border-color: var(--col-green); color: var(--col-green); cursor: default; }
+    .pexeso-card.hebrew { font-family: 'Tinos', serif; direction: rtl; font-size: 22px; }
 
     .filter-bar {
       display: flex;
@@ -309,6 +332,7 @@
     <div id="badge-subj" class="badge" style="display:none;" onclick="setScreen('SELECT_TOPIC')">Předmět</div>
     <div id="badge-topic" class="badge" style="display:none;" onclick="setScreen('SELECT_GAME')">Téma</div>
     <div class="spacer"></div>
+    <div id="study-timer" class="study-timer-box" title="Čas učení dnes">⏱️ 00:00 / 15:00</div>
     <div class="nav-btn" onclick="syncData()" title="Synchronizovat">🔄</div>
   </header>
 
@@ -329,7 +353,7 @@
   const API_URL = "https://script.google.com/macros/s/AKfycbxaxBIXP-ECpWstcqRDw8RuT_ds6UwcplU_3pZ9_-ksELN5FVeGt5EHjjexkJVmx1FR_w/exec";
 
   let appData = { users: [], vocab: [], quizzes: [], sequences: [] };
-  let currentUser = JSON.parse(localStorage.getItem("cur_user") || '{"name":"Táta","grade":99,"goal":30,"stars":0}');
+  let currentUser = JSON.parse(localStorage.getItem("cur_user") || '{"name":"Honzík","grade":9,"goal":25,"stars":0,"targetMinutes":15}');
   let filterGradeOnly = true;
 
   let currentScreen = "SELECT_USER";
@@ -338,12 +362,46 @@
   let currentTopicIndex = -1;
   let selectedGame = "";
 
-  // Pexeso stav
+  // 1. STAV PROGRESU CVIČENÍ (Cíl např. 10 bodů, při chybě klesá)
+  const EXERCISE_TARGET = 10;
+  let exerciseScore = 0;
+
+  // 2. STOPKY ČASU UČENÍ (POVINNÝ + BONUSOVÝ ČAS)
+  let todaySecondsStudied = Number(localStorage.getItem(`time_${new Date().toDateString()}_${currentUser.name}`) || 0);
+  setInterval(() => {
+    todaySecondsStudied++;
+    localStorage.setItem(`time_${new Date().toDateString()}_${currentUser.name}`, todaySecondsStudied);
+    updateStudyTimerUI();
+  }, 1000);
+
+  function updateStudyTimerUI() {
+    const box = document.getElementById("study-timer");
+    if (!box) return;
+
+    const targetSec = (currentUser.targetMinutes || 15) * 60;
+    const format = s => {
+      const m = Math.floor(s / 60);
+      const sec = s % 60;
+      return `${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+    };
+
+    if (todaySecondsStudied < targetSec) {
+      box.classList.remove("bonus");
+      box.innerText = `⏱️ ${format(todaySecondsStudied)} / ${format(targetSec)}`;
+    } else {
+      const bonusSec = todaySecondsStudied - targetSec;
+      box.classList.add("bonus");
+      box.innerText = `★ BONUS: +${format(bonusSec)}`;
+    }
+  }
+
+  // 4. PEXESO STAV S POČÍTADLEM POKUSŮ
   let pexesoPairCount = 4;
   let pexesoCards = [];
   let pexesoFlipped = [];
   let pexesoMatched = [];
   let pexesoLocked = false;
+  let pexesoAttempts = 0; // Počet otočení
 
   // Zvuky
   const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -450,8 +508,35 @@
     return null;
   }
 
+  // 2. AUTOMATICKÝ PŘECHOD NA DALŠÍ AKTIVITU V ŘADĚ
+  function checkAutoAdvanceActivity() {
+    if (exerciseScore >= EXERCISE_TARGET) {
+      sndFanfare();
+      addReward(3, getActiveTopic().title);
+
+      const gameSequence = ['CARDS', 'ADAPTIVE', 'SCRAMBLE', 'MISSING', 'PEXESO'];
+      const curIdx = gameSequence.indexOf(selectedGame);
+
+      setTimeout(() => {
+        if (curIdx !== -1 && curIdx < gameSequence.length - 1) {
+          const nextGame = gameSequence[curIdx + 1];
+          if (nextGame === 'PEXESO') {
+            startPexesoGame(4);
+          } else {
+            startGame(nextGame);
+          }
+        } else {
+          setScreen("SELECT_GAME");
+        }
+      }, 1200);
+      return true;
+    }
+    return false;
+  }
+
   function renderScreen() {
     updateFooter();
+    updateStudyTimerUI();
     const main = document.getElementById("main-content");
     const bUser = document.getElementById("badge-user");
     const bSubj = document.getElementById("badge-subj");
@@ -459,33 +544,33 @@
 
     bUser.innerText = currentUser.name;
 
-    // VÝBĚR ŽÁKA
+    // 1. VÝBĚR ŽÁKA
     if (currentScreen === "SELECT_USER") {
       bSubj.style.display = "none";
       bTopic.style.display = "none";
       const uList = (appData.users && appData.users.length) ? appData.users : [
-        {name: "Daniel", grade: 2, goal: 10, stars: 0},
-        {name: "Pavel", grade: 5, goal: 15, stars: 0},
-        {name: "Míša", grade: 7, goal: 20, stars: 0},
-        {name: "Honzík", grade: 9, goal: 25, stars: 0},
-        {name: "Táta", grade: 99, goal: 30, stars: 0}
+        {name: "Daniel", grade: 2, goal: 10, targetMinutes: 10},
+        {name: "Pavel", grade: 5, goal: 15, targetMinutes: 15},
+        {name: "Míša", grade: 7, goal: 20, targetMinutes: 20},
+        {name: "Honzík", grade: 9, goal: 25, targetMinutes: 25},
+        {name: "Táta", grade: 99, goal: 30, targetMinutes: 30}
       ];
 
       main.innerHTML = `
         <h2 style="font-size:18px;margin-bottom:12px;text-align:center;color:var(--col-yellow);">Kdo se jde učit?</h2>
         <div class="grid-2">
           ${uList.map(u => `
-            <div class="tile" style="${currentUser.name === u.name ? 'border-color:var(--col-green);background:#142838;' : ''}" onclick="selectUser('${u.name}', ${u.grade}, ${u.goal})">
+            <div class="tile" style="${currentUser.name === u.name ? 'border-color:var(--col-green);background:#142838;' : ''}" onclick="selectUser('${u.name}', ${u.grade}, ${u.goal}, ${u.targetMinutes||15})">
               <h2>${u.name}</h2>
               <p>${u.grade <= 9 ? u.grade + '. třída ZŠ' : 'Dospělý'}</p>
-              <p style="color:var(--col-yellow);margin-top:4px;">Cíl: ${u.goal} ★</p>
+              <p style="color:var(--col-yellow);margin-top:4px;">Cíl: ${u.goal} ★ | ⏱️ ${u.targetMinutes||15} min</p>
             </div>
           `).join('')}
         </div>
       `;
     }
 
-    // VÝBĚR PŘEDMĚTU (HEBREJŠTINA SE ZOBRAZÍ POUZE PRO DOSPĚLÉHO - ROČNÍK 99)
+    // 2. VÝBĚR PŘEDMĚTU
     else if (currentScreen === "SELECT_SUBJECT") {
       bSubj.style.display = "none";
       bTopic.style.display = "none";
@@ -508,7 +593,7 @@
       `;
     }
 
-    // VÝBĚR TÉMATU S FILTREM ROČNÍKU
+    // 3. VÝBĚR TÉMATU S FILTREM ROČNÍKU
     else if (currentScreen === "SELECT_TOPIC") {
       bSubj.style.display = "flex";
       bSubj.innerText = selectedSubject;
@@ -576,7 +661,7 @@
       main.innerHTML = html;
     }
 
-    // VÝBĚR HRY (PEXESO SE ZOBRAZUJE POUZE U SLOVÍČEK - VOCAB!)
+    // 4. VÝBĚR HRY
     else if (currentScreen === "SELECT_GAME") {
       const topic = getActiveTopic();
       bSubj.style.display = "flex";
@@ -599,7 +684,7 @@
       `;
     }
 
-    // VÝBĚR VELIKOSTI PEXESA
+    // 5. VÝBĚR VELIKOSTI PEXESA
     else if (currentScreen === "SELECT_PEXESO_SIZE") {
       const topic = getActiveTopic();
       bSubj.style.display = "flex";
@@ -609,27 +694,15 @@
       main.innerHTML = `
         <h2 style="font-size:18px;margin-bottom:12px;text-align:center;color:var(--col-yellow);">Vyber velikost pexesa:</h2>
         <div class="grid-2">
-          <div class="tile" onclick="startPexesoGame(3)">
-            <h2>6 KARET (2 × 3)</h2>
-            <p>3 dvojice – rychlovka na začátek</p>
-          </div>
-          <div class="tile" onclick="startPexesoGame(4)">
-            <h2>8 KARET (2 × 4)</h2>
-            <p>4 dvojice – pohodová hra</p>
-          </div>
-          <div class="tile" onclick="startPexesoGame(6)">
-            <h2>12 KARET (3 × 4)</h2>
-            <p>6 dvojic – klasické pexeso</p>
-          </div>
-          <div class="tile" onclick="startPexesoGame(8)">
-            <h2>16 KARET (4 × 4)</h2>
-            <p>8 dvojic – velká výzva!</p>
-          </div>
+          <div class="tile" onclick="startPexesoGame(3)"><h2>6 KARET (2 × 3)</h2><p>3 dvojice – rychlovka</p></div>
+          <div class="tile" onclick="startPexesoGame(4)"><h2>8 KARET (2 × 4)</h2><p>4 dvojice – pohodová hra</p></div>
+          <div class="tile" onclick="startPexesoGame(6)"><h2>12 KARET (3 × 4)</h2><p>6 dvojic – klasika</p></div>
+          <div class="tile" onclick="startPexesoGame(8)"><h2>16 KARET (4 × 4)</h2><p>8 dvojic – velká výzva!</p></div>
         </div>
       `;
     }
 
-    // SAMOTNÁ HRA
+    // 6. SAMOTNÁ HRA
     else if (currentScreen === "PLAYING") {
       const topic = getActiveTopic();
       bSubj.style.display = "flex";
@@ -639,9 +712,10 @@
     }
   }
 
-  function selectUser(name, grade, goal) {
-    currentUser = { name, grade, goal, stars: 0 };
+  function selectUser(name, grade, goal, targetMinutes) {
+    currentUser = { name, grade, goal, targetMinutes, stars: 0 };
     localStorage.setItem("cur_user", JSON.stringify(currentUser));
+    todaySecondsStudied = Number(localStorage.getItem(`time_${new Date().toDateString()}_${currentUser.name}`) || 0);
     setScreen("SELECT_SUBJECT");
   }
 
@@ -663,6 +737,7 @@
 
   function startGame(game) {
     selectedGame = game;
+    exerciseScore = 0; // Reset počítadla série
     initGameState();
     setScreen("PLAYING");
   }
@@ -725,7 +800,7 @@
       vActivePool = Math.min(topic.words.length, Math.max(3, masteredCount + 3));
 
       if (selectedGame === "CARDS") vCardIdx = 0;
-      if (selectedGame === "ADAPTIVE") { pickNextAdaptiveWord(); }
+      if (selectedGame === "ADAPTIVE") pickNextAdaptiveWord();
       if (selectedGame === "SCRAMBLE") { scrambleDeck = []; initScramble(); }
       if (selectedGame === "MISSING") { missingDeck = []; initMissing(); }
     }
@@ -766,22 +841,25 @@
 
     if (known) {
       sndOk();
-      addReward(1, topic.title);
+      exerciseScore = Math.min(EXERCISE_TARGET, exerciseScore + 1); // 1. POSTUP VPŘED
       vMastery[vCurrentWord] = Math.min(2, (vMastery[vCurrentWord] || 0) + 1);
 
       if (vMastery[vCurrentWord] >= 2 && vActivePool < topic.words.length) {
         vActivePool++;
-        sndFanfare();
       }
       saveWordMasteryToGoogle(topic.id, w.foreign, vMastery[vCurrentWord]);
     } else {
       sndErr();
+      exerciseScore = Math.max(0, exerciseScore - 1); // 1. PŘI CHYBĚ KLESNE O 1 ZPĚT!
       vMastery[vCurrentWord] = 0;
       saveWordMasteryToGoogle(topic.id, w.foreign, 0);
     }
 
-    pickNextAdaptiveWord();
-    renderActiveGame();
+    // 2. Kontrola, zda je splněno 10/10 a přejde se automaticky na další hru
+    if (!checkAutoAdvanceActivity()) {
+      pickNextAdaptiveWord();
+      renderActiveGame();
+    }
   }
 
   function initScramble() {
@@ -817,8 +895,10 @@
       if (scramblePlaced.length === targetGraphemes.length) {
         scrambleDone = true;
         if (!scrambleHadMistake) {
-          addReward(1, topic.title);
+          exerciseScore = Math.min(EXERCISE_TARGET, exerciseScore + 1); // +1 bod
           sndFanfare();
+        } else {
+          exerciseScore = Math.max(0, exerciseScore - 1); // Chyba vrátí skóre o 1 zpět!
         }
       }
     } else {
@@ -829,8 +909,10 @@
   }
 
   function nextScrambleStep() {
-    initScramble();
-    renderActiveGame();
+    if (!checkAutoAdvanceActivity()) {
+      initScramble();
+      renderActiveGame();
+    }
   }
 
   function initMissing() {
@@ -864,18 +946,22 @@
 
     if (isCorrect) {
       sndOk();
-      addReward(1, topic.title);
+      exerciseScore = Math.min(EXERCISE_TARGET, exerciseScore + 1);
     } else {
       sndErr();
+      exerciseScore = Math.max(0, exerciseScore - 1); // Chyba srazí postup o 1
     }
     renderActiveGame();
   }
 
   function nextMissingStep() {
-    initMissing();
-    renderActiveGame();
+    if (!checkAutoAdvanceActivity()) {
+      initMissing();
+      renderActiveGame();
+    }
   }
 
+  // 4. PEXESO S POČÍTADLEM POKUSŮ A EFEKTIVITOU
   function initPexeso() {
     const topic = getActiveTopic();
     const count = Math.min(pexesoPairCount, topic.words.length);
@@ -891,6 +977,7 @@
     pexesoFlipped = [];
     pexesoMatched = [];
     pexesoLocked = false;
+    pexesoAttempts = 0; // Reset pokusů
   }
 
   function clickPexesoCard(index) {
@@ -902,6 +989,7 @@
     renderActiveGame();
 
     if (pexesoFlipped.length === 2) {
+      pexesoAttempts++; // Každé 2 otočené karty = 1 pokus
       const idx1 = pexesoFlipped[0];
       const idx2 = pexesoFlipped[1];
       const card1 = pexesoCards[idx1];
@@ -914,7 +1002,10 @@
 
         if (pexesoMatched.length === Math.min(pexesoPairCount, getActiveTopic().words.length)) {
           sndFanfare();
-          addReward(pexesoPairCount >= 6 ? 4 : 2, getActiveTopic().title);
+          // Ochrana proti zběsilému klikání: Plná odměna jen při rozumném počtu pokusů
+          const maxIdealAttempts = pexesoPairCount * 2;
+          const starsEarned = (pexesoAttempts <= maxIdealAttempts) ? (pexesoPairCount >= 6 ? 4 : 2) : 1;
+          addReward(starsEarned, getActiveTopic().title);
         }
         renderActiveGame();
       } else {
@@ -929,6 +1020,9 @@
     }
   }
 
+  // ==========================================
+  // VYKRESLOVÁNÍ
+  // ==========================================
   function renderActiveGame() {
     const main = document.getElementById("main-content");
     const topic = getActiveTopic();
@@ -938,6 +1032,10 @@
     if (selectedGame === "CARDS") {
       const w = topic.words[vCardIdx];
       main.innerHTML = `
+        <div class="exercise-progress-bar">
+          <span>Prohlížení karet</span>
+          <span class="progress-pill">${vCardIdx+1} / ${Math.min(EXERCISE_TARGET, topic.words.length)}</span>
+        </div>
         <div class="prompt-box ${isHebrew ? 'hebrew-text' : ''}">${w.foreign}</div>
         <div class="prompt-box" style="color:#fff;font-size:22px;">${w.czech}</div>
         <div style="text-align:center;color:var(--col-active-tab);font-size:18px;margin-bottom:12px;">[ ${w.pron || ''} ]</div>
@@ -953,266 +1051,4 @@
       const w = topic.words[vCurrentWord];
       const mVal = vMastery[vCurrentWord] || 0;
       main.innerHTML = `
-        <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--col-text-muted);">
-          <span>Naučeno: ${mVal}/2 ★</span>
-          <span>Aktivní skupina: ${vActivePool} z ${topic.words.length}</span>
-        </div>
-        <div class="prompt-box" style="color:#fff;margin-top:6px;">${w.czech}</div>
-        <div class="prompt-box ${isHebrew ? 'hebrew-text' : ''}" style="color:${vQuizRevealed ? 'var(--col-yellow)' : 'var(--col-text-muted)'};">
-          ${vQuizRevealed ? w.foreign : '[ ? ? ? ]'}
-        </div>
-        ${vQuizRevealed ? `
-          <div style="text-align:center;color:var(--col-active-tab);margin-bottom:8px;">[ ${w.pron || ''} ]</div>
-          <div class="grid-2">
-            <div class="action-btn red" onclick="answerAdaptive(false)">Nevěděl jsem</div>
-            <div class="action-btn green" onclick="answerAdaptive(true)">Věděl jsem (+1 ★)</div>
-          </div>
-        ` : `
-          <div class="action-btn" onclick="vQuizRevealed=true;renderActiveGame();">ZKONTROLOVAT</div>
-        `}
-      `;
-    }
-
-    // 3. SKLÁDÁNÍ SLOVA
-    else if (selectedGame === "SCRAMBLE") {
-      const w = topic.words[vCurrentWord];
-      const targetGraphemes = getGraphemes(w.foreign);
-
-      main.innerHTML = `
-        <div style="font-size:13px;color:var(--col-text-muted);text-align:center;">
-          Trénink pravopisu (zbývá v balíčku: ${scrambleDeck.length})
-        </div>
-        <div class="prompt-box" style="font-size:22px;color:#fff;margin-top:6px;">Slož: <b>${w.czech}</b></div>
-        <div class="slots-row ${isHebrew ? 'hebrew-text' : ''}">
-          ${targetGraphemes.map((ch, i) => `
-            <div class="letter-slot ${i < scramblePlaced.length ? 'filled' : ''}">
-              ${i < scramblePlaced.length ? scramblePlaced[i] : '_'}
-            </div>
-          `).join('')}
-        </div>
-        ${!scrambleDone ? `
-          <div class="letters-row">
-            ${scrambleLetters.map((item, idx) => `
-              <div class="letter-tile ${isHebrew ? 'hebrew' : ''} ${item.used ? 'used' : ''}" onclick="clickScrambleLetter(${idx})">
-                ${item.ch}
-              </div>
-            `).join('')}
-          </div>
-        ` : `
-          <div style="text-align:center;color:var(--col-active-tab);margin-bottom:6px;">[ ${w.pron || ''} ]</div>
-          <div class="action-btn ${scrambleHadMistake ? 'red' : 'green'}" onclick="nextScrambleStep()">
-            ${scrambleHadMistake ? 'DOKONČENO S CHYBOU ➔ DALŠÍ' : 'VÝBORNĚ! DALŠÍ SLOVO ➔'}
-          </div>
-        `}
-      `;
-    }
-
-    // 4. DOPLŇOVÁNÍ PÍSMENE
-    else if (selectedGame === "MISSING") {
-      const w = topic.words[vCurrentWord];
-      const letters = getGraphemes(w.foreign);
-
-      let maskedWord = "";
-      letters.forEach((ch, idx) => {
-        if (idx === missingSlot) {
-          maskedWord += missingChosen === -1 ? " [ _ ] " : ` [ ${ch} ] `;
-        } else {
-          maskedWord += ch + " ";
-        }
-      });
-
-      main.innerHTML = `
-        <div style="font-size:13px;color:var(--col-text-muted);text-align:center;">
-          Doplňování znaku (zbývá v balíčku: ${missingDeck.length})
-        </div>
-        <div class="prompt-box" style="font-size:20px;color:#fff;margin-top:6px;">Doplň: <b>${w.czech}</b></div>
-        <div class="prompt-box ${isHebrew ? 'hebrew-text' : ''}">${maskedWord}</div>
-        <div class="grid-2">
-          ${missingChoices.map((ch, i) => {
-            const isCorrect = ch === letters[missingSlot];
-            const cls = missingChosen !== -1 ? (isCorrect ? 'correct' : (i === missingChosen ? 'wrong' : '')) : '';
-            return `<div class="opt-btn ${isHebrew ? 'hebrew' : ''} ${cls}" onclick="clickMissingOption(${i})">${ch}</div>`;
-          }).join('')}
-        </div>
-        ${missingChosen !== -1 ? `<div class="action-btn" onclick="nextMissingStep()">DALŠÍ ➔</div>` : ''}
-      `;
-    }
-
-    // 5. PEXESO
-    else if (selectedGame === "PEXESO") {
-      const isComplete = pexesoMatched.length === Math.min(pexesoPairCount, topic.words.length);
-      const cols = pexesoPairCount <= 4 ? 4 : 4;
-
-      main.innerHTML = `
-        <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--col-text-muted);margin-bottom:6px;">
-          <span>Nalezeno: ${pexesoMatched.length} z ${Math.min(pexesoPairCount, topic.words.length)} dvojic</span>
-          <span style="color:var(--col-yellow);font-weight:bold;">PEXESO</span>
-        </div>
-        ${!isComplete ? `
-          <div class="pexeso-grid" style="grid-template-columns: repeat(${cols}, 1fr);">
-            ${pexesoCards.map((c, i) => {
-              const isMatched = pexesoMatched.includes(c.wordIdx);
-              const isFlipped = pexesoFlipped.includes(i);
-              let cls = isMatched ? 'matched' : (isFlipped ? 'flipped' : 'hidden');
-              if (c.isForeign && isHebrew) cls += ' hebrew';
-              return `
-                <div class="pexeso-card ${cls}" onclick="clickPexesoCard(${i})">
-                  ${isMatched || isFlipped ? c.text : '❓'}
-                </div>
-              `;
-            }).join('')}
-          </div>
-        ` : `
-          <div style="text-align:center;padding:30px 10px;">
-            <h2 style="color:var(--col-green);font-size:26px;margin-bottom:10px;">VÝBORNĚ! PEXESO SPLNĚNO!</h2>
-            <p style="color:var(--col-yellow);font-size:18px;margin-bottom:20px;">Získáváš hvězdy do denního cíle!</p>
-            <div class="action-btn green" onclick="initPexeso();renderActiveGame();">HRÁT ZNOVU ➔</div>
-            <div class="action-btn" style="margin-top:10px;" onclick="setScreen('SELECT_PEXESO_SIZE')">ZMĚNIT VELIKOST PEXESA</div>
-          </div>
-        `}
-      `;
-    }
-
-    // 6. KVÍZ
-    else if (selectedGame === "QUIZ") {
-      const q = topic.questions[qCurStep];
-      main.innerHTML = `
-        <div style="font-size:12px;color:var(--col-text-muted);margin-bottom:4px;">Otázka ${qCurStep+1} z ${topic.questions.length}</div>
-        <div class="prompt-box" style="font-size:20px;color:#fff;">${q.prompt}</div>
-        <div class="grid-2" style="margin-top:10px;">
-          ${q.options.map((opt, i) => `
-            <div class="opt-btn ${qAnswered ? (i === q.correctIdx ? 'correct' : 'wrong') : ''}" onclick="clickQuizOpt(${i})">
-              ${opt}
-            </div>
-          `).join('')}
-        </div>
-        ${qAnswered ? `<div class="action-btn" onclick="nextQuizStep()">DALŠÍ ➔</div>` : ''}
-      `;
-    }
-
-    // 7. POSLOUPNOSTI NA ČAS (MĚSÍCE, DNY, VERŠE)
-    else if (selectedGame === "SEQ") {
-      const isFinished = seqTargetIdx >= topic.items.length;
-      const targetWord = topic.items[seqTargetIdx];
-
-      main.innerHTML = `
-        <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--col-text-muted);">
-          <span>Položka ${Math.min(seqTargetIdx+1, topic.items.length)} z ${topic.items.length} ${seqHintActive ? '<b style="color:var(--col-yellow);">[NÁPOVĚDA]</b>' : ''}</span>
-          <span id="seq-timer" style="color:var(--col-yellow);font-weight:bold;">0.0 s</span>
-        </div>
-        <div class="prompt-box ${isHebrew ? 'hebrew-text' : ''}" style="margin:8px 0;min-height:56px;color:#fff;font-size:22px;">
-          ${topic.items.slice(0, seqTargetIdx).join(' ')} 
-          <span style="color:var(--col-yellow);">${seqHintActive ? `[ ${targetWord}! ]` : '[ ??? ]'}</span>
-        </div>
-        ${!isFinished ? `
-          <div class="grid-2">
-            ${seqSlots.map((itemIdx, slot) => {
-              const isHintSlot = (seqHintActive && itemIdx === seqTargetIdx);
-              return `
-                <div id="seq-btn-${slot}" class="opt-btn ${isHebrew ? 'hebrew' : ''} ${isHintSlot ? 'hint' : ''}" onclick="clickSeqSlot(${slot})">
-                  ${itemIdx !== -1 ? topic.items[itemIdx] : ''}
-                </div>
-              `;
-            }).join('')}
-          </div>
-        ` : `
-          <div class="action-btn green" onclick="initSequence();renderActiveGame();">DOKONČENO! HRÁT ZNOVU</div>
-        `}
-      `;
-    }
-  }
-
-  function vCardPrev() {
-    const topic = getActiveTopic();
-    vCardIdx = (vCardIdx + topic.words.length - 1) % topic.words.length;
-    renderActiveGame();
-  }
-  function vCardNext() {
-    const topic = getActiveTopic();
-    vCardIdx = (vCardIdx + 1) % topic.words.length;
-    renderActiveGame();
-  }
-
-  function clickQuizOpt(idx) {
-    if (qAnswered) return;
-    const topic = getActiveTopic();
-    const q = topic.questions[qCurStep];
-    qAnswered = true;
-    if (idx === q.correctIdx) { sndOk(); addReward(1, topic.title); }
-    else sndErr();
-    renderActiveGame();
-  }
-  function nextQuizStep() {
-    const topic = getActiveTopic();
-    qCurStep++;
-    qAnswered = false;
-    if (qCurStep >= topic.questions.length) setScreen("SELECT_TOPIC");
-    else renderActiveGame();
-  }
-
-  function resetInactivityTimer() {
-    if (seqInactivityTimer) clearTimeout(seqInactivityTimer);
-    seqInactivityTimer = setTimeout(() => {
-      seqHintActive = true;
-      renderActiveGame();
-    }, 3000);
-  }
-
-  function initSequence() {
-    const topic = getActiveTopic();
-    seqTargetIdx = 0;
-    seqHintActive = false;
-    seqSlots = [-1, -1, -1, -1];
-    seqSlots[0] = 0;
-    if (topic.items.length > 1) seqSlots[1] = 1;
-    for (let s = 2; s < Math.min(4, topic.items.length); s++) seqSlots[s] = s;
-    seqSlots.sort(() => Math.random() - 0.5);
-
-    seqStartTime = Date.now();
-    if (seqTimerInterval) clearInterval(seqTimerInterval);
-    seqTimerInterval = setInterval(() => {
-      const el = document.getElementById("seq-timer");
-      if (el && seqTargetIdx < topic.items.length) {
-        el.innerText = ((Date.now() - seqStartTime) / 1000).toFixed(1) + " s";
-      }
-    }, 100);
-
-    resetInactivityTimer();
-  }
-
-  function clickSeqSlot(slot) {
-    const topic = getActiveTopic();
-    const btnEl = document.getElementById(`seq-btn-${slot}`);
-
-    if (seqSlots[slot] === seqTargetIdx) {
-      sndOk();
-      seqTargetIdx++;
-      seqHintActive = false;
-
-      if (seqTargetIdx >= topic.items.length) {
-        clearInterval(seqTimerInterval);
-        if (seqInactivityTimer) clearTimeout(seqInactivityTimer);
-        sndFanfare();
-        addReward(3, topic.title);
-      } else {
-        const next = seqTargetIdx + 1;
-        seqSlots[slot] = next < topic.items.length ? next : -1;
-        resetInactivityTimer();
-      }
-      renderActiveGame();
-    } else {
-      sndErr();
-      if (btnEl) {
-        btnEl.classList.add("wrong");
-        setTimeout(() => { if (btnEl) btnEl.classList.remove("wrong"); }, 250);
-      }
-      seqHintActive = true;
-      resetInactivityTimer();
-      renderActiveGame();
-    }
-  }
-
-  loadData();
-</script>
-</body>
-</html>
+        <div class="exer
