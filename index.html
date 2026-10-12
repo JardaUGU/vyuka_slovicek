@@ -72,7 +72,7 @@
       justify-content: center;
       font-weight: bold;
       cursor: pointer;
-      font-size: 16px;
+      font-size: 15px;
     }
     .badge {
       background: #242c3a;
@@ -88,6 +88,24 @@
     }
     .badge.active { background: var(--col-active-tab); border-color: #fff; }
     .spacer { flex: 1; }
+
+    .tts-toggle-btn {
+      background: #24344d;
+      border: 1px solid var(--col-card-border);
+      color: #fff;
+      border-radius: 6px;
+      padding: 4px 8px;
+      font-size: 12px;
+      font-weight: bold;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .tts-toggle-btn.active {
+      background: var(--col-green);
+      border-color: #fff;
+    }
 
     .study-timer-box {
       background: #101c2e;
@@ -238,6 +256,7 @@
     .opt-btn.correct { background: var(--col-green) !important; border-color: #fff; }
     .opt-btn.wrong { background: var(--col-red) !important; border-color: #fff; }
 
+    /* Velká tlačítka skládání */
     .slots-row, .letters-row {
       display: flex;
       justify-content: center;
@@ -280,6 +299,7 @@
     .letter-tile.hebrew { font-family: 'Tinos', serif; font-size: 32px; }
     .letter-tile.used { background: #181c24; border-color: #282d37; color: #4b5563; cursor: default; box-shadow: none; }
 
+    /* PEXESO STYLY (VĚTŠÍ NA MOBILU) */
     .pexeso-grid {
       display: grid;
       gap: 10px;
@@ -340,6 +360,7 @@
     <div id="badge-subj" class="badge" style="display:none;" onclick="setScreen('SELECT_GROUP')">Předmět</div>
     <div id="badge-group" class="badge" style="display:none;" onclick="setScreen('SELECT_GAME')">Skupina</div>
     <div class="spacer"></div>
+    <div id="btn-tts-auto" class="tts-toggle-btn active" onclick="toggleAutoTTS()" title="Automatické čtení">🔊 Auto</div>
     <div id="study-timer" class="study-timer-box" title="Čas studia dnes">⏱️ 00:00 / 15:00</div>
     <div class="nav-btn" onclick="syncData()" title="Synchronizovat">🔄</div>
   </header>
@@ -363,15 +384,48 @@
   let appData = { users: [], progress: {}, items: [] };
   let currentUser = JSON.parse(localStorage.getItem("cur_user") || 'null');
   let filterGradeOnly = true;
-  let viewMode = "LESSONS"; // "LESSONS" (podle lekcí) nebo "TOPICS" (podle témat)
+  let viewMode = "LESSONS";
 
   let currentScreen = "SELECT_USER";
   let selectedSubject = "";
-  let selectedGroupKey = ""; // např. lekce "Unit 1" nebo téma "Slovesa A2"
-  let activeItems = [];      // filtrované položky pro vybranou skupinu
+  let selectedGroupKey = "";
+  let activeItems = [];
   let selectedGame = "";
 
-  // 1. ČASOVÝ MONITOR: BĚŽÍ JEN PŘI HRANÍ, PAUZA PO 15 SEKUNDÁCH
+  // Automatická výslovnost – VÝCHOZÍ STAV VŽDY ZAPNUTÝ
+  let isAutoTTS = localStorage.getItem("auto_tts") !== "false";
+
+  function toggleAutoTTS() {
+    isAutoTTS = !isAutoTTS;
+    localStorage.setItem("auto_tts", isAutoTTS);
+    updateTTSBtnUI();
+  }
+
+  function updateTTSBtnUI() {
+    const btn = document.getElementById("btn-tts-auto");
+    if (!btn) return;
+    if (isAutoTTS) {
+      btn.className = "tts-toggle-btn active";
+      btn.innerText = "🔊 Auto";
+    } else {
+      btn.className = "tts-toggle-btn";
+      btn.innerText = "🔇 Vyp";
+    }
+  }
+
+  function speakWord(text, langCode) {
+    if (!('speechSynthesis' in window)) return;
+    window.speechSynthesis.cancel();
+    const clean = text.split('-')[0].trim();
+    const u = new SpeechSynthesisUtterance(clean);
+    if (langCode === 'EN') u.lang = 'en-US';
+    else if (langCode === 'DE') u.lang = 'de-DE';
+    else if (langCode === 'HE') u.lang = 'he-IL';
+    else u.lang = 'cs-CZ';
+    window.speechSynthesis.speak(u);
+  }
+
+  // Časový monitor (běží jen v aktivní hře, pauza po 15 s)
   let todaySecondsStudied = 0;
   let lastUserActivityTime = Date.now();
   let isTimerPaused = false;
@@ -433,27 +487,13 @@
     }
   }
 
-  // 2. HLASOVÁ VÝSLOVNOST (Web Speech API)
-  function speakWord(text, langCode) {
-    if (!('speechSynthesis' in window)) return;
-    window.speechSynthesis.cancel();
-    const clean = text.split('-')[0].trim(); // přečte první tvar
-    const u = new SpeechSynthesisUtterance(clean);
-    if (langCode === 'EN') u.lang = 'en-US';
-    else if (langCode === 'DE') u.lang = 'de-DE';
-    else if (langCode === 'HE') u.lang = 'he-IL';
-    else u.lang = 'cs-CZ';
-    window.speechSynthesis.speak(u);
-  }
-
-  // 3. ADAPTIVNÍ VELIKOST OKNA PODLE VĚKU / ROČNÍKU
   function getAdaptiveWindowSize() {
     if (!currentUser) return 3;
-    if (currentUser.grade >= 90) return 12; // Dospělý / Táta
-    if (currentUser.grade >= 9) return 9;   // Honzík (9. třída)
-    if (currentUser.grade >= 7) return 7;   // Míša (7. třída)
-    if (currentUser.grade >= 5) return 5;   // Pavel (5. třída)
-    return 3;                              // Daniel (2. třída)
+    if (currentUser.grade >= 90) return 12;
+    if (currentUser.grade >= 9) return 9;
+    if (currentUser.grade >= 7) return 7;
+    if (currentUser.grade >= 5) return 5;
+    return 3;
   }
 
   // Pexeso stav
@@ -528,7 +568,6 @@
         localStorage.setItem("app_data", JSON.stringify(json));
         document.getElementById("status-info").innerText = "Data aktuální";
 
-        // Pokud uživatel nebyl vybrán nebo potřebuje obnovit
         if (currentUser && appData.users) {
           const foundU = appData.users.find(u => u.name.toLowerCase() === currentUser.name.toLowerCase());
           if (foundU) {
@@ -547,7 +586,6 @@
   async function saveWordMasteryToGoogle(itemQuestion, masteryLevel) {
     if (!currentUser) return;
     try {
-      // Okamžitá lokální aktualizace v mapě pokroku
       const uKey = currentUser.name.toLowerCase().trim();
       if (!appData.progress) appData.progress = {};
       if (!appData.progress[uKey]) appData.progress[uKey] = {};
@@ -579,7 +617,6 @@
     renderScreen();
   }
 
-  // Pomocné rozdělení položek podle typu pro aktuální skupinu
   function getVocabItems() { return activeItems.filter(it => it.type === "SLOVO"); }
   function getQuizItems()  { return activeItems.filter(it => it.type === "KVIZ"); }
   function getSeqItems()   { return activeItems.filter(it => it.type === "RADA"); }
@@ -587,6 +624,7 @@
   function renderScreen() {
     updateFooter();
     updateStudyTimerUI();
+    updateTTSBtnUI();
     const main = document.getElementById("main-content");
     const bUser = document.getElementById("badge-user");
     const bSubj = document.getElementById("badge-subj");
@@ -594,7 +632,7 @@
 
     bUser.innerText = currentUser ? currentUser.name : "Uživatel";
 
-    // 1. VÝBĚR ŽÁKA (100% z tabulky!)
+    // 1. VÝBĚR ŽÁKA
     if (currentScreen === "SELECT_USER" || !currentUser) {
       bSubj.style.display = "none";
       bGroup.style.display = "none";
@@ -641,20 +679,18 @@
       `;
     }
 
-    // 3. VÝBĚR SKUPINY (LEKCE vs. TÉMATA S FILTREM ROČNÍKU)
+    // 3. VÝBĚR SKUPINY (LEKCE vs. TÉMATA)
     else if (currentScreen === "SELECT_GROUP") {
       bSubj.style.display = "flex";
       bSubj.innerText = selectedSubject;
       bGroup.style.display = "none";
 
-      // Filtrujeme položky pro daný předmět a ročník
       const subjItems = appData.items.filter(it => {
         if (it.subject !== selectedSubject) return false;
         if (filterGradeOnly && it.minGrade > currentUser.grade) return false;
         return true;
       });
 
-      // Seskupení podle Lekce nebo podle Téma
       const groupsMap = {};
       subjItems.forEach(it => {
         const key = (viewMode === "LESSONS") ? it.lesson : it.topic;
@@ -701,7 +737,7 @@
       main.innerHTML = html;
     }
 
-    // 4. VÝBĚR HRY V RÁMCI SKUPINY
+    // 4. VÝBĚR HRY
     else if (currentScreen === "SELECT_GAME") {
       bSubj.style.display = "flex";
       bGroup.style.display = "flex";
@@ -867,11 +903,13 @@
         if (m >= 2) masteredCount++;
       });
 
-      // Dynamické okno podle věku žáka!
       const baseWin = getAdaptiveWindowSize();
       vActivePool = Math.min(vItems.length, Math.max(baseWin, masteredCount + baseWin));
 
-      if (selectedGame === "CARDS") vCardIdx = 0;
+      if (selectedGame === "CARDS") {
+        vCardIdx = 0;
+        if (isAutoTTS && vItems.length > 0) speakWord(vItems[0].question, selectedSubject);
+      }
       if (selectedGame === "ADAPTIVE") pickNextAdaptiveWord();
       if (selectedGame === "SCRAMBLE") { scrambleDeck = []; scrambleSolvedCount = 0; initScramble(); }
       if (selectedGame === "MISSING") { missingDeck = []; missingSolvedCount = 0; initMissing(); }
@@ -904,7 +942,7 @@
 
     const stats = getMasteryStats();
     if (stats.masteredCount >= stats.totalWords) {
-      vCurrentWord = -1; // 100% hotovo!
+      vCurrentWord = -1;
       return;
     }
 
@@ -948,12 +986,21 @@
       saveWordMasteryToGoogle(w.question, vMastery[vCurrentWord]);
     } else {
       sndErr();
-      vMastery[vCurrentWord] = 0; // Chyba vrátí slovo k prioritnímu opakování
+      vMastery[vCurrentWord] = 0;
       saveWordMasteryToGoogle(w.question, 0);
     }
 
     pickNextAdaptiveWord();
     renderActiveGame();
+  }
+
+  function revealAdaptiveQuiz() {
+    vQuizRevealed = true;
+    renderActiveGame();
+    if (isAutoTTS && vCurrentWord !== -1) {
+      const vItems = getVocabItems();
+      speakWord(vItems[vCurrentWord].question, selectedSubject);
+    }
   }
 
   function initScramble() {
@@ -993,6 +1040,7 @@
           addReward(1, selectedGroupKey);
           sndFanfare();
         }
+        if (isAutoTTS) speakWord(w.question, selectedSubject);
       }
     } else {
       sndErr();
@@ -1039,6 +1087,7 @@
       sndOk();
       missingSolvedCount++;
       addReward(1, selectedGroupKey);
+      if (isAutoTTS) speakWord(w.question, selectedSubject);
     } else {
       sndErr();
     }
@@ -1050,6 +1099,7 @@
     renderActiveGame();
   }
 
+  // PEXESO – ČTENÍ PŘI KAŽDÉM OTOČENÍ CIZÍHO SLOVA
   function initPexeso() {
     const vItems = getVocabItems();
     const count = Math.min(pexesoPairCount, vItems.length);
@@ -1074,6 +1124,13 @@
     if (pexesoMatched.includes(pexesoCards[index].wordIdx)) return;
 
     pexesoFlipped.push(index);
+    const cardJustFlipped = pexesoCards[index];
+
+    // AUTOMATICKÉ PŘEČTENÍ SLOVA PŘI KAŽDÉM OTOČENÍ
+    if (isAutoTTS && cardJustFlipped.isForeign) {
+      speakWord(cardJustFlipped.text, selectedSubject);
+    }
+
     renderActiveGame();
 
     if (pexesoFlipped.length === 2) {
@@ -1186,7 +1243,7 @@
             <div class="action-btn green" onclick="answerAdaptive(true)">Věděl jsem (+1 ★)</div>
           </div>
         ` : `
-          <div class="action-btn" onclick="vQuizRevealed=true;renderActiveGame();">ZKONTROLOVAT</div>
+          <div class="action-btn" onclick="revealAdaptiveQuiz()">ZKONTROLOVAT</div>
         `}
       `;
     }
@@ -1298,6 +1355,9 @@
           <div style="text-align:center;padding:30px 10px;">
             <h2 style="color:var(--col-green);font-size:26px;margin-bottom:8px;">VÝBORNĚ! PEXESO SPLNĚNO!</h2>
             <p style="color:var(--col-yellow);font-size:18px;margin-bottom:6px;">Hotovo za ${pexesoAttempts} pokusů!</p>
+            <p style="color:var(--col-text-muted);font-size:14px;margin-bottom:20px;">
+              ${pexesoAttempts <= totalPairs * 2 ? 'Skvělá paměť! Žádné zbytečné klikání.' : 'Příště zkus klikat rozvážněji a méně naslepo!'}
+            </p>
             <div class="action-btn green" onclick="initPexeso();renderActiveGame();">HRÁT ZNOVU ➔</div>
             <div class="action-btn" style="margin-top:10px;" onclick="setScreen('SELECT_PEXESO_SIZE')">ZMĚNIT VELIKOST PEXESA</div>
           </div>
@@ -1334,7 +1394,7 @@
 
     // 7. POSLOUPNOSTI NA ČAS
     else if (selectedGame === "SEQ") {
-      const seqConfig = sItems[0]; // vezme vybranou řadu
+      const seqConfig = sItems[0];
       const itemsList = seqConfig.answer.split('|').map(s => s.trim()).filter(Boolean);
       const isFinished = seqTargetIdx >= itemsList.length;
       const targetWord = itemsList[seqTargetIdx];
@@ -1374,11 +1434,13 @@
     const vItems = getVocabItems();
     vCardIdx = (vCardIdx + vItems.length - 1) % vItems.length;
     renderActiveGame();
+    if (isAutoTTS && vItems.length > 0) speakWord(vItems[vCardIdx].question, selectedSubject);
   }
   function vCardNext() {
     const vItems = getVocabItems();
     vCardIdx = (vCardIdx + 1) % vItems.length;
     renderActiveGame();
+    if (isAutoTTS && vItems.length > 0) speakWord(vItems[vCardIdx].question, selectedSubject);
   }
 
   function clickQuizOpt(chosen) {
