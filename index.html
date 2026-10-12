@@ -102,10 +102,7 @@
       align-items: center;
       gap: 4px;
     }
-    .tts-toggle-btn.active {
-      background: var(--col-green);
-      border-color: #fff;
-    }
+    .tts-toggle-btn.active { background: var(--col-green); border-color: #fff; }
 
     .study-timer-box {
       background: #101c2e;
@@ -219,7 +216,6 @@
       cursor: pointer;
       opacity: 0.8;
     }
-    .audio-btn:hover { opacity: 1; }
 
     .action-btn {
       background: var(--col-active-tab);
@@ -256,7 +252,6 @@
     .opt-btn.correct { background: var(--col-green) !important; border-color: #fff; }
     .opt-btn.wrong { background: var(--col-red) !important; border-color: #fff; }
 
-    /* Velká tlačítka skládání */
     .slots-row, .letters-row {
       display: flex;
       justify-content: center;
@@ -299,7 +294,6 @@
     .letter-tile.hebrew { font-family: 'Tinos', serif; font-size: 32px; }
     .letter-tile.used { background: #181c24; border-color: #282d37; color: #4b5563; cursor: default; box-shadow: none; }
 
-    /* PEXESO STYLY (VĚTŠÍ NA MOBILU) */
     .pexeso-grid {
       display: grid;
       gap: 10px;
@@ -383,7 +377,7 @@
 
   let appData = { users: [], progress: {}, items: [] };
   let currentUser = JSON.parse(localStorage.getItem("cur_user") || 'null');
-  let filterGradeOnly = true;
+  let filterExactGradeOnly = true; // PŘÍSNÝ FILTR: POUZE PŘESNÝ ROČNÍK!
   let viewMode = "LESSONS";
 
   let currentScreen = "SELECT_USER";
@@ -392,7 +386,6 @@
   let activeItems = [];
   let selectedGame = "";
 
-  // Automatická výslovnost – VÝCHOZÍ STAV VŽDY ZAPNUTÝ
   let isAutoTTS = localStorage.getItem("auto_tts") !== "false";
 
   function toggleAutoTTS() {
@@ -425,7 +418,6 @@
     window.speechSynthesis.speak(u);
   }
 
-  // Časový monitor (běží jen v aktivní hře, pauza po 15 s)
   let todaySecondsStudied = 0;
   let lastUserActivityTime = Date.now();
   let isTimerPaused = false;
@@ -490,13 +482,13 @@
   function getAdaptiveWindowSize() {
     if (!currentUser) return 3;
     if (currentUser.grade >= 90) return 12;
-    if (currentUser.grade >= 9) return 9;
+    if (currentUser.grade >= 10) return 10; // SŠ
+    if (currentUser.grade >= 9) return 9;   // 9. třída
     if (currentUser.grade >= 7) return 7;
     if (currentUser.grade >= 5) return 5;
     return 3;
   }
 
-  // Pexeso stav
   let pexesoPairCount = 4;
   let pexesoCards = [];
   let pexesoFlipped = [];
@@ -504,7 +496,6 @@
   let pexesoLocked = false;
   let pexesoAttempts = 0;
 
-  // Zvuky
   const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   function playTone(freq, type, duration) {
     try {
@@ -544,7 +535,10 @@
 
   function updateFooter() {
     if (!currentUser) return;
-    document.getElementById("footer-user").innerText = `${currentUser.name} (${currentUser.grade <= 9 ? currentUser.grade + '. tř.' : 'Dospělý'})`;
+    const gradeLabel = currentUser.grade >= 10 && currentUser.grade < 90 
+      ? `${currentUser.grade - 9}. ročník SŠ` 
+      : (currentUser.grade <= 9 ? `${currentUser.grade}. tř.` : 'Dospělý');
+    document.getElementById("footer-user").innerText = `${currentUser.name} (${gradeLabel})`;
   }
 
   async function loadData() {
@@ -646,13 +640,16 @@
       main.innerHTML = `
         <h2 style="font-size:18px;margin-bottom:12px;text-align:center;color:var(--col-yellow);">Kdo se jde učit?</h2>
         <div class="grid-2">
-          ${uList.map(u => `
-            <div class="tile" style="${currentUser && currentUser.name === u.name ? 'border-color:var(--col-green);background:#142838;' : ''}" onclick="selectUser('${u.name}', ${u.grade}, ${u.targetMinutes||15})">
-              <h2>${u.name}</h2>
-              <p>${u.grade <= 9 ? u.grade + '. třída ZŠ' : 'Dospělý'}</p>
-              <p style="color:var(--col-yellow);margin-top:4px;">⏱️ Cíl: ${u.targetMinutes||15} min</p>
-            </div>
-          `).join('')}
+          ${uList.map(u => {
+            const grLabel = u.grade >= 10 && u.grade < 90 ? `${u.grade - 9}. ročník SŠ` : (u.grade <= 9 ? `${u.grade}. třída ZŠ` : 'Dospělý');
+            return `
+              <div class="tile" style="${currentUser && currentUser.name === u.name ? 'border-color:var(--col-green);background:#142838;' : ''}" onclick="selectUser('${u.name}', ${u.grade}, ${u.targetMinutes||15})">
+                <h2>${u.name}</h2>
+                <p>${grLabel}</p>
+                <p style="color:var(--col-yellow);margin-top:4px;">⏱️ Cíl: ${u.targetMinutes||15} min</p>
+              </div>
+            `;
+          }).join('')}
         </div>
       `;
     }
@@ -661,11 +658,11 @@
     else if (currentScreen === "SELECT_SUBJECT") {
       bSubj.style.display = "none";
       bGroup.style.display = "none";
-      const showHebrew = currentUser.grade >= 99 || !filterGradeOnly;
+      const showHebrew = currentUser.grade >= 99 || !filterExactGradeOnly;
 
       main.innerHTML = `
         <div class="grid-2">
-          <div class="tile" onclick="chooseSubject('EN')"><h2>Angličtina</h2><p>Lekce & slovesa A1-B2</p></div>
+          <div class="tile" onclick="chooseSubject('EN')"><h2>Angličtina</h2><p>Lekce ročníku & nepravidelná slovesa</p></div>
           <div class="tile" onclick="chooseSubject('DE')"><h2>Němčina</h2><p>Lekce, barvy, věty, členy</p></div>
           <div class="tile" onclick="chooseSubject('CZ')"><h2>Český jazyk</h2><p>Slovní druhy, pády, I/Y, básničky</p></div>
           <div class="tile" onclick="chooseSubject('PRV')"><h2>Prvouka & čas</h2><p>Dny, měsíce, abeceda</p></div>
@@ -679,16 +676,24 @@
       `;
     }
 
-    // 3. VÝBĚR SKUPINY (LEKCE vs. TÉMATA)
+    // 3. VÝBĚR SKUPINY (LEKCE vs. TÉMATA S PŘÍSNÝM FILTREM ROČNÍKU!)
     else if (currentScreen === "SELECT_GROUP") {
       bSubj.style.display = "flex";
       bSubj.innerText = selectedSubject;
       bGroup.style.display = "none";
 
+      // PŘÍSNÝ FILTR:
+      // Zobrazí POUZE položky pro přesný ročník dítěte!
+      // (Nebo položky společné jako slovesa A1-B2 pokud je minGrade 2 a méně u daného tématu, nebo když je filtr vypnutý)
       const subjItems = appData.items.filter(it => {
         if (it.subject !== selectedSubject) return false;
-        if (filterGradeOnly && it.minGrade > currentUser.grade) return false;
-        return true;
+        if (!filterExactGradeOnly) return true; // Zobrazit vše
+        
+        // Dospělý vidí vše
+        if (currentUser.grade >= 99) return true;
+
+        // Běžný žák: Vidí POUZE svůj ročník (nebo slovesa/společná témata označená pro jeho věk)
+        return it.minGrade === currentUser.grade || it.lesson.toLowerCase().includes('sloves') || it.topic.toLowerCase().includes('irregular');
       });
 
       const groupsMap = {};
@@ -702,6 +707,7 @@
       });
 
       const groups = Object.values(groupsMap);
+      const gradeStr = currentUser.grade >= 10 && currentUser.grade < 90 ? `${currentUser.grade - 9}. ročník SŠ` : `${currentUser.grade}. třída`;
 
       let html = `
         <div class="filter-bar">
@@ -709,23 +715,24 @@
             <button class="toggle-btn ${viewMode === 'LESSONS' ? 'on' : ''}" onclick="viewMode='LESSONS';renderScreen();">📁 Podle lekcí</button>
             <button class="toggle-btn ${viewMode === 'TOPICS' ? 'on' : ''}" onclick="viewMode='TOPICS';renderScreen();">🏷️ Podle témat</button>
           </div>
-          <button class="toggle-btn ${filterGradeOnly ? 'on' : ''}" onclick="filterGradeOnly=!filterGradeOnly;renderScreen();">
-            ${filterGradeOnly ? 'Jen pro mě' : 'Vše'}
+          <button class="toggle-btn ${filterExactGradeOnly ? 'on' : ''}" onclick="filterExactGradeOnly=!filterExactGradeOnly;renderScreen();">
+            ${filterExactGradeOnly ? 'Jen ' + gradeStr : 'Všechny ročníky'}
           </button>
         </div>
         <div style="display:flex;flex-direction:column;gap:8px;">
       `;
 
       if (groups.length === 0) {
-        html += `<div style="text-align:center;padding:25px;color:var(--col-text-muted);">Žádné položky pro tento ročník. Klikněte nahoře na "Vše".</div>`;
+        html += `<div style="text-align:center;padding:25px;color:var(--col-text-muted);">Pro ${gradeStr} tu zatím není specifické téma. Klikněte nahoře na "Všechny ročníky".</div>`;
       } else {
         groups.forEach(g => {
           const typeLabels = Array.from(g.types).map(t => t === 'SLOVO' ? 'Slova' : (t === 'KVIZ' ? 'Kvíz' : 'Řada')).join(', ');
+          const gGradeLabel = g.minGrade >= 10 && g.minGrade < 90 ? `${g.minGrade - 9}. ročník SŠ` : (g.minGrade <= 9 ? `${g.minGrade}. tř.` : 'Dospělý');
           html += `
             <div class="tile" style="flex-direction:row;justify-content:space-between;padding:12px;" onclick="chooseGroup('${g.name}')">
               <div style="text-align:left;">
                 <h2>${g.name}</h2>
-                <p>${typeLabels} (${g.minGrade <= 9 ? g.minGrade + '. tř.' : 'Dospělý'})</p>
+                <p>${typeLabels} (${gGradeLabel})</p>
               </div>
               <span style="color:var(--col-active-tab);font-weight:bold;">${g.count} úloh</span>
             </div>
@@ -1099,7 +1106,6 @@
     renderActiveGame();
   }
 
-  // PEXESO – ČTENÍ PŘI KAŽDÉM OTOČENÍ CIZÍHO SLOVA
   function initPexeso() {
     const vItems = getVocabItems();
     const count = Math.min(pexesoPairCount, vItems.length);
@@ -1126,7 +1132,6 @@
     pexesoFlipped.push(index);
     const cardJustFlipped = pexesoCards[index];
 
-    // AUTOMATICKÉ PŘEČTENÍ SLOVA PŘI KAŽDÉM OTOČENÍ
     if (isAutoTTS && cardJustFlipped.isForeign) {
       speakWord(cardJustFlipped.text, selectedSubject);
     }
