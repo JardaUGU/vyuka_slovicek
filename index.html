@@ -415,23 +415,46 @@ function speakWord(text, langCode) {
 
     let toSpeak = text;
 
-    // Speciální fonetická oprava pro nepravidelná slovesa se shodným zápisem
+    // 1. Zvláštní fonetické opravy pro slovesa
     if (text.toLowerCase().includes('read - read - read') || text.toLowerCase().includes('read-read-read')) {
       toSpeak = "read, red, red";
-    } 
-    // Obecná úprava pro nepravidelná slovesa: pomlčky nahradíme čárkami pro pauzy
-    else if (text.includes('-')) {
+    } else if (text.includes('-')) {
+      // Rozdělení pomlček na zřetelné pauzy
       toSpeak = text.replace(/\//g, ' or ').replace(/-/g, ', ');
     }
 
     const u = new SpeechSynthesisUtterance(toSpeak);
-    if (langCode === 'EN') u.lang = 'en-US';
-    else if (langCode === 'DE') u.lang = 'de-DE';
-    else if (langCode === 'HE') u.lang = 'he-IL';
-    else u.lang = 'cs-CZ';
 
-    u.rate = 0.88; // Mírně pomalejší tempo pro zřetelnou artikulaci
+    // 2. Vynucení správného jazyka
+    let targetLang = 'cs-CZ';
+    if (langCode === 'EN' || selectedSubject === 'EN' || text.includes(' - ')) {
+      targetLang = 'en-US';
+    } else if (langCode === 'DE' || selectedSubject === 'DE') {
+      targetLang = 'de-DE';
+    } else if (langCode === 'HE' || selectedSubject === 'HE') {
+      targetLang = 'he-IL';
+    }
+
+    u.lang = targetLang;
+    u.rate = 0.86; // Klidné tempo
+
+    // 3. Vynucení skutečného cizojazyčného hlasu (klíčové pro iPhone Safari!)
+    const voices = window.speechSynthesis.getVoices();
+    if (voices.length > 0) {
+      const matchVoice = voices.find(v => v.lang.startsWith(targetLang.split('-')[0]));
+      if (matchVoice) {
+        u.voice = matchVoice;
+      }
+    }
+
     window.speechSynthesis.speak(u);
+  }
+
+  // Předehřátí hlasů v prohlížeči při startu (aby byly hlasy v iOS ihned připravené)
+  if ('speechSynthesis' in window) {
+    window.speechSynthesis.onvoiceschanged = () => {
+      window.speechSynthesis.getVoices();
+    };
   }
 
   let todaySecondsStudied = 0;
