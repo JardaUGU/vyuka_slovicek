@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Výukový Systém</title>
   
-  <!-- iOS PWA Standalone režim bez lišt prohlížeče -->
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Výuka">
@@ -142,7 +141,7 @@
       align-items: center;
       justify-content: space-between;
       padding: 0 12px;
-      font-size: 13px;
+      font-size: 12px;
       color: var(--col-yellow);
     }
     .grid-2 {
@@ -375,8 +374,8 @@
 
   <footer>
     <div id="footer-user">Žák: --</div>
-    <div id="footer-goal">Cíl dnes: 0 / 15 min ⏱️</div>
-    <div id="status-info">Online</div>
+    <div id="footer-version" onclick="forceHardReload()" style="cursor:pointer;opacity:0.8;color:var(--col-active-tab);" title="Klepnutím vynutíte nahrání nové verze">v3.1 (Obnovit kód)</div>
+    <div id="footer-goal">0/15 min ⏱️</div>
   </footer>
 </div>
 
@@ -393,6 +392,11 @@
   let selectedGroupKey = "";
   let activeItems = [];
   let selectedGame = "";
+
+  // Vynucený reload k prolomení mezipaměti iOS Safari
+  function forceHardReload() {
+    window.location.href = window.location.origin + window.location.pathname + '?reload=' + Date.now();
+  }
 
   let isAutoTTS = localStorage.getItem("auto_tts") !== "false";
 
@@ -440,7 +444,6 @@
     window.speechSynthesis.speak(u);
   }
 
-  // Monitor aktivity pro férový čas
   let todaySecondsStudied = 0;
   let lastUserActivityTime = Date.now();
   let isTimerPaused = false;
@@ -486,7 +489,7 @@
 
     const spentMin = Math.floor(todaySecondsStudied / 60);
     if (footerGoal) {
-      footerGoal.innerText = `Cíl: ${spentMin} / ${currentUser.targetMinutes || 15} min ⏱️`;
+      footerGoal.innerText = `${spentMin} / ${currentUser.targetMinutes || 15} min ⏱️`;
     }
 
     if (currentScreen !== "PLAYING" || isTimerPaused) {
@@ -502,11 +505,10 @@
     }
   }
 
-  // Leitnerovo okno podle ročníku (bez hardcoded jmen!)
   function getAdaptiveWindowSize(grade) {
-    if (grade >= 90) return 12; // Dospělý
-    if (grade >= 10) return 10; // SŠ
-    return Math.max(3, grade);  // ZŠ: 2. tř -> 3, 5. tř -> 5, 7. tř -> 7, 9. tř -> 9
+    if (grade >= 90) return 12;
+    if (grade >= 10) return 10;
+    return Math.max(3, Number(grade));
   }
 
   let pexesoPairCount = 4;
@@ -586,7 +588,7 @@
           const foundU = appData.users.find(u => u.name.toLowerCase() === currentUser.name.toLowerCase());
           if (foundU) {
             currentUser.targetMinutes = foundU.targetMinutes || 15;
-            currentUser.grade = foundU.grade;
+            currentUser.grade = Number(foundU.grade);
             localStorage.setItem("cur_user", JSON.stringify(currentUser));
           }
         }
@@ -646,14 +648,14 @@
 
     bUser.innerText = currentUser ? currentUser.name : "Uživatel";
 
-    // 1. VÝBĚR ŽÁKA (100% z Google Sheets)
+    // 1. VÝBĚR ŽÁKA
     if (currentScreen === "SELECT_USER" || !currentUser) {
       bSubj.style.display = "none";
       bGroup.style.display = "none";
       const uList = (appData.users && appData.users.length) ? appData.users : [];
 
       if (uList.length === 0) {
-        main.innerHTML = `<div style="text-align:center;padding:30px;color:var(--col-text-muted);">Načítám profily z listu Uzivatele...</div>`;
+        main.innerHTML = `<div style="text-align:center;padding:30px;color:var(--col-text-muted);">Načítám profily z tabulky...</div>`;
         return;
       }
 
@@ -674,16 +676,16 @@
       `;
     }
 
-    // 2. VÝBĚR PŘEDMĚTU (100% DYNAMICKÝ ZE VŠECH LISTŮ – VČETNĚ DĚJEPISU!)
+    // 2. VÝBĚR PŘEDMĚTU
     else if (currentScreen === "SELECT_SUBJECT") {
       bSubj.style.display = "none";
       bGroup.style.display = "none";
 
       const subjectsMap = {};
       appData.items.forEach(it => {
-        if (filterExactGradeOnly && currentUser.grade < 90) {
-          const isCommon = it.lesson.toLowerCase().includes('sloves') || it.topic.toLowerCase().includes('irregular');
-          if (it.minGrade !== currentUser.grade && !isCommon) return;
+        // PŘÍSNÁ FILTRACE PŘEDMĚTŮ:
+        if (filterExactGradeOnly && Number(currentUser.grade) < 90) {
+          if (Number(it.minGrade) !== Number(currentUser.grade)) return;
         }
         if (!subjectsMap[it.subject]) {
           subjectsMap[it.subject] = { name: it.subject, count: 0 };
@@ -695,7 +697,7 @@
 
       let html = `
         <div class="filter-bar">
-          <span>Filtr: ${filterExactGradeOnly ? 'Jen můj ročník' : 'Vše'}</span>
+          <span>Filtr: ${filterExactGradeOnly ? 'Jen můj ročník' : 'Všechny ročníky'}</span>
           <button class="toggle-btn ${filterExactGradeOnly ? 'on' : ''}" onclick="filterExactGradeOnly=!filterExactGradeOnly;renderScreen();">
             ${filterExactGradeOnly ? 'Jen můj ročník' : 'Všechny ročníky'}
           </button>
@@ -721,19 +723,18 @@
       main.innerHTML = html;
     }
 
-    // 3. VÝBĚR SKUPINY (LEKCE vs. TÉMATA S PŘÍSNÝM FILTREM ROČNÍKU)
+    // 3. VÝBĚR SKUPINY (STRIKTNĚ POUZE ROČNÍK ŽÁKA)
     else if (currentScreen === "SELECT_GROUP") {
       bSubj.style.display = "flex";
       bSubj.innerText = selectedSubject;
       bGroup.style.display = "none";
 
+      // PŘÍSNÝ FILTR BEZ JAKÝCHKOLIV VÝJIMEK:
       const subjItems = appData.items.filter(it => {
         if (it.subject !== selectedSubject) return false;
         if (!filterExactGradeOnly) return true;
         if (Number(currentUser.grade) >= 90) return true;
-        
-        const isCommon = it.lesson.toLowerCase().includes('sloves') || it.topic.toLowerCase().includes('irregular');
-        return Number(it.minGrade) === Number(currentUser.grade) || isCommon;
+        return Number(it.minGrade) === Number(currentUser.grade);
       });
 
       const groupsMap = {};
@@ -763,7 +764,7 @@
       `;
 
       if (groups.length === 0) {
-        html += `<div style="text-align:center;padding:25px;color:var(--col-text-muted);">Pro ${gradeStr} tu zatím není látka. Klikněte nahoře na "Všechny ročníky".</div>`;
+        html += `<div style="text-align:center;padding:25px;color:var(--col-text-muted);">Pro ${gradeStr} tu zatím není látka. Přepněte na "Všechny ročníky".</div>`;
       } else {
         groups.forEach(g => {
           const typeLabels = Array.from(g.types).map(t => t === 'SLOVO' ? 'Slova' : (t === 'KVIZ' ? 'Kvíz' : 'Řada')).join(', ');
@@ -862,33 +863,25 @@
   }
 
   function selectUser(name, grade, targetMinutes) {
-    currentUser = { name, grade, targetMinutes, stars: 0 };
+    currentUser = { name, grade: Number(grade), targetMinutes: Number(targetMinutes), stars: 0 };
     localStorage.setItem("cur_user", JSON.stringify(currentUser));
     todaySecondsStudied = Number(localStorage.getItem(`time_${new Date().toDateString()}_${currentUser.name}`) || 0);
     setScreen("SELECT_SUBJECT");
   }
 
-function chooseGroup(groupName) {
-    selectedGroupKey = groupName;
-    activeItems = appData.items.filter(it => {
-      if (it.subject !== selectedSubject) return false;
-
-      // STRIKTNÍ FILTR: Daniel vidí POUZE svůj ročník i uvnitř zvolené lekce!
-      if (filterExactGradeOnly && Number(currentUser.grade) < 90) {
-        const isCommon = it.lesson.toLowerCase().includes('sloves') || it.topic.toLowerCase().includes('irregular');
-        if (Number(it.minGrade) !== Number(currentUser.grade) && !isCommon) return false;
-      }
-
-      const key = (viewMode === "LESSONS") ? it.lesson : it.topic;
-      return key === groupName;
-    });
-    setScreen("SELECT_GAME");
+  function chooseSubject(subj) {
+    selectedSubject = subj;
+    setScreen("SELECT_GROUP");
   }
 
+  // PŘÍSNÁ FILTRACE PŘI KLIKNUTÍ NA SKUPINU (ŽÁDNÉ MÍCHÁNÍ TŘÍD)
   function chooseGroup(groupName) {
     selectedGroupKey = groupName;
     activeItems = appData.items.filter(it => {
       if (it.subject !== selectedSubject) return false;
+      if (filterExactGradeOnly && Number(currentUser.grade) < 90) {
+        if (Number(it.minGrade) !== Number(currentUser.grade)) return false;
+      }
       const key = (viewMode === "LESSONS") ? it.lesson : it.topic;
       return key === groupName;
     });
@@ -962,7 +955,6 @@ function chooseGroup(groupName) {
         if (m >= 2) masteredCount++;
       });
 
-      // Škálování podle ročníku žáka!
       const baseWin = getAdaptiveWindowSize(currentUser.grade);
       vActivePool = Math.min(vItems.length, Math.max(baseWin, masteredCount + baseWin));
 
