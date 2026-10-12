@@ -730,8 +730,10 @@
       const subjItems = appData.items.filter(it => {
         if (it.subject !== selectedSubject) return false;
         if (!filterExactGradeOnly) return true;
-        if (currentUser.grade >= 90) return true;
-        return it.minGrade === currentUser.grade || it.lesson.toLowerCase().includes('sloves') || it.topic.toLowerCase().includes('irregular');
+        if (Number(currentUser.grade) >= 90) return true;
+        
+        const isCommon = it.lesson.toLowerCase().includes('sloves') || it.topic.toLowerCase().includes('irregular');
+        return Number(it.minGrade) === Number(currentUser.grade) || isCommon;
       });
 
       const groupsMap = {};
@@ -866,9 +868,21 @@
     setScreen("SELECT_SUBJECT");
   }
 
-  function chooseSubject(subj) {
-    selectedSubject = subj;
-    setScreen("SELECT_GROUP");
+function chooseGroup(groupName) {
+    selectedGroupKey = groupName;
+    activeItems = appData.items.filter(it => {
+      if (it.subject !== selectedSubject) return false;
+
+      // STRIKTNÍ FILTR: Daniel vidí POUZE svůj ročník i uvnitř zvolené lekce!
+      if (filterExactGradeOnly && Number(currentUser.grade) < 90) {
+        const isCommon = it.lesson.toLowerCase().includes('sloves') || it.topic.toLowerCase().includes('irregular');
+        if (Number(it.minGrade) !== Number(currentUser.grade) && !isCommon) return false;
+      }
+
+      const key = (viewMode === "LESSONS") ? it.lesson : it.topic;
+      return key === groupName;
+    });
+    setScreen("SELECT_GAME");
   }
 
   function chooseGroup(groupName) {
