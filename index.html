@@ -676,14 +676,14 @@
       `;
     }
 
-    // 2. VÝBĚR PŘEDMĚTU
+    // 2. VÝBĚR PŘEDMĚTU – 100% AUTOMATICKY ZE VŠECH LISTŮ (Literatura, Dejepis...)
     else if (currentScreen === "SELECT_SUBJECT") {
       bSubj.style.display = "none";
       bGroup.style.display = "none";
 
       const subjectsMap = {};
       appData.items.forEach(it => {
-        // PŘÍSNÁ FILTRACE PŘEDMĚTŮ:
+        // Filtr ročníku: zobrazí předměty, které mají látku pro Honzíkův ročník
         if (filterExactGradeOnly && Number(currentUser.grade) < 90) {
           if (Number(it.minGrade) !== Number(currentUser.grade)) return;
         }
@@ -722,7 +722,6 @@
       html += `</div>`;
       main.innerHTML = html;
     }
-
     // 3. VÝBĚR SKUPINY (STRIKTNĚ POUZE ROČNÍK ŽÁKA)
     else if (currentScreen === "SELECT_GROUP") {
       bSubj.style.display = "flex";
