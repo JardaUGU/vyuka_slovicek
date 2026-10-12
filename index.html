@@ -406,14 +406,18 @@
     }
   }
 
-  function speakWord(text, langCode) {
+function speakWord(text, langCode) {
     if (!('speechSynthesis' in window)) return;
     window.speechSynthesis.cancel();
 
-    // Pokud jde o nepravidelná slovesa s pomlčkami (např. "get - got - got"):
-    // nahradíme pomlčky čárkami s mezerou, aby syntetizér přečetl všechny 3 tvary s hezkou pauzou!
     let toSpeak = text;
-    if (text.includes('-')) {
+
+    // Speciální fonetická oprava pro nepravidelná slovesa se shodným zápisem
+    if (text.toLowerCase().includes('read - read - read') || text.toLowerCase().includes('read-read-read')) {
+      toSpeak = "read, red, red";
+    } 
+    // Obecná úprava pro nepravidelná slovesa: pomlčky nahradíme čárkami pro pauzy
+    else if (text.includes('-')) {
       toSpeak = text.replace(/\//g, ' or ').replace(/-/g, ', ');
     }
 
@@ -423,7 +427,7 @@
     else if (langCode === 'HE') u.lang = 'he-IL';
     else u.lang = 'cs-CZ';
 
-    u.rate = 0.88; // Mírně pomalejší tempo pro srozumitelnost všech tvarů
+    u.rate = 0.88; // Mírně pomalejší tempo pro zřetelnou artikulaci
     window.speechSynthesis.speak(u);
   }
 
