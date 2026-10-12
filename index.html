@@ -141,7 +141,7 @@
       align-items: center;
       justify-content: space-between;
       padding: 0 12px;
-      font-size: 11px;
+      font-size: 12px;
       color: var(--col-yellow);
     }
     .grid-2 {
@@ -259,6 +259,7 @@
     .opt-btn.correct { background: var(--col-green) !important; border-color: #fff; }
     .opt-btn.wrong { background: var(--col-red) !important; border-color: #fff; }
 
+    /* Velká tlačítka skládání */
     .slots-row, .letters-row {
       display: flex;
       justify-content: center;
@@ -374,8 +375,8 @@
 
   <footer>
     <div id="footer-user">Žák: --</div>
-    <div id="footer-status" style="color:var(--col-active-tab);cursor:pointer;" onclick="forceHardReload()">v3.2 (Obnovit)</div>
-    <div id="footer-goal">0/15 min ⏱️</div>
+    <div id="footer-status" style="color:var(--col-active-tab);cursor:pointer;" onclick="forceHardReload()">v3.3 (Obnovit kód)</div>
+    <div id="footer-goal">0 / 15 min ⏱️</div>
   </footer>
 </div>
 
@@ -397,6 +398,83 @@
     window.location.href = window.location.origin + window.location.pathname + '?reload=' + Date.now();
   }
 
+  // --- TRVALÁ SPRÁVA ČASU BEZ RESETU NA NULU ---
+  function getStudyTimeKey(userName) {
+    const d = new Date();
+    const dateKey = `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+    const uKey = (userName || 'user').toLowerCase().trim();
+    return `study_sec_${dateKey}_${uKey}`;
+  }
+
+  function loadUserStudyTime(userName) {
+    if (!userName) return 0;
+    return Number(localStorage.getItem(getStudyTimeKey(userName)) || 0);
+  }
+
+  // Okamžité načtení dosavadního dnešního času ze storage
+  let todaySecondsStudied = currentUser ? loadUserStudyTime(currentUser.name) : 0;
+  let lastUserActivityTime = Date.now();
+  let isTimerPaused = false;
+
+  function registerUserAction() {
+    lastUserActivityTime = Date.now();
+    if (isTimerPaused) {
+      isTimerPaused = false;
+      updateStudyTimerUI();
+    }
+  }
+
+  window.addEventListener('click', registerUserAction, true);
+  window.addEventListener('touchstart', registerUserAction, true);
+
+  // Časovač: tolerance 60 s nečinnosti před pauzou
+  setInterval(() => {
+    if (currentScreen === "PLAYING" && currentUser) {
+      const idleTime = Date.now() - lastUserActivityTime;
+      if (idleTime < 60000) {
+        todaySecondsStudied++;
+        localStorage.setItem(getStudyTimeKey(currentUser.name), todaySecondsStudied);
+        isTimerPaused = false;
+      } else {
+        isTimerPaused = true;
+      }
+    } else {
+      isTimerPaused = true;
+    }
+    updateStudyTimerUI();
+  }, 1000);
+
+  function updateStudyTimerUI() {
+    const box = document.getElementById("study-timer");
+    const footerGoal = document.getElementById("footer-goal");
+    if (!box || !currentUser) return;
+
+    const targetSec = (currentUser.targetMinutes || 15) * 60;
+    const format = s => {
+      const m = Math.floor(s / 60);
+      const sec = s % 60;
+      return `${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+    };
+
+    const spentMin = Math.floor(todaySecondsStudied / 60);
+    if (footerGoal) {
+      footerGoal.innerText = `${spentMin} / ${currentUser.targetMinutes || 15} min ⏱️`;
+    }
+
+    if (currentScreen !== "PLAYING" || isTimerPaused) {
+      box.className = "study-timer-box paused";
+      box.innerText = `⏸️ ${format(todaySecondsStudied)} / ${format(targetSec)}`;
+    } else if (todaySecondsStudied < targetSec) {
+      box.className = "study-timer-box";
+      box.innerText = `⏱️ ${format(todaySecondsStudied)} / ${format(targetSec)}`;
+    } else {
+      const bonusSec = todaySecondsStudied - targetSec;
+      box.className = "study-timer-box bonus";
+      box.innerText = `★ BONUS: +${format(bonusSec)}`;
+    }
+  }
+
+  // --- AUTOMATICKÁ VÝSLOVNOST ---
   let isAutoTTS = localStorage.getItem("auto_tts") !== "false";
 
   function toggleAutoTTS() {
@@ -443,72 +521,12 @@
     window.speechSynthesis.speak(u);
   }
 
-  let todaySecondsStudied = 0;
-  let lastUserActivityTime = Date.now();
-  let isTimerPaused = false;
-
-  function registerUserAction() {
-    lastUserActivityTime = Date.now();
-    if (isTimerPaused) {
-      isTimerPaused = false;
-      updateStudyTimerUI();
-    }
-  }
-
-  window.addEventListener('click', registerUserAction, true);
-  window.addEventListener('touchstart', registerUserAction, true);
-
-  setInterval(() => {
-    if (currentScreen === "PLAYING" && currentUser) {
-      const idleTime = Date.now() - lastUserActivityTime;
-      if (idleTime < 15000) {
-        todaySecondsStudied++;
-        localStorage.setItem(`time_${new Date().toDateString()}_${currentUser.name}`, todaySecondsStudied);
-        isTimerPaused = false;
-      } else {
-        isTimerPaused = true;
-      }
-    } else {
-      isTimerPaused = true;
-    }
-    updateStudyTimerUI();
-  }, 1000);
-
-  function updateStudyTimerUI() {
-    const box = document.getElementById("study-timer");
-    const footerGoal = document.getElementById("footer-goal");
-    if (!box || !currentUser) return;
-
-    const targetSec = (currentUser.targetMinutes || 15) * 60;
-    const format = s => {
-      const m = Math.floor(s / 60);
-      const sec = s % 60;
-      return `${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
-    };
-
-    const spentMin = Math.floor(todaySecondsStudied / 60);
-    if (footerGoal) {
-      footerGoal.innerText = `${spentMin} / ${currentUser.targetMinutes || 15} min ⏱️`;
-    }
-
-    if (currentScreen !== "PLAYING" || isTimerPaused) {
-      box.className = "study-timer-box paused";
-      box.innerText = `⏸️ ${format(todaySecondsStudied)} / ${format(targetSec)}`;
-    } else if (todaySecondsStudied < targetSec) {
-      box.className = "study-timer-box";
-      box.innerText = `⏱️ ${format(todaySecondsStudied)} / ${format(targetSec)}`;
-    } else {
-      const bonusSec = todaySecondsStudied - targetSec;
-      box.className = "study-timer-box bonus";
-      box.innerText = `★ BONUS: +${format(bonusSec)}`;
-    }
-  }
-
+  // --- LEITNEROVO OKNO DLE ROČNÍKU ---
   function getAdaptiveWindowSize(grade) {
     const g = parseInt(grade) || 2;
-    if (g >= 90) return 12;
-    if (g >= 10) return 10;
-    return Math.max(3, g);
+    if (g >= 90) return 12; // Dospělý
+    if (g >= 10) return 10; // SŠ
+    return Math.max(3, g);  // ZŠ: 2. tř -> 3, 5. tř -> 5, 7. tř -> 7, 9. tř -> 9
   }
 
   let pexesoPairCount = 4;
@@ -538,6 +556,7 @@
     [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => playTone(f, 'triangle', 0.1), i * 110));
   }
 
+  // Logování aktivity (odešle skutečné minuty do Google Sheets)
   function addReward(count = 1, section = "Lekce") {
     if (!currentUser) return;
     currentUser.stars = (currentUser.stars || 0) + count;
@@ -551,6 +570,8 @@
       fd.append("subject", selectedSubject);
       fd.append("section", section);
       fd.append("stars", count);
+      // PŘESNÉ MINUTY ODESÍLANÉ DO LISTU AKTIVITA
+      fd.append("minutes", (todaySecondsStudied / 60).toFixed(1));
       fetch(API_URL, { method: "POST", mode: "no-cors", body: fd });
     } catch(e) {}
   }
@@ -581,9 +602,8 @@
       const res = await fetch(API_URL);
       const json = await res.json();
       
-      // DIAGNOSTIKA: Kontrola, zda Google vrací novou strukturu
       if (!json.items) {
-        alert("CHYBA V GOOGLE SKRIPTU:\nGoogle Apps Script vrátil starý formát bez 'items'.\nV Apps Scriptu musíte kliknout na:\nImplementovat -> Spravovat implementace -> Upravit (tužka) -> Verze: NOVÁ VERZE -> Implementovat.");
+        alert("CHYBA V GOOGLE APPS SCRIPTU:\nSkript vrátil data bez 'items'.\nV editoru skriptu musíte kliknout na:\nImplementovat ➔ Spravovat implementace ➔ Upravit (tužka) ➔ Verze: NOVÁ VERZE ➔ Implementovat.");
         if (statusEl) statusEl.innerText = "Chyba API";
         return;
       }
@@ -686,7 +706,7 @@
       `;
     }
 
-    // 2. VÝBĚR PŘEDMĚTU
+    // 2. VÝBĚR PŘEDMĚTU (100% dynamický ze všech listů)
     else if (currentScreen === "SELECT_SUBJECT") {
       bSubj.style.display = "none";
       bGroup.style.display = "none";
@@ -696,7 +716,6 @@
 
       (appData.items || []).forEach(it => {
         const itemG = parseInt(it.minGrade) || 2;
-        // Přísný filtr ročníku
         if (filterExactGradeOnly && userG < 90) {
           if (itemG !== userG) return;
         }
@@ -881,7 +900,10 @@
   function selectUser(name, grade, targetMinutes) {
     currentUser = { name, grade: parseInt(grade) || 2, targetMinutes: parseInt(targetMinutes) || 15, stars: 0 };
     localStorage.setItem("cur_user", JSON.stringify(currentUser));
-    todaySecondsStudied = Number(localStorage.getItem(`time_${new Date().toDateString()}_${currentUser.name}`) || 0);
+    todaySecondsStudied = loadUserStudyTime(currentUser.name);
+    lastUserActivityTime = Date.now();
+    isTimerPaused = false;
+    updateStudyTimerUI();
     setScreen("SELECT_SUBJECT");
   }
 
