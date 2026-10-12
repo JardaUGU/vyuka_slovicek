@@ -427,11 +427,11 @@
   window.addEventListener('click', registerUserAction, true);
   window.addEventListener('touchstart', registerUserAction, true);
 
-  // Časovač: tolerance 60 s nečinnosti před pauzou
+  // Časovač: tolerance 30 s nečinnosti před pauzou
   setInterval(() => {
     if (currentScreen === "PLAYING" && currentUser) {
       const idleTime = Date.now() - lastUserActivityTime;
-      if (idleTime < 60000) {
+      if (idleTime < 30000) {
         todaySecondsStudied++;
         localStorage.setItem(getStudyTimeKey(currentUser.name), todaySecondsStudied);
         isTimerPaused = false;
