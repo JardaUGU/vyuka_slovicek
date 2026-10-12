@@ -516,6 +516,7 @@
     try {
       const fd = new URLSearchParams();
       fd.append("action", "save_mastery");
+      fd.append("user", currentUser.name);
       fd.append("lessonId", lessonId);
       fd.append("foreign", foreignWord);
       fd.append("mastery", masteryLevel);
@@ -807,11 +808,17 @@
     if (currentTopicType === "VOCAB") {
       vMastery = {};
       let masteredCount = 0;
+      const uKey = currentUser.name.toLowerCase().trim();
+      const userProgress = (appData.progress && appData.progress[uKey]) ? appData.progress[uKey] : {};
+
       topic.words.forEach((w, i) => {
-        const m = Number(w.mastery || 0);
+        // Zjistíme úroveň pro přihlášeného žáka z dynamické mapy pokroku
+        const m = Number(userProgress[w.foreign] || 0);
         vMastery[i] = m;
         if (m >= 2) masteredCount++;
       });
+
+      // Aktivní okno pro daného žáka
       vActivePool = Math.min(topic.words.length, Math.max(3, masteredCount + 3));
 
       if (selectedGame === "CARDS") vCardIdx = 0;
