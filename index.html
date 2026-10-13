@@ -14,19 +14,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Tinos:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=4.7">
-
-  <!-- Filtr proti falešným systémovým chybám prohlížeče -->
-  <script>
-    window.addEventListener('error', function(e) {
-      if (!e.message || e.message === 'Script error.' || e.lineno === 0) return;
-      const m = document.getElementById('main-content');
-      if (m) {
-        m.innerHTML = '<div style="background:#ef4444;color:#fff;padding:15px;border-radius:8px;margin:20px;text-align:left;">' +
-          '<b>Chyba v JavaScriptu:</b><br>' + e.message + '<br><small>' + (e.filename || '') + ':' + e.lineno + '</small></div>';
-      }
-    });
-  </script>
+  <link rel="stylesheet" href="style.css?v=4.8">
 </head>
 <body>
 
@@ -50,13 +38,13 @@
 
   <footer>
     <div id="footer-user">Žák: --</div>
-    <div id="footer-status" style="color:var(--col-active-tab);cursor:pointer;" onclick="forceHardReload()">v4.7 (Restart)</div>
+    <div id="footer-status" style="color:var(--col-active-tab);cursor:pointer;" onclick="forceHardReload()">v4.8 (Restart)</div>
     <div id="footer-goal">0 / 15 min ⏱️</div>
   </footer>
 </div>
 
-<script src="app.js?v=4.7"></script>
-<script src="math_engine.js?v=4.7"></script>
-<script src="games.js?v=4.7"></script>
+<script src="app.js?v=4.8"></script>
+<script src="math_engine.js?v=4.8"></script>
+<script src="games.js?v=4.8"></script>
 </body>
 </html>
