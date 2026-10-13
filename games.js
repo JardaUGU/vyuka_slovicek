@@ -1,6 +1,14 @@
 /**
- * HERNÍ REŽIMY: KARTY, OBOUSMĚRNÉ ZKOUŠENÍ, CHYTRÉ SKLÁDÁNÍ, RYCHLÁ VOLBA, PEXESO, KVÍZ, ŘADA
+ * HERNÍ REŽIMY: KARTY, OBOUSMĚRNÉ ZKOUŠENÍ, CHYTRÉ SKLÁDÁNÍ, RYCHLÁ VOLBA, ARKÁDA PADAJÍCÍ SLOVA, PEXESO, KVÍZ, ŘADA
  */
+
+// Pomocná funkce pro vyčištění české nápovědy od rodových zkratek
+function cleanCzechTranslation(text) {
+  if (!text) return "";
+  return text.replace(/\s*\([^)]*r\.\)/gi, '')
+             .replace(/\s*\((sg|pl)\.\)/gi, '')
+             .trim();
+}
 
 // ========================================================
 // 1. ZKOUŠENÍ Z HLAVY (LEITNER BEZ NECHTĚNÉHO OPAKOVÁNÍ)
@@ -59,7 +67,6 @@ function getMasteryStats() {
   };
 }
 
-// OPRAVA VÝBĚRU SLOVA: Žádné opakování hotových slov, zákaz 2× stejného po sobě
 function pickNextAdaptiveWord() {
   const vItems = getVocabItems();
   vQuizRevealed = false;
@@ -224,7 +231,7 @@ function nextScrambleStep() {
 }
 
 // ========================================================
-// 3. RYCHLÁ VOLBA (S POVINNÝM TLAČÍTKEM "DALŠÍ")
+// 3. RYCHLÁ VOLBA (STATICKÁ S FIXACÍ)
 // ========================================================
 let quickDeck = [];
 let quickCurrentItem = null;
@@ -287,7 +294,181 @@ function nextQuickChoiceStep() {
 }
 
 // ========================================================
-// 4. DOPLŇOVÁNÍ PÍSMENE, PEXESO, KVÍZ, ŘADA
+// 4. ARKÁDOVÁ HRA: PADAJÍCÍ SLOVA (METEORITY)
+// ========================================================
+let arcadeDeck = [];
+let arcadeCurrent = null;
+let arcadeLives = 3;
+let arcadeScore = 0;
+let arcadeLevel = 1;
+let arcadeY = 0;              // Aktuální pozice v pixelech od shora
+let arcadeSpeed = 0.8;        // Rychlost pádu
+let arcadeAnimId = null;
+let arcadeState = "PLAYING";   // "PLAYING", "HIT", "MISS", "GAMEOVER"
+let arcadeEvalTimer = null;
+
+function stopArcadeLoop() {
+  if (arcadeAnimId) {
+    cancelAnimationFrame(arcadeAnimId);
+    arcadeAnimId = null;
+  }
+  if (arcadeEvalTimer) {
+    clearTimeout(arcadeEvalTimer);
+    arcadeEvalTimer = null;
+  }
+}
+
+function startArcadeGame() {
+  stopArcadeLoop();
+  const vItems = getVocabItems();
+  const mode = getQuickChoiceMode();
+
+  arcadeDeck = vItems.filter(it => {
+    if (mode === "DER_DIE_DAS") return /^(der|die|das)\s/i.test(it.question);
+    if (mode === "A_AN") return /^(a|an)\s/i.test(it.question);
+    if (mode === "I_Y") return it.question.includes('_');
+    return false;
+  }).sort(() => Math.random() - 0.5);
+
+  if (arcadeDeck.length === 0) {
+    alert("Pro tento režim v této lekci není dostatek vhodných slov!");
+    return;
+  }
+
+  arcadeLives = 3;
+  arcadeScore = 0;
+  arcadeLevel = 1;
+  arcadeSpeed = 0.8;
+  arcadeState = "PLAYING";
+
+  selectedGame = "ARCADE";
+  setScreen("PLAYING");
+  spawnArcadeWord();
+}
+
+function spawnArcadeWord() {
+  if (arcadeLives <= 0) {
+    triggerArcadeGameOver();
+    return;
+  }
+
+  if (arcadeDeck.length === 0) {
+    const vItems = getVocabItems();
+    const mode = getQuickChoiceMode();
+    arcadeDeck = vItems.filter(it => {
+      if (mode === "DER_DIE_DAS") return /^(der|die|das)\s/i.test(it.question);
+      if (mode === "A_AN") return /^(a|an)\s/i.test(it.question);
+      if (mode === "I_Y") return it.question.includes('_');
+      return false;
+    }).sort(() => Math.random() - 0.5);
+  }
+
+  arcadeCurrent = arcadeDeck.pop();
+  arcadeY = 5;
+  arcadeState = "PLAYING";
+  renderActiveGame();
+  runArcadeLoop();
+}
+
+function runArcadeLoop() {
+  stopArcadeLoop();
+
+  function step() {
+    if (currentScreen !== "PLAYING" || selectedGame !== "ARCADE" || arcadeState !== "PLAYING") return;
+
+    if (!isTimerPaused) {
+      arcadeY += arcadeSpeed;
+      const el = document.getElementById("arcade-falling-elem");
+      const playfield = document.getElementById("arcade-field");
+
+      if (el && playfield) {
+        el.style.top = arcadeY + "px";
+        const maxH = playfield.clientHeight - el.clientHeight - 8;
+
+        if (arcadeY >= maxH) {
+          handleArcadeMiss(true); // Dopadlo na zem
+          return;
+        }
+      }
+    }
+    arcadeAnimId = requestAnimationFrame(step);
+  }
+  arcadeAnimId = requestAnimationFrame(step);
+}
+
+function clickArcadeChoice(choice) {
+  if (arcadeState !== "PLAYING" || !arcadeCurrent) return;
+
+  const mode = getQuickChoiceMode();
+  let isCorrect = false;
+
+  if (mode === "DER_DIE_DAS" || mode === "A_AN") {
+    isCorrect = arcadeCurrent.question.toLowerCase().startsWith(choice.toLowerCase() + " ");
+  } else if (mode === "I_Y") {
+    isCorrect = arcadeCurrent.answer.trim().toLowerCase() === choice.toLowerCase();
+  }
+
+  if (isCorrect) {
+    handleArcadeHit();
+  } else {
+    handleArcadeMiss(false);
+  }
+}
+
+function handleArcadeHit() {
+  arcadeState = "HIT";
+  stopArcadeLoop();
+  sndOk();
+  arcadeScore++;
+  addReward(1, "Padající slova");
+
+  // Zvýšení levelu každých 7 zásahů
+  if (arcadeScore % 7 === 0) {
+    arcadeLevel++;
+    arcadeSpeed += 0.35;
+    sndFanfare();
+  }
+
+  const el = document.getElementById("arcade-falling-elem");
+  if (el) el.classList.add("hit");
+
+  arcadeEvalTimer = setTimeout(() => {
+    spawnArcadeWord();
+  }, 380);
+}
+
+function handleArcadeMiss(hitGround) {
+  arcadeState = "MISS";
+  stopArcadeLoop();
+  sndErr();
+  arcadeLives--;
+
+  const el = document.getElementById("arcade-falling-elem");
+  if (el) {
+    el.classList.add("miss");
+    const mainText = el.querySelector(".falling-main-word");
+    if (mainText) mainText.innerText = arcadeCurrent.question; // Zobrazí celý správný tvar (např. die Banane)
+  }
+
+  if (isAutoTTS) speakWord(arcadeCurrent.question, selectedSubject);
+
+  arcadeEvalTimer = setTimeout(() => {
+    if (arcadeLives <= 0) {
+      triggerArcadeGameOver();
+    } else {
+      spawnArcadeWord();
+    }
+  }, 1400); // 1,4 s pauza k zafixování správného výsledku
+}
+
+function triggerArcadeGameOver() {
+  arcadeState = "GAMEOVER";
+  stopArcadeLoop();
+  renderActiveGame();
+}
+
+// ========================================================
+// 5. DOPLŇOVÁNÍ PÍSMENE, PEXESO, KVÍZ, ŘADA
 // ========================================================
 let missingDeck = [];
 let missingSlot = 0;
@@ -362,7 +543,7 @@ function initPexeso() {
   pexesoCards = [];
   shuffledWords.forEach((w, wIdx) => {
     pexesoCards.push({ id: `f_${wIdx}`, wordIdx: wIdx, text: w.question, isForeign: true });
-    pexesoCards.push({ id: `c_${wIdx}`, wordIdx: wIdx, text: w.answer, isForeign: false });
+    pexesoCards.push({ id: `c_${wIdx}`, wordIdx: wIdx, text: cleanCzechTranslation(w.answer), isForeign: false });
   });
 
   pexesoCards.sort(() => Math.random() - 0.5);
@@ -526,6 +707,7 @@ function vCardNext() {
 }
 
 function startGame(game) {
+  stopArcadeLoop();
   selectedGame = game;
   initGameState();
   setScreen("PLAYING");
@@ -554,7 +736,7 @@ function renderActiveGame() {
         ${w.question}
         <span class="audio-btn" onclick="speakWord('${w.question}', '${selectedSubject}')" title="Přečíst">🔊</span>
       </div>
-      <div class="prompt-box" style="color:#fff;font-size:22px;">${w.answer}</div>
+      <div class="prompt-box" style="color:#fff;font-size:22px;">${cleanCzechTranslation(w.answer)}</div>
       <div style="text-align:center;color:var(--col-active-tab);font-size:18px;margin-bottom:12px;">[ ${w.help || ''} ]</div>
       <div class="grid-2">
         <div class="action-btn" onclick="vCardPrev()">Předchozí</div>
@@ -563,7 +745,7 @@ function renderActiveGame() {
     `;
   }
 
-  // 2. OBOUSMĚRNÉ ZKOUŠENÍ (BEZ NECHTĚNÉHO OPAKOVÁNÍ)
+  // 2. OBOUSMĚRNÉ ZKOUŠENÍ
   else if (selectedGame === "ADAPTIVE") {
     const stats = getMasteryStats();
     const pct = Math.round((stats.current / stats.total) * 100);
@@ -583,8 +765,8 @@ function renderActiveGame() {
 
     const w = vItems[vCurrentWord];
     const mVal = vMastery[vCurrentWord] || 0;
-    const promptText = isDirOut ? w.answer : w.question;
-    const targetText = isDirOut ? w.question : w.answer;
+    const promptText = isDirOut ? cleanCzechTranslation(w.answer) : w.question;
+    const targetText = isDirOut ? w.question : cleanCzechTranslation(w.answer);
 
     main.innerHTML = `
       <div class="bargraph-container">
@@ -630,7 +812,7 @@ function renderActiveGame() {
         </div>
         <div class="bargraph-track"><div class="bargraph-fill" style="width:${pct}%;"></div></div>
       </div>
-      <div class="prompt-box" style="font-size:20px;color:#fff;margin-top:4px;">Slož: <b>${w.answer}</b></div>
+      <div class="prompt-box" style="font-size:20px;color:#fff;margin-top:4px;">Slož: <b>${cleanCzechTranslation(w.answer)}</b></div>
       <div class="slots-row ${isHebrew ? 'hebrew-text' : ''}">
         ${scrambleTiles.map((tile, i) => `
           <div class="letter-slot ${scrambleIsWordMode ? 'word-slot' : ''} ${i < scramblePlaced.length ? 'filled' : ''}">
@@ -655,7 +837,60 @@ function renderActiveGame() {
     `;
   }
 
-  // 4. RYCHLÁ VOLBA (S FIXACÍ A TLAČÍTKEM "DALŠÍ")
+  // 4. ARKÁDA: PADAJÍCÍ SLOVA
+  else if (selectedGame === "ARCADE") {
+    const mode = getQuickChoiceMode();
+    let btns = [];
+    if (mode === "DER_DIE_DAS") btns = ['DER', 'DIE', 'DAS'];
+    else if (mode === "A_AN") btns = ['A', 'AN'];
+    else if (mode === "I_Y") btns = ['I / Í', 'Y / Ý'];
+
+    if (arcadeState === "GAMEOVER") {
+      main.innerHTML = `
+        <div style="text-align:center;padding:35px 15px;">
+          <h2 style="color:var(--col-red);font-size:28px;margin-bottom:12px;">KONEC HRY! 💔</h2>
+          <p style="font-size:20px;color:#fff;margin-bottom:6px;">Dosažený Level: <b>${arcadeLevel}</b></p>
+          <p style="font-size:18px;color:var(--col-yellow);margin-bottom:20px;">Sestřeleno slov: <b>${arcadeScore}</b></p>
+          <div class="action-btn green" onclick="startArcadeGame()">HRÁT ZNOVU ➔</div>
+          <div class="action-btn" style="margin-top:10px;" onclick="setScreen('SELECT_GAME')">ZPĚT DO MENU HRY</div>
+        </div>
+      `;
+      return;
+    }
+
+    const hearts = "❤️".repeat(Math.max(0, arcadeLives)) + "🖤".repeat(Math.max(0, 3 - arcadeLives));
+    let displayWord = arcadeCurrent ? arcadeCurrent.question : "";
+    if (mode === "DER_DIE_DAS") displayWord = displayWord.replace(/^(der|die|das)\s+/i, '');
+    if (mode === "A_AN") displayWord = displayWord.replace(/^(a|an)\s+/i, '');
+
+    const czHint = arcadeCurrent ? cleanCzechTranslation(arcadeCurrent.answer) : "";
+
+    main.innerHTML = `
+      <div class="arcade-arena">
+        <div class="arcade-top-bar">
+          <span style="font-size:16px;">${hearts}</span>
+          <span style="color:var(--col-yellow);">LVL ${arcadeLevel}</span>
+          <span style="color:var(--col-active-tab);">Body: ${arcadeScore}</span>
+        </div>
+        <div class="arcade-playfield" id="arcade-field">
+          ${arcadeCurrent ? `
+            <div id="arcade-falling-elem" class="falling-item" style="top:${arcadeY}px;">
+              <div class="falling-main-word">${displayWord}</div>
+              <div class="falling-sub-word">${czHint}</div>
+            </div>
+          ` : ''}
+          <div class="arcade-danger-line"></div>
+        </div>
+        <div class="arcade-bottom-bar">
+          ${btns.map(b => `
+            <div class="arcade-btn" onclick="clickArcadeChoice('${b}')">${b}</div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  // 5. STATICKÁ RYCHLÁ VOLBA (PRO PROCVIČENÍ BEZ STRESU)
   else if (selectedGame === "QUICK_CHOICE") {
     const mode = getQuickChoiceMode();
     const it = quickCurrentItem;
@@ -695,7 +930,7 @@ function renderActiveGame() {
       <div class="prompt-box" style="font-size:32px;color:#fff;margin:20px 0;">
         ${isAnswered ? it.question : promptClean}
       </div>
-      <p style="text-align:center;color:var(--col-text-muted);font-size:16px;margin-bottom:15px;">${it.answer}</p>
+      <p style="text-align:center;color:var(--col-text-muted);font-size:16px;margin-bottom:15px;">${cleanCzechTranslation(it.answer)}</p>
       <div style="display:flex;gap:10px;justify-content:center;">
         ${btns.map(b => {
           let cls = "";
@@ -716,7 +951,7 @@ function renderActiveGame() {
     `;
   }
 
-  // 5. MATEMATIKA (S FIXACÍ A TLAČÍTKEM "DALŠÍ")
+  // 6. PROCEDURÁLNÍ MATEMATIKA
   else if (selectedGame === "PROCEDURAL_MATH") {
     const isAnswered = mathChosenAnswer !== null;
 
@@ -751,7 +986,7 @@ function renderActiveGame() {
     `;
   }
 
-  // 6. DOPLŇOVÁNÍ PÍSMENE
+  // 7. DOPLŇOVÁNÍ PÍSMENE
   else if (selectedGame === "MISSING") {
     const w = vItems[vCurrentWord];
     const letters = getGraphemes(w.question);
@@ -774,7 +1009,7 @@ function renderActiveGame() {
         </div>
         <div class="bargraph-track"><div class="bargraph-fill" style="width:${pct}%;"></div></div>
       </div>
-      <div class="prompt-box" style="font-size:20px;color:#fff;margin-top:4px;">Doplň: <b>${w.answer}</b></div>
+      <div class="prompt-box" style="font-size:20px;color:#fff;margin-top:4px;">Doplň: <b>${cleanCzechTranslation(w.answer)}</b></div>
       <div class="prompt-box ${isHebrew ? 'hebrew-text' : ''}">${maskedWord}</div>
       <div class="grid-2">
         ${missingChoices.map((ch, i) => {
@@ -787,7 +1022,7 @@ function renderActiveGame() {
     `;
   }
 
-  // 7. PEXESO
+  // 8. PEXESO
   else if (selectedGame === "PEXESO") {
     const totalPairs = Math.min(pexesoPairCount, vItems.length);
     const isComplete = pexesoMatched.length === totalPairs;
@@ -825,7 +1060,7 @@ function renderActiveGame() {
     `;
   }
 
-  // 8. KVÍZ
+  // 9. KVÍZ
   else if (selectedGame === "QUIZ") {
     const q = qItems[qCurStep];
     const pct = Math.round(((qCurStep + 1) / qItems.length) * 100);
@@ -852,7 +1087,7 @@ function renderActiveGame() {
     `;
   }
 
-  // 9. ŘADA NA ČAS
+  // 10. ŘADA NA ČAS
   else if (selectedGame === "SEQ") {
     const seqConfig = sItems[0];
     const itemsList = seqConfig.answer.split('|').map(s => s.trim()).filter(Boolean);
