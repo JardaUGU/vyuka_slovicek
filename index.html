@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Výukový Systém</title>
   
+  <!-- Invariant: iOS Fullscreen & Standalone PWA -->
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Výuka">
@@ -46,7 +47,7 @@
       width: 100vw;
       max-width: 680px;
       height: 100vh;
-      max-height: 560px;
+      max-height: 600px;
       background-color: var(--col-bg);
       display: flex;
       flex-direction: column;
@@ -55,7 +56,7 @@
       overflow: hidden;
       box-shadow: 0 10px 25px rgba(0,0,0,0.6);
     }
-    @media (max-width: 680px), (max-height: 560px) {
+    @media (max-width: 680px), (max-height: 600px) {
       #app-container { border-radius: 0; border: none; max-width: 100vw; max-height: 100vh; }
     }
     header {
@@ -84,7 +85,7 @@
     .badge {
       background: #242c3a;
       border: 1px solid var(--col-card-border);
-      padding: 0 10px;
+      padding: 0 8px;
       height: 32px;
       display: flex;
       align-items: center;
@@ -92,6 +93,10 @@
       font-size: 13px;
       font-weight: 500;
       cursor: pointer;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      overflow: hidden;
+      max-width: 130px;
     }
     .badge.active { background: var(--col-active-tab); border-color: #fff; }
     .spacer { flex: 1; }
@@ -101,26 +106,27 @@
       border: 1px solid var(--col-card-border);
       color: #fff;
       border-radius: 6px;
-      padding: 4px 8px;
+      padding: 4px 6px;
       font-size: 12px;
       font-weight: bold;
       cursor: pointer;
       display: flex;
       align-items: center;
-      gap: 4px;
+      gap: 3px;
     }
     .tts-toggle-btn.active { background: var(--col-green); border-color: #fff; }
 
     .study-timer-box {
       background: #101c2e;
       border: 1px solid var(--col-card-border);
-      padding: 4px 8px;
+      padding: 4px 7px;
       border-radius: 6px;
       font-size: 12px;
       font-weight: bold;
       display: flex;
       align-items: center;
       gap: 4px;
+      white-space: nowrap;
     }
     .study-timer-box.bonus { border-color: var(--col-yellow); color: var(--col-yellow); background: #2d2605; }
     .study-timer-box.paused { border-color: var(--col-orange); color: var(--col-orange); }
@@ -163,7 +169,7 @@
       transition: transform 0.05s, border-color 0.1s;
     }
     .tile:active { transform: scale(0.97); border-color: #fff; }
-    .tile h2 { font-size: 18px; color: #fff; margin-bottom: 4px; }
+    .tile h2 { font-size: 17px; color: #fff; margin-bottom: 4px; }
     .tile p { font-size: 12px; color: var(--col-text-muted); }
 
     .bargraph-container {
@@ -230,7 +236,7 @@
       color: #fff;
       padding: 12px;
       border-radius: 8px;
-      font-size: 18px;
+      font-size: 17px;
       font-weight: bold;
       text-align: center;
       cursor: pointer;
@@ -269,37 +275,46 @@
       max-width: 580px;
     }
     .letter-slot {
-      min-width: 52px;
-      height: 56px;
-      padding: 0 8px;
+      min-width: 50px;
+      height: 52px;
+      padding: 0 10px;
       background: var(--col-card);
       border: 2px solid var(--col-active-tab);
       border-radius: 8px;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 28px;
+      font-size: 24px;
       font-weight: bold;
+    }
+    .letter-slot.word-slot {
+      min-width: 80px;
+      font-size: 19px;
     }
     .letter-slot.filled { background: #143c28; border-color: var(--col-green); color: var(--col-green); }
     .letter-tile {
-      min-width: 52px;
-      height: 56px;
-      padding: 0 8px;
+      min-width: 50px;
+      height: 52px;
+      padding: 0 10px;
       background: var(--col-card);
       border: 2px solid var(--col-active-tab);
       border-radius: 8px;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 28px;
+      font-size: 24px;
       font-weight: bold;
       cursor: pointer;
       box-shadow: 0 3px 6px rgba(0,0,0,0.3);
       transition: transform 0.05s;
     }
+    .letter-tile.word-tile {
+      min-width: 80px;
+      font-size: 19px;
+      padding: 6px 12px;
+    }
     .letter-tile:active { transform: scale(0.92); }
-    .letter-tile.hebrew { font-family: 'Tinos', serif; font-size: 32px; }
+    .letter-tile.hebrew { font-family: 'Tinos', serif; font-size: 30px; }
     .letter-tile.used { background: #181c24; border-color: #282d37; color: #4b5563; cursor: default; box-shadow: none; }
 
     .pexeso-grid {
@@ -307,7 +322,7 @@
       gap: 10px;
       width: 100%;
       flex: 1;
-      min-height: 360px;
+      min-height: 340px;
       margin: 4px 0;
     }
     .pexeso-card {
@@ -320,17 +335,16 @@
       text-align: center;
       padding: 8px 4px;
       cursor: pointer;
-      font-size: 17px;
+      font-size: 16px;
       font-weight: bold;
-      transition: transform 0.15s, background 0.15s, border-color 0.15s;
       color: #fff;
       box-shadow: 0 4px 8px rgba(0,0,0,0.3);
     }
     .pexeso-card:active { transform: scale(0.95); }
-    .pexeso-card.hidden { background: #121c2c; color: var(--col-text-muted); font-size: 28px; }
+    .pexeso-card.hidden { background: #121c2c; color: var(--col-text-muted); font-size: 26px; }
     .pexeso-card.flipped { background: #1d3557; border-color: var(--col-active-tab); color: #fff; }
     .pexeso-card.matched { background: #143c28; border-color: var(--col-green); color: var(--col-green); cursor: default; }
-    .pexeso-card.hebrew { font-family: 'Tinos', serif; direction: rtl; font-size: 26px; }
+    .pexeso-card.hebrew { font-family: 'Tinos', serif; direction: rtl; font-size: 24px; }
 
     .filter-bar {
       display: flex;
@@ -351,6 +365,14 @@
       cursor: pointer;
     }
     .toggle-btn.on { background: var(--col-active-tab); border-color: #fff; }
+
+    /* Streak oheň */
+    .streak-badge {
+      color: var(--col-orange);
+      font-weight: bold;
+      font-size: 13px;
+      margin-left: 4px;
+    }
   </style>
 </head>
 <body>
@@ -375,7 +397,7 @@
 
   <footer>
     <div id="footer-user">Žák: --</div>
-    <div id="footer-status" style="color:var(--col-active-tab);cursor:pointer;" onclick="forceHardReload()">v3.3 (Obnovit kód)</div>
+    <div id="footer-status" style="color:var(--col-active-tab);cursor:pointer;" onclick="forceHardReload()">v4.0 (Obnovit)</div>
     <div id="footer-goal">0 / 15 min ⏱️</div>
   </footer>
 </div>
@@ -394,11 +416,14 @@
   let activeItems = [];
   let selectedGame = "";
 
+  // Směr zkoušení: DIR_OUT = CZ -> Cizí, DIR_IN = Cizí -> CZ
+  let testingDirection = localStorage.getItem("testing_dir") || "DIR_OUT";
+
   function forceHardReload() {
     window.location.href = window.location.origin + window.location.pathname + '?reload=' + Date.now();
   }
 
-  // --- TRVALÁ SPRÁVA ČASU BEZ RESETU NA NULU ---
+  // --- TRVALÁ SPRÁVA ČASU & STREAK ---
   function getStudyTimeKey(userName) {
     const d = new Date();
     const dateKey = `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
@@ -411,7 +436,34 @@
     return Number(localStorage.getItem(getStudyTimeKey(userName)) || 0);
   }
 
-  // Okamžité načtení dosavadního dnešního času ze storage
+  function getUserStreak(userName) {
+    if (!userName) return 0;
+    return Number(localStorage.getItem(`streak_${userName.toLowerCase().trim()}`) || 0);
+  }
+
+  function updateUserStreak(userName, targetMinutes) {
+    if (!userName) return;
+    const uKey = userName.toLowerCase().trim();
+    const d = new Date();
+    const todayStr = `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+    const lastCompleted = localStorage.getItem(`streak_last_date_${uKey}`);
+    
+    if (lastCompleted === todayStr) return; // Dnes už započteno
+
+    let streak = Number(localStorage.getItem(`streak_${uKey}`) || 0);
+    const yest = new Date(Date.now() - 86400000);
+    const yestStr = `${yest.getFullYear()}-${yest.getMonth() + 1}-${yest.getDate()}`;
+
+    if (lastCompleted === yestStr) {
+      streak += 1;
+    } else {
+      streak = 1;
+    }
+
+    localStorage.setItem(`streak_${uKey}`, streak);
+    localStorage.setItem(`streak_last_date_${uKey}`, todayStr);
+  }
+
   let todaySecondsStudied = currentUser ? loadUserStudyTime(currentUser.name) : 0;
   let lastUserActivityTime = Date.now();
   let isTimerPaused = false;
@@ -427,14 +479,19 @@
   window.addEventListener('click', registerUserAction, true);
   window.addEventListener('touchstart', registerUserAction, true);
 
-  // Časovač: tolerance 30 s nečinnosti před pauzou
+  // INVARIANT: Přísná pauza po 15 sekundách bez dotyku
   setInterval(() => {
     if (currentScreen === "PLAYING" && currentUser) {
       const idleTime = Date.now() - lastUserActivityTime;
-      if (idleTime < 30000) {
+      if (idleTime < 15000) {
         todaySecondsStudied++;
         localStorage.setItem(getStudyTimeKey(currentUser.name), todaySecondsStudied);
         isTimerPaused = false;
+
+        const targetSec = (currentUser.targetMinutes || 15) * 60;
+        if (todaySecondsStudied >= targetSec) {
+          updateUserStreak(currentUser.name, currentUser.targetMinutes || 15);
+        }
       } else {
         isTimerPaused = true;
       }
@@ -521,20 +578,12 @@
     window.speechSynthesis.speak(u);
   }
 
-  // --- LEITNEROVO OKNO DLE ROČNÍKU ---
   function getAdaptiveWindowSize(grade) {
     const g = parseInt(grade) || 2;
-    if (g >= 90) return 12; // Dospělý
-    if (g >= 10) return 10; // SŠ
-    return Math.max(3, g);  // ZŠ: 2. tř -> 3, 5. tř -> 5, 7. tř -> 7, 9. tř -> 9
+    if (g >= 90) return 12;
+    if (g >= 10) return 10;
+    return Math.max(3, g);
   }
-
-  let pexesoPairCount = 4;
-  let pexesoCards = [];
-  let pexesoFlipped = [];
-  let pexesoMatched = [];
-  let pexesoLocked = false;
-  let pexesoAttempts = 0;
 
   const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   function playTone(freq, type, duration) {
@@ -556,7 +605,6 @@
     [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => playTone(f, 'triangle', 0.1), i * 110));
   }
 
-  // Logování aktivity (odešle skutečné minuty do Google Sheets)
   function addReward(count = 1, section = "Lekce") {
     if (!currentUser) return;
     currentUser.stars = (currentUser.stars || 0) + count;
@@ -570,7 +618,6 @@
       fd.append("subject", selectedSubject);
       fd.append("section", section);
       fd.append("stars", count);
-      // PŘESNÉ MINUTY ODESÍLANÉ DO LISTU AKTIVITA
       fd.append("minutes", (todaySecondsStudied / 60).toFixed(1));
       fetch(API_URL, { method: "POST", mode: "no-cors", body: fd });
     } catch(e) {}
@@ -580,7 +627,8 @@
     if (!currentUser) return;
     const g = parseInt(currentUser.grade) || 2;
     const gradeLabel = g >= 10 && g < 90 ? `${g - 9}. ročník SŠ` : (g <= 9 ? `${g}. tř.` : 'Dospělý');
-    document.getElementById("footer-user").innerText = `${currentUser.name} (${gradeLabel})`;
+    const streak = getUserStreak(currentUser.name);
+    document.getElementById("footer-user").innerHTML = `${currentUser.name} (${gradeLabel}) <span class="streak-badge">🔥 ${streak}</span>`;
   }
 
   async function loadData() {
@@ -603,7 +651,6 @@
       const json = await res.json();
       
       if (!json.items) {
-        alert("CHYBA V GOOGLE APPS SCRIPTU:\nSkript vrátil data bez 'items'.\nV editoru skriptu musíte kliknout na:\nImplementovat ➔ Spravovat implementace ➔ Upravit (tužka) ➔ Verze: NOVÁ VERZE ➔ Implementovat.");
         if (statusEl) statusEl.innerText = "Chyba API";
         return;
       }
@@ -612,7 +659,7 @@
       localStorage.setItem("app_data", JSON.stringify(json));
 
       const subjs = [...new Set(appData.items.map(i => i.subject))];
-      if (statusEl) statusEl.innerText = `OK: ${appData.items.length} úloh (${subjs.join(',')})`;
+      if (statusEl) statusEl.innerText = `OK: ${appData.items.length} úloh`;
 
       if (currentUser && appData.users) {
         const foundU = appData.users.find(u => u.name.toLowerCase() === currentUser.name.toLowerCase());
@@ -628,13 +675,16 @@
     }
   }
 
-  async function saveWordMasteryToGoogle(itemQuestion, masteryLevel) {
+  // Uložení pokroku do Google Sheets s 4-prvkovým klíčem
+  async function saveWordMasteryToGoogle(itemQuestion, masteryLevel, direction) {
     if (!currentUser) return;
     try {
       const uKey = currentUser.name.toLowerCase().trim();
+      const compKey = `${selectedSubject}:::${itemQuestion}:::${direction}`;
+      
       if (!appData.progress) appData.progress = {};
       if (!appData.progress[uKey]) appData.progress[uKey] = {};
-      appData.progress[uKey][itemQuestion] = masteryLevel;
+      appData.progress[uKey][compKey] = masteryLevel;
       localStorage.setItem("app_data", JSON.stringify(appData));
 
       const fd = new URLSearchParams();
@@ -643,14 +693,30 @@
       fd.append("subject", selectedSubject);
       fd.append("foreign", itemQuestion);
       fd.append("mastery", masteryLevel);
+      fd.append("direction", direction);
       fetch(API_URL, { method: "POST", mode: "no-cors", body: fd });
     } catch(e) {}
+  }
+
+  function getSavedMastery(itemQuestion, direction) {
+    if (!currentUser || !appData.progress) return 0;
+    const uKey = currentUser.name.toLowerCase().trim();
+    const userMap = appData.progress[uKey];
+    if (!userMap) return 0;
+    const compKey = `${selectedSubject}:::${itemQuestion}:::${direction}`;
+    if (userMap[compKey] !== undefined) return Number(userMap[compKey]);
+    // Zpětná kompatibilita pro stará data bez směru
+    if (userMap[itemQuestion] !== undefined) return Number(userMap[itemQuestion]);
+    return 0;
   }
 
   function goBack() {
     if (currentScreen === "PLAYING" && selectedGame === "PEXESO") setScreen("SELECT_PEXESO_SIZE");
     else if (currentScreen === "SELECT_PEXESO_SIZE") setScreen("SELECT_GAME");
-    else if (currentScreen === "PLAYING") setScreen("SELECT_GAME");
+    else if (currentScreen === "PLAYING") {
+      if (selectedSubject === "Matematika (Početní dril)") setScreen("SELECT_SUBJECT");
+      else setScreen("SELECT_GAME");
+    }
     else if (currentScreen === "SELECT_GAME") setScreen("SELECT_GROUP");
     else if (currentScreen === "SELECT_GROUP") setScreen("SELECT_SUBJECT");
     else if (currentScreen === "SELECT_SUBJECT") setScreen("SELECT_USER");
@@ -665,6 +731,33 @@
   function getVocabItems() { return (activeItems || []).filter(it => it.type === "SLOVO"); }
   function getQuizItems()  { return (activeItems || []).filter(it => it.type === "KVIZ"); }
   function getSeqItems()   { return (activeItems || []).filter(it => it.type === "RADA"); }
+
+  // Zjištění rychlé volby (der/die/das, a/an, i/y)
+  function getQuickChoiceMode() {
+    const s = selectedSubject.toLowerCase();
+    if (s.includes("nemc") || s === "de") return "DER_DIE_DAS";
+    if (s.includes("angli") || s === "en") return "A_AN";
+    if (s.includes("cest") || s === "cs") return "I_Y";
+    return null;
+  }
+
+  // Výpočet procenta zvládnutí skupiny (Mastery bar v menu)
+  function getGroupMasteryPercent(groupItems, subjName) {
+    if (!currentUser || !groupItems || groupItems.length === 0) return 0;
+    const vList = groupItems.filter(it => it.type === "SLOVO");
+    if (vList.length === 0) return 0;
+
+    let points = 0;
+    const totalPossible = vList.length * 4; // 2 body pro DIR_OUT + 2 body pro DIR_IN
+
+    vList.forEach(it => {
+      const mOut = getSavedMastery(it.question, "DIR_OUT");
+      const mIn = getSavedMastery(it.question, "DIR_IN");
+      points += (mOut + mIn);
+    });
+
+    return Math.min(100, Math.round((points / totalPossible) * 100));
+  }
 
   function renderScreen() {
     updateFooter();
@@ -694,11 +787,13 @@
           ${uList.map(u => {
             const g = parseInt(u.grade) || 2;
             const grLabel = g >= 10 && g < 90 ? `${g - 9}. ročník SŠ` : (g <= 9 ? `${g}. třída ZŠ` : 'Dospělý');
+            const streak = getUserStreak(u.name);
             return `
               <div class="tile" style="${currentUser && currentUser.name === u.name ? 'border-color:var(--col-green);background:#142838;' : ''}" onclick="selectUser('${u.name}', ${g}, ${u.targetMinutes||15})">
                 <h2>${u.name}</h2>
                 <p>${grLabel}</p>
-                <p style="color:var(--col-yellow);margin-top:4px;">⏱️ Cíl: ${u.targetMinutes||15} min</p>
+                <p style="color:var(--col-orange);margin-top:4px;">🔥 Série: ${streak} dní</p>
+                <p style="color:var(--col-yellow);margin-top:2px;">⏱️ Cíl: ${u.targetMinutes||15} min</p>
               </div>
             `;
           }).join('')}
@@ -706,7 +801,7 @@
       `;
     }
 
-    // 2. VÝBĚR PŘEDMĚTU (100% dynamický ze všech listů)
+    // 2. VÝBĚR PŘEDMĚTU (+ Dynamická procedurální Matematika)
     else if (currentScreen === "SELECT_SUBJECT") {
       bSubj.style.display = "none";
       bGroup.style.display = "none";
@@ -735,28 +830,27 @@
           </button>
         </div>
         <div class="grid-2">
+          <!-- PROCEDURÁLNÍ MATEMATIKA -->
+          <div class="tile" style="border-color:var(--col-active-tab);background:#102538;" onclick="startMathProceduralGame()">
+            <h2 style="color:var(--col-active-tab);">🔢 Matematika</h2>
+            <p>Početní dril (${userG}. ročník)</p>
+          </div>
       `;
 
-      if (availableSubjects.length === 0) {
-        html += `<div style="grid-column: span 2; text-align:center; padding:30px; color:var(--col-text-muted);">
-          Žádné předměty pro ${userG}. třídu.<br><br>
-          <button class="action-btn" onclick="filterExactGradeOnly=false;renderScreen();">Zobrazit všechny ročníky</button>
-        </div>`;
-      } else {
-        availableSubjects.forEach(s => {
-          html += `
-            <div class="tile" onclick="chooseSubject('${s.name}')">
-              <h2>${s.name}</h2>
-              <p>${s.count} úloh k procvičení</p>
-            </div>
-          `;
-        });
-      }
+      availableSubjects.forEach(s => {
+        html += `
+          <div class="tile" onclick="chooseSubject('${s.name}')">
+            <h2>${s.name}</h2>
+            <p>${s.count} úloh k procvičení</p>
+          </div>
+        `;
+      });
+
       html += `</div>`;
       main.innerHTML = html;
     }
 
-    // 3. VÝBĚR SKUPINY (LEKCE vs. TÉMATA)
+    // 3. VÝBĚR SKUPINY (S indikátorem % Mastery stromu)
     else if (currentScreen === "SELECT_GROUP") {
       bSubj.style.display = "flex";
       bSubj.innerText = selectedSubject;
@@ -775,9 +869,10 @@
       subjItems.forEach(it => {
         const key = (viewMode === "LESSONS") ? it.lesson : it.topic;
         if (!key) return;
-        if (!groupsMap[key]) groupsMap[key] = { name: key, count: 0, minGrade: it.minGrade, types: new Set() };
+        if (!groupsMap[key]) groupsMap[key] = { name: key, count: 0, minGrade: it.minGrade, types: new Set(), rawItems: [] };
         groupsMap[key].count++;
         groupsMap[key].types.add(it.type);
+        groupsMap[key].rawItems.push(it);
         if (it.minGrade > groupsMap[key].minGrade) groupsMap[key].minGrade = it.minGrade;
       });
 
@@ -804,13 +899,25 @@
           const typeLabels = Array.from(g.types).map(t => t === 'SLOVO' ? 'Slova' : (t === 'KVIZ' ? 'Kvíz' : 'Řada')).join(', ');
           const gGrade = parseInt(g.minGrade) || 2;
           const gGradeLabel = gGrade >= 10 && gGrade < 90 ? `${gGrade - 9}. ročník SŠ` : (gGrade <= 9 ? `${gGrade}. tř.` : 'Dospělý');
+          const mPct = getGroupMasteryPercent(g.rawItems, selectedSubject);
+
           html += `
-            <div class="tile" style="flex-direction:row;justify-content:space-between;padding:12px;" onclick="chooseGroup('${g.name}')">
-              <div style="text-align:left;">
-                <h2>${g.name}</h2>
-                <p>${typeLabels} (${gGradeLabel})</p>
+            <div class="tile" style="flex-direction:column;align-items:stretch;padding:12px;gap:6px;" onclick="chooseGroup('${g.name}')">
+              <div style="display:flex;justify-content:space-between;align-items:center;">
+                <div style="text-align:left;">
+                  <h2>${g.name}</h2>
+                  <p>${typeLabels} (${gGradeLabel})</p>
+                </div>
+                <span style="color:var(--col-active-tab);font-weight:bold;">${g.count} úloh</span>
               </div>
-              <span style="color:var(--col-active-tab);font-weight:bold;">${g.count} úloh</span>
+              ${g.types.has('SLOVO') ? `
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <div class="bargraph-track" style="height:6px;flex:1;">
+                    <div class="bargraph-fill" style="width:${mPct}%;background:${mPct===100?'var(--col-green)':'linear-gradient(90deg, var(--col-active-tab), var(--col-green))'};"></div>
+                  </div>
+                  <span style="font-size:11px;font-weight:bold;color:${mPct===100?'var(--col-green)':'var(--col-yellow)'};">${mPct} %</span>
+                </div>
+              ` : ''}
             </div>
           `;
         });
@@ -829,15 +936,33 @@
       const vItems = getVocabItems();
       const qItems = getQuizItems();
       const sItems = getSeqItems();
+      const quickMode = getQuickChoiceMode();
 
       let tilesHtml = `<div class="grid-2">`;
 
       if (vItems.length > 0) {
         tilesHtml += `
           <div class="tile" onclick="startGame('CARDS')"><h2>1. Karty</h2><p>Čtení a výslovnost (${vItems.length})</p></div>
-          <div class="tile" onclick="startGame('ADAPTIVE')"><h2>2. Zkoušení</h2><p>Konec až při 2 ★ (${vItems.length})</p></div>
-          <div class="tile" onclick="startGame('SCRAMBLE')"><h2>3. Skládání</h2><p>Trénink pravopisu</p></div>
+          <div class="tile" style="border-color:var(--col-green);" onclick="startGame('ADAPTIVE')">
+            <h2 style="color:var(--col-green);">2. Zkoušení</h2>
+            <p>${testingDirection === 'DIR_OUT' ? '🇨🇿 ➔ Cizí' : 'Cizí ➔ 🇨🇿'} (Konec při 2 ★)</p>
+          </div>
+          <div class="tile" onclick="startGame('SCRAMBLE')"><h2>3. Skládání</h2><p>Pravopis slov a frází</p></div>
           <div class="tile" onclick="startGame('MISSING')"><h2>4. Doplň písmeno</h2><p>Doplň znak</p></div>
+        `;
+      }
+
+      if (quickMode && vItems.length > 0) {
+        const labels = {
+          "DER_DIE_DAS": "⚡ DER / DIE / DAS",
+          "A_AN": "⚡ A / AN",
+          "I_Y": "⚡ I / Y"
+        };
+        tilesHtml += `
+          <div class="tile" style="border-color:var(--col-yellow);grid-column: span 2;" onclick="startGame('QUICK_CHOICE')">
+            <h2 style="color:var(--col-yellow);">${labels[quickMode]}</h2>
+            <p>Rychlé reakční třídění</p>
+          </div>
         `;
       }
 
@@ -891,6 +1016,7 @@
     // 6. SAMOTNÁ HRA
     else if (currentScreen === "PLAYING") {
       bSubj.style.display = "flex";
+      bSubj.innerText = selectedSubject;
       bGroup.style.display = "flex";
       bGroup.innerText = selectedGroupKey;
       renderActiveGame();
@@ -939,8 +1065,15 @@
     setScreen("PLAYING");
   }
 
+  function toggleTestingDirection() {
+    testingDirection = (testingDirection === "DIR_OUT") ? "DIR_IN" : "DIR_OUT";
+    localStorage.setItem("testing_dir", testingDirection);
+    initGameState();
+    renderActiveGame();
+  }
+
   // ==========================================
-  // ADAPTIVNÍ HERNÍ ENGINE
+  // HERNÍ ENGINE: ZKOUŠENÍ, SCRAMBLE, QUICK, MATH
   // ==========================================
   let vMastery = {};
   let vActivePool = 3;
@@ -950,7 +1083,8 @@
 
   let scrambleDeck = [];
   let scramblePlaced = [];
-  let scrambleLetters = [];
+  let scrambleTiles = [];
+  let scrambleIsWordMode = false;
   let scrambleHadMistake = false;
   let scrambleDone = false;
   let scrambleSolvedCount = 0;
@@ -961,6 +1095,10 @@
   let missingChosen = -1;
   let missingSolvedCount = 0;
 
+  let quickDeck = [];
+  let quickCurrentItem = null;
+  let quickSolvedCount = 0;
+
   let qCurStep = 0;
   let qAnswered = false;
 
@@ -970,6 +1108,11 @@
   let seqTimerInterval = null;
   let seqHintActive = false;
   let seqInactivityTimer = null;
+
+  // PROCEDURÁLNÍ MATEMATIKA
+  let mathTask = null;
+  let mathStreak = 0;
+  let mathAnswered = false;
 
   function getGraphemes(str) {
     if (window.Intl && Intl.Segmenter) {
@@ -984,11 +1127,9 @@
     if (vItems.length > 0) {
       vMastery = {};
       let masteredCount = 0;
-      const uKey = currentUser.name.toLowerCase().trim();
-      const userProgress = (appData.progress && appData.progress[uKey]) ? appData.progress[uKey] : {};
 
       vItems.forEach((w, i) => {
-        const m = Number(userProgress[w.question] || 0);
+        const m = getSavedMastery(w.question, testingDirection);
         vMastery[i] = m;
         if (m >= 2) masteredCount++;
       });
@@ -1003,6 +1144,7 @@
       if (selectedGame === "ADAPTIVE") pickNextAdaptiveWord();
       if (selectedGame === "SCRAMBLE") { scrambleDeck = []; scrambleSolvedCount = 0; initScramble(); }
       if (selectedGame === "MISSING") { missingDeck = []; missingSolvedCount = 0; initMissing(); }
+      if (selectedGame === "QUICK_CHOICE") { quickDeck = []; quickSolvedCount = 0; initQuickChoice(); }
     }
     if (selectedGame === "QUIZ") { qCurStep = 0; qAnswered = false; }
     if (selectedGame === "SEQ") initSequence();
@@ -1073,11 +1215,11 @@
       if (vMastery[vCurrentWord] >= 2 && vActivePool < vItems.length) {
         vActivePool++;
       }
-      saveWordMasteryToGoogle(w.question, vMastery[vCurrentWord]);
+      saveWordMasteryToGoogle(w.question, vMastery[vCurrentWord], testingDirection);
     } else {
       sndErr();
       vMastery[vCurrentWord] = 0;
-      saveWordMasteryToGoogle(w.question, 0);
+      saveWordMasteryToGoogle(w.question, 0, testingDirection);
     }
 
     pickNextAdaptiveWord();
@@ -1093,6 +1235,7 @@
     }
   }
 
+  // --- CHYTRÉ SKLÁDÁNÍ (Písmena vs. Celá slova/fráze) ---
   function initScramble() {
     const vItems = getVocabItems();
     if (!scrambleDeck || scrambleDeck.length === 0) {
@@ -1104,26 +1247,52 @@
     scrambleHadMistake = false;
     scrambleDone = false;
 
-    const graphemes = getGraphemes(w.question);
-    scrambleLetters = graphemes.map(ch => ({ ch, used: false })).sort(() => Math.random() - 0.5);
+    const rawTarget = w.question.trim();
+    const words = rawTarget.split(/\s+/);
+
+    // Pokud je zadání delší fráze nebo trojice (např. be - was - been), skládáme celá slova
+    if (words.length >= 3 || rawTarget.length > 15) {
+      scrambleIsWordMode = true;
+      // Rozdělení podle pomlček nebo mezer
+      let tokens = rawTarget.includes('-') 
+        ? rawTarget.split('-').map(s => s.trim()) 
+        : words;
+      
+      scrambleTiles = tokens.map((chunk, idx) => ({ text: chunk, originalIdx: idx, used: false }))
+                            .sort(() => Math.random() - 0.5);
+    } else {
+      scrambleIsWordMode = false;
+      const graphemes = getGraphemes(rawTarget);
+      scrambleTiles = graphemes.map((ch, idx) => ({ text: ch, originalIdx: idx, used: false }))
+                               .sort(() => Math.random() - 0.5);
+    }
   }
 
-  function clickScrambleLetter(idx) {
+  function clickScrambleTile(idx) {
     if (scrambleDone) return;
-    const vItems = getVocabItems();
-    const item = scrambleLetters[idx];
+    const item = scrambleTiles[idx];
     if (item.used) return;
 
+    const vItems = getVocabItems();
     const w = vItems[vCurrentWord];
-    const targetGraphemes = getGraphemes(w.question);
-    const expected = targetGraphemes[scramblePlaced.length];
 
-    if (item.ch === expected) {
+    let targetTokens = [];
+    if (scrambleIsWordMode) {
+      targetTokens = w.question.includes('-')
+        ? w.question.split('-').map(s => s.trim())
+        : w.question.trim().split(/\s+/);
+    } else {
+      targetTokens = getGraphemes(w.question.trim());
+    }
+
+    const expected = targetTokens[scramblePlaced.length];
+
+    if (item.text === expected) {
       sndOk();
       item.used = true;
-      scramblePlaced.push(item.ch);
+      scramblePlaced.push(item.text);
 
-      if (scramblePlaced.length === targetGraphemes.length) {
+      if (scramblePlaced.length === targetTokens.length) {
         scrambleDone = true;
         scrambleSolvedCount++;
         if (!scrambleHadMistake) {
@@ -1142,6 +1311,164 @@
   function nextScrambleStep() {
     initScramble();
     renderActiveGame();
+  }
+
+  // --- RYCHLÁ VOLBA (TŘÍDĚNÍ: DER/DIE/DAS, A/AN, I/Y) ---
+  function initQuickChoice() {
+    const vItems = getVocabItems();
+    const mode = getQuickChoiceMode();
+    if (!quickDeck || quickDeck.length === 0) {
+      quickDeck = vItems.filter(it => {
+        if (mode === "DER_DIE_DAS") return /^(der|die|das)\s/i.test(it.question);
+        if (mode === "A_AN") return /^(a|an)\s/i.test(it.question);
+        if (mode === "I_Y") return it.question.includes('_');
+        return true;
+      }).sort(() => Math.random() - 0.5);
+    }
+    if (quickDeck.length === 0) {
+      // Pokud filtr nic nenašel, vezmeme celý balíček
+      quickDeck = [...vItems].sort(() => Math.random() - 0.5);
+    }
+    quickCurrentItem = quickDeck.pop();
+  }
+
+  function answerQuickChoice(choice) {
+    if (!quickCurrentItem) return;
+    const mode = getQuickChoiceMode();
+    let isCorrect = false;
+
+    if (mode === "DER_DIE_DAS") {
+      isCorrect = quickCurrentItem.question.toLowerCase().startsWith(choice.toLowerCase() + " ");
+    } else if (mode === "A_AN") {
+      isCorrect = quickCurrentItem.question.toLowerCase().startsWith(choice.toLowerCase() + " ");
+    } else if (mode === "I_Y") {
+      isCorrect = quickCurrentItem.answer.trim().toLowerCase() === choice.toLowerCase();
+    }
+
+    if (isCorrect) {
+      sndOk();
+      quickSolvedCount++;
+      addReward(1, selectedGroupKey);
+      if (isAutoTTS) speakWord(quickCurrentItem.question, selectedSubject);
+      setTimeout(() => {
+        if (quickDeck.length > 0) {
+          quickCurrentItem = quickDeck.pop();
+        } else {
+          initQuickChoice();
+        }
+        renderActiveGame();
+      }, 350);
+    } else {
+      sndErr();
+    }
+  }
+
+  // --- PROCEDURÁLNÍ MATEMATICKÝ ENGINE ---
+  function startMathProceduralGame() {
+    selectedSubject = "Matematika (Početní dril)";
+    selectedGroupKey = `${currentUser.grade}. ročník`;
+    selectedGame = "PROCEDURAL_MATH";
+    mathStreak = 0;
+    generateNextMathTask();
+    setScreen("PLAYING");
+  }
+
+  function generateNextMathTask() {
+    const g = parseInt(currentUser.grade) || 2;
+    mathAnswered = false;
+
+    // 2. TŘÍDA: Sčítání a odčítání do 20 (i s přechodem), desítky do 100, malá násobilka 2-5
+    if (g <= 2) {
+      const types = ['ADD_20', 'SUB_20', 'TENS_100', 'MUL_SMALL'];
+      const pick = types[Math.floor(Math.random() * types.length)];
+      if (pick === 'ADD_20') {
+        const a = Math.floor(Math.random() * 11) + 2;
+        const b = Math.floor(Math.random() * (20 - a)) + 1;
+        mathTask = { q: `${a} + ${b} = ?`, ans: a + b, opts: makeNumberOptions(a + b) };
+      } else if (pick === 'SUB_20') {
+        const ans = Math.floor(Math.random() * 15) + 1;
+        const b = Math.floor(Math.random() * (20 - ans)) + 1;
+        const a = ans + b;
+        mathTask = { q: `${a} - ${b} = ?`, ans: ans, opts: makeNumberOptions(ans) };
+      } else if (pick === 'TENS_100') {
+        const a = (Math.floor(Math.random() * 8) + 1) * 10;
+        const b = (Math.floor(Math.random() * (10 - a / 10)) + 1) * 10;
+        mathTask = { q: `${a} + ${b} = ?`, ans: a + b, opts: makeNumberOptions(a + b, 10) };
+      } else {
+        const a = Math.floor(Math.random() * 4) + 2; // 2, 3, 4, 5
+        const b = Math.floor(Math.random() * 10) + 1;
+        mathTask = { q: `${a} · ${b} = ?`, ans: a * b, opts: makeNumberOptions(a * b) };
+      }
+    }
+    // 3.–5. TŘÍDA: Násobilka 1-10, dělení, sčítání a odčítání do 1000
+    else if (g <= 5) {
+      const types = ['MUL_FULL', 'DIV_EXACT', 'ADD_1000'];
+      const pick = types[Math.floor(Math.random() * types.length)];
+      if (pick === 'MUL_FULL') {
+        const a = Math.floor(Math.random() * 9) + 2;
+        const b = Math.floor(Math.random() * 9) + 2;
+        mathTask = { q: `${a} · ${b} = ?`, ans: a * b, opts: makeNumberOptions(a * b) };
+      } else if (pick === 'DIV_EXACT') {
+        const b = Math.floor(Math.random() * 8) + 2;
+        const ans = Math.floor(Math.random() * 9) + 1;
+        const a = b * ans;
+        mathTask = { q: `${a} : ${b} = ?`, ans: ans, opts: makeNumberOptions(ans) };
+      } else {
+        const a = Math.floor(Math.random() * 400) + 50;
+        const b = Math.floor(Math.random() * 400) + 50;
+        mathTask = { q: `${a} + ${b} = ?`, ans: a + b, opts: makeNumberOptions(a + b) };
+      }
+    }
+    // 6.–9. TŘÍDA: Celá čísla, zlomky, rovnice ax + b = c
+    else {
+      const types = ['NEG_ARITH', 'EQUATION', 'SQUARE'];
+      const pick = types[Math.floor(Math.random() * types.length)];
+      if (pick === 'NEG_ARITH') {
+        const a = Math.floor(Math.random() * 20) - 10;
+        const b = Math.floor(Math.random() * 20) - 10;
+        mathTask = { q: `(${a}) + (${b}) = ?`, ans: a + b, opts: makeNumberOptions(a + b) };
+      } else if (pick === 'EQUATION') {
+        const a = Math.floor(Math.random() * 4) + 2; // 2..5
+        const x = Math.floor(Math.random() * 10) + 1;
+        const b = Math.floor(Math.random() * 10) + 1;
+        const c = a * x + b;
+        mathTask = { q: `${a}x + ${b} = ${c}  (x = ?)`, ans: x, opts: makeNumberOptions(x) };
+      } else {
+        const x = Math.floor(Math.random() * 15) + 2;
+        mathTask = { q: `${x}² = ?`, ans: x * x, opts: makeNumberOptions(x * x) };
+      }
+    }
+  }
+
+  function makeNumberOptions(correct, step = 1) {
+    const opts = [correct];
+    while (opts.length < 4) {
+      const delta = (Math.floor(Math.random() * 5) - 2) * step;
+      const fake = correct + (delta === 0 ? step : delta);
+      if (!opts.includes(fake) && fake >= 0) opts.push(fake);
+    }
+    return opts.sort(() => Math.random() - 0.5);
+  }
+
+  function answerMathTask(chosen) {
+    if (mathAnswered) return;
+    mathAnswered = true;
+    const isCorrect = chosen === mathTask.ans;
+
+    if (isCorrect) {
+      sndOk();
+      mathStreak++;
+      addReward(1, "Matematika");
+      if (mathStreak % 5 === 0) sndFanfare();
+      setTimeout(() => {
+        generateNextMathTask();
+        renderActiveGame();
+      }, 350);
+    } else {
+      sndErr();
+      mathStreak = 0;
+      renderActiveGame();
+    }
   }
 
   function initMissing() {
@@ -1188,6 +1515,13 @@
     initMissing();
     renderActiveGame();
   }
+
+  let pexesoPairCount = 4;
+  let pexesoCards = [];
+  let pexesoFlipped = [];
+  let pexesoMatched = [];
+  let pexesoLocked = false;
+  let pexesoAttempts = 0;
 
   function initPexeso() {
     const vItems = getVocabItems();
@@ -1284,20 +1618,18 @@
       `;
     }
 
-    // 2. ADAPTIVNÍ ZKOUŠENÍ: KONEC AŽ PŘI 100% ZVLÁDNUTÍ
+    // 2. OBOUSMĚRNÉ ADAPTIVNÍ ZKOUŠENÍ
     else if (selectedGame === "ADAPTIVE") {
       const stats = getMasteryStats();
       const pct = Math.round((stats.current / stats.total) * 100);
+      const isDirOut = testingDirection === "DIR_OUT";
 
       if (stats.masteredCount >= stats.totalWords) {
         main.innerHTML = `
           <div style="text-align:center;padding:30px 10px;">
             <h2 style="color:var(--col-green);font-size:26px;margin-bottom:12px;">KOMPLETNĚ ZVLÁDNUTO! 🎉</h2>
-            <p style="font-size:18px;color:#fff;margin-bottom:8px;">Všech ${stats.totalWords} položek umíš na 2 ★!</p>
-            <div class="bargraph-container" style="margin:20px auto;max-width:320px;">
-              <div class="bargraph-header"><span>Naučeno: 100 %</span><span style="color:var(--col-green);">${stats.current}/${stats.total} bodů</span></div>
-              <div class="bargraph-track"><div class="bargraph-fill" style="width:100%;background:var(--col-green);"></div></div>
-            </div>
+            <p style="font-size:17px;color:#fff;margin-bottom:8px;">Všech ${stats.totalWords} položek v tomto směru (${isDirOut ? '🇨🇿 ➔ Cizí' : 'Cizí ➔ 🇨🇿'}) umíš na 2 ★!</p>
+            <div class="action-btn" style="margin-bottom:10px;" onclick="toggleTestingDirection()">PŘEPNOUT NA DRUHÝ SMĚR ⇄</div>
             <div class="action-btn green" onclick="setScreen('SELECT_GAME')">ZPĚT DO MENU HRY ➔</div>
           </div>
         `;
@@ -1307,22 +1639,28 @@
       const w = vItems[vCurrentWord];
       const mVal = vMastery[vCurrentWord] || 0;
 
+      // Směr: DIR_OUT = prompt česky, odpověď cizí | DIR_IN = prompt cizí, odpověď česky
+      const promptText = isDirOut ? w.answer : w.question;
+      const targetText = isDirOut ? w.question : w.answer;
+
       main.innerHTML = `
         <div class="bargraph-container">
           <div class="bargraph-header">
-            <span>Učení: ${stats.masteredCount} z ${stats.totalWords} hotovo (${stats.current}/${stats.total} b.)</span>
+            <span>Učení: ${stats.masteredCount} z ${stats.totalWords} (${stats.current}/${stats.total} b.)</span>
             <span style="color:var(--col-green);">${pct} %</span>
           </div>
           <div class="bargraph-track"><div class="bargraph-fill" style="width:${pct}%;"></div></div>
         </div>
-        <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--col-text-muted);margin-bottom:4px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--col-text-muted);margin-bottom:4px;">
           <span>Slovo: ${mVal}/2 ★</span>
-          <span>Aktivní okno: ${vActivePool} z ${vItems.length}</span>
+          <button class="toggle-btn on" onclick="toggleTestingDirection()" style="font-size:11px;padding:2px 8px;">
+            Směr: ${isDirOut ? '🇨🇿 ➔ Cizí' : 'Cizí ➔ 🇨🇿'} ⇄
+          </button>
         </div>
-        <div class="prompt-box" style="color:#fff;margin-top:2px;">${w.answer}</div>
-        <div class="prompt-box ${isHebrew ? 'hebrew-text' : ''}" style="color:${vQuizRevealed ? 'var(--col-yellow)' : 'var(--col-text-muted)'};">
-          ${vQuizRevealed ? w.question : '[ ? ? ? ]'}
-          ${vQuizRevealed ? `<span class="audio-btn" onclick="speakWord('${w.question}', '${selectedSubject}')">🔊</span>` : ''}
+        <div class="prompt-box" style="color:#fff;margin-top:2px;">${promptText}</div>
+        <div class="prompt-box ${(!isDirOut && isHebrew) ? 'hebrew-text' : (isDirOut && isHebrew && vQuizRevealed ? 'hebrew-text' : '')}" style="color:${vQuizRevealed ? 'var(--col-yellow)' : 'var(--col-text-muted)'};">
+          ${vQuizRevealed ? targetText : '[ ? ? ? ]'}
+          ${(vQuizRevealed && isDirOut) ? `<span class="audio-btn" onclick="speakWord('${w.question}', '${selectedSubject}')">🔊</span>` : ''}
         </div>
         ${vQuizRevealed ? `
           <div style="text-align:center;color:var(--col-active-tab);margin-bottom:8px;">[ ${w.help || ''} ]</div>
@@ -1336,10 +1674,9 @@
       `;
     }
 
-    // 3. SKLÁDÁNÍ SLOVA
+    // 3. SKLÁDÁNÍ (SLOVA / PÍSMENA)
     else if (selectedGame === "SCRAMBLE") {
       const w = vItems[vCurrentWord];
-      const targetGraphemes = getGraphemes(w.question);
       const pct = Math.min(100, Math.round((scrambleSolvedCount / vItems.length) * 100));
 
       main.innerHTML = `
@@ -1350,19 +1687,19 @@
           </div>
           <div class="bargraph-track"><div class="bargraph-fill" style="width:${pct}%;"></div></div>
         </div>
-        <div class="prompt-box" style="font-size:22px;color:#fff;margin-top:4px;">Slož: <b>${w.answer}</b></div>
+        <div class="prompt-box" style="font-size:20px;color:#fff;margin-top:4px;">Slož: <b>${w.answer}</b></div>
         <div class="slots-row ${isHebrew ? 'hebrew-text' : ''}">
-          ${targetGraphemes.map((ch, i) => `
-            <div class="letter-slot ${i < scramblePlaced.length ? 'filled' : ''}">
+          ${scrambleTiles.map((tile, i) => `
+            <div class="letter-slot ${scrambleIsWordMode ? 'word-slot' : ''} ${i < scramblePlaced.length ? 'filled' : ''}">
               ${i < scramblePlaced.length ? scramblePlaced[i] : '_'}
             </div>
           `).join('')}
         </div>
         ${!scrambleDone ? `
           <div class="letters-row">
-            ${scrambleLetters.map((item, idx) => `
-              <div class="letter-tile ${isHebrew ? 'hebrew' : ''} ${item.used ? 'used' : ''}" onclick="clickScrambleLetter(${idx})">
-                ${item.ch}
+            ${scrambleTiles.map((item, idx) => `
+              <div class="letter-tile ${scrambleIsWordMode ? 'word-tile' : ''} ${isHebrew ? 'hebrew' : ''} ${item.used ? 'used' : ''}" onclick="clickScrambleTile(${idx})">
+                ${item.text}
               </div>
             `).join('')}
           </div>
@@ -1375,7 +1712,68 @@
       `;
     }
 
-    // 4. DOPLŇOVÁNÍ PÍSMENE
+    // 4. RYCHLÁ VOLBA (DER/DIE/DAS, A/AN, I/Y)
+    else if (selectedGame === "QUICK_CHOICE") {
+      const mode = getQuickChoiceMode();
+      const it = quickCurrentItem;
+      if (!it) {
+        initQuickChoice();
+        return;
+      }
+
+      let promptClean = it.question;
+      let btns = [];
+
+      if (mode === "DER_DIE_DAS") {
+        promptClean = it.question.replace(/^(der|die|das)\s+/i, '');
+        btns = ['DER', 'DIE', 'DAS'];
+      } else if (mode === "A_AN") {
+        promptClean = it.question.replace(/^(a|an)\s+/i, '');
+        btns = ['A', 'AN'];
+      } else if (mode === "I_Y") {
+        btns = ['I / Í', 'Y / Ý'];
+      }
+
+      main.innerHTML = `
+        <div class="bargraph-container">
+          <div class="bargraph-header">
+            <span>Rychlá volba: ${quickSolvedCount} vyřešeno</span>
+            <span style="color:var(--col-yellow);">Zbývá: ${quickDeck.length + 1}</span>
+          </div>
+          <div class="bargraph-track"><div class="bargraph-fill" style="width:100%;"></div></div>
+        </div>
+        <div class="prompt-box" style="font-size:32px;color:#fff;margin:25px 0;">${promptClean}</div>
+        <p style="text-align:center;color:var(--col-text-muted);font-size:16px;margin-bottom:15px;">${it.answer}</p>
+        <div style="display:flex;gap:10px;justify-content:center;">
+          ${btns.map(b => `
+            <div class="opt-btn" style="flex:1;height:65px;font-size:22px;font-weight:bold;" onclick="answerQuickChoice('${b}')">${b}</div>
+          `).join('')}
+        </div>
+      `;
+    }
+
+    // 5. PROCEDURÁLNÍ MATEMATIKA
+    else if (selectedGame === "PROCEDURAL_MATH") {
+      main.innerHTML = `
+        <div class="bargraph-container">
+          <div class="bargraph-header">
+            <span>Série správně: ${mathStreak} 🔥</span>
+            <span style="color:var(--col-active-tab);">${selectedGroupKey}</span>
+          </div>
+          <div class="bargraph-track"><div class="bargraph-fill" style="width:${Math.min(100, mathStreak * 10)}%;"></div></div>
+        </div>
+        <div class="prompt-box" style="font-size:36px;color:#fff;margin:20px 0;">${mathTask.q}</div>
+        <div class="grid-2">
+          ${mathTask.opts.map(opt => `
+            <div class="opt-btn ${mathAnswered ? (opt === mathTask.ans ? 'correct' : 'wrong') : ''}" style="height:60px;font-size:26px;font-weight:bold;" onclick="answerMathTask(${opt})">
+              ${opt}
+            </div>
+          `).join('')}
+        </div>
+      `;
+    }
+
+    // 6. DOPLŇOVÁNÍ PÍSMENE
     else if (selectedGame === "MISSING") {
       const w = vItems[vCurrentWord];
       const letters = getGraphemes(w.question);
@@ -1411,11 +1809,10 @@
       `;
     }
 
-    // 5. PEXESO
+    // 7. PEXESO
     else if (selectedGame === "PEXESO") {
       const totalPairs = Math.min(pexesoPairCount, vItems.length);
       const isComplete = pexesoMatched.length === totalPairs;
-      const cols = 4;
 
       main.innerHTML = `
         <div class="bargraph-container">
@@ -1426,7 +1823,7 @@
           <div class="bargraph-track"><div class="bargraph-fill" style="width:${(pexesoMatched.length / totalPairs) * 100}%;"></div></div>
         </div>
         ${!isComplete ? `
-          <div class="pexeso-grid" style="grid-template-columns: repeat(${cols}, 1fr);">
+          <div class="pexeso-grid" style="grid-template-columns: repeat(4, 1fr);">
             ${pexesoCards.map((c, i) => {
               const isMatched = pexesoMatched.includes(c.wordIdx);
               const isFlipped = pexesoFlipped.includes(i);
@@ -1443,9 +1840,6 @@
           <div style="text-align:center;padding:30px 10px;">
             <h2 style="color:var(--col-green);font-size:26px;margin-bottom:8px;">VÝBORNĚ! PEXESO SPLNĚNO!</h2>
             <p style="color:var(--col-yellow);font-size:18px;margin-bottom:6px;">Hotovo za ${pexesoAttempts} pokusů!</p>
-            <p style="color:var(--col-text-muted);font-size:14px;margin-bottom:20px;">
-              ${pexesoAttempts <= totalPairs * 2 ? 'Skvělá paměť! Žádné zbytečné klikání.' : 'Příště zkus klikat rozvážněji a méně naslepo!'}
-            </p>
             <div class="action-btn green" onclick="initPexeso();renderActiveGame();">HRÁT ZNOVU ➔</div>
             <div class="action-btn" style="margin-top:10px;" onclick="setScreen('SELECT_PEXESO_SIZE')">ZMĚNIT VELIKOST PEXESA</div>
           </div>
@@ -1453,7 +1847,7 @@
       `;
     }
 
-    // 6. KVÍZ
+    // 8. KVÍZ
     else if (selectedGame === "QUIZ") {
       const q = qItems[qCurStep];
       const pct = Math.round(((qCurStep + 1) / qItems.length) * 100);
@@ -1467,7 +1861,7 @@
         </div>
         <div class="prompt-box" style="font-size:20px;color:#fff;">${q.question}</div>
         <div class="grid-2" style="margin-top:10px;">
-          ${q.options.map((opt, i) => `
+          ${q.options.map(opt => `
             <div class="opt-btn ${qAnswered ? (opt === q.answer ? 'correct' : 'wrong') : ''}" onclick="clickQuizOpt('${opt}')">
               ${opt}
             </div>
@@ -1480,7 +1874,7 @@
       `;
     }
 
-    // 7. POSLOUPNOSTI NA ČAS
+    // 9. ŘADA NA ČAS
     else if (selectedGame === "SEQ") {
       const seqConfig = sItems[0];
       const itemsList = seqConfig.answer.split('|').map(s => s.trim()).filter(Boolean);
