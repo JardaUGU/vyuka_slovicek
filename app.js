@@ -21,7 +21,7 @@ function forceHardReload() {
   window.location.href = window.location.origin + window.location.pathname + '?reload=' + Date.now();
 }
 
-// --- SDRÍLENÉ DIDAKTICKÉ POMOCNÉ FUNKCE ---
+// --- SDRÍLENÉ POMOCNÉ FUNKCE PRO VŠECHNY MODULY ---
 function getVocabItems() { return (activeItems || []).filter(it => it.type === "SLOVO"); }
 function getQuizItems()  { return (activeItems || []).filter(it => it.type === "KVIZ"); }
 function getSeqItems()   { return (activeItems || []).filter(it => it.type === "RADA"); }
@@ -116,7 +116,7 @@ function registerUserAction() {
 window.addEventListener('click', registerUserAction, true);
 window.addEventListener('touchstart', registerUserAction, true);
 
-// INVARIANT: Zastavení času po 15 sekundách nečinnosti
+// INVARIANT: Přísná pauza po 15 sekundách nečinnosti
 setInterval(() => {
   if (currentScreen === "PLAYING" && currentUser) {
     const idleTime = Date.now() - lastUserActivityTime;
@@ -260,6 +260,7 @@ function updateFooter() {
   document.getElementById("footer-user").innerHTML = `${currentUser.name} (${gradeLabel}) <span class="streak-badge">🔥 ${streak}</span>`;
 }
 
+// --- NAČÍTÁNÍ DAT S GARANCÍ VYKRESLENÍ (NEZAMRZNE) ---
 async function loadData() {
   const cached = localStorage.getItem("app_data");
   if (cached) {
@@ -270,6 +271,7 @@ async function loadData() {
     } catch(e) {}
   }
   await syncData();
+  renderScreen(); // Pojistka: vždy vykreslit po pokusu o sync
 }
 
 async function syncData() {
@@ -281,6 +283,7 @@ async function syncData() {
     
     if (!json.items) {
       if (statusEl) statusEl.innerText = "Chyba API";
+      renderScreen();
       return;
     }
 
@@ -300,10 +303,11 @@ async function syncData() {
     renderScreen();
   } catch(e) {
     if (statusEl) statusEl.innerText = "Offline";
+    renderScreen();
   }
 }
 
-// Uložení pokroku do listu Pokrok
+// Uložení pokroku do listu Pokrok s 4-prvkovým klíčem
 async function saveWordMasteryToGoogle(itemQuestion, masteryLevel, direction) {
   if (!currentUser) return;
   try {
@@ -354,7 +358,6 @@ function getGroupMasteryPercent(groupItems, subjName) {
   return Math.min(100, Math.round((points / totalPossible) * 100));
 }
 
-// Změna v funkci goBack() pro bezpečné ukončení běžící smyčky:
 function goBack() {
   if (typeof stopArcadeLoop === "function") stopArcadeLoop();
   if (currentScreen === "PLAYING" && selectedGame === "PEXESO") setScreen("SELECT_PEXESO_SIZE");
@@ -368,6 +371,7 @@ function goBack() {
   else if (currentScreen === "SELECT_GROUP") setScreen("SELECT_SUBJECT");
   else if (currentScreen === "SELECT_SUBJECT") setScreen("SELECT_USER");
 }
+
 function setScreen(scr) {
   currentScreen = scr;
   registerUserAction();
@@ -428,7 +432,12 @@ function renderScreen() {
     const uList = (appData.users && appData.users.length) ? appData.users : [];
 
     if (uList.length === 0) {
-      main.innerHTML = `<div style="text-align:center;padding:30px;color:var(--col-text-muted);">Načítám profily z tabulky...</div>`;
+      main.innerHTML = `
+        <div style="text-align:center;padding:30px;color:var(--col-text-muted);">
+          <p style="margin-bottom:15px;">Načítám profily z tabulky...</p>
+          <button class="action-btn" onclick="syncData()">Zkusit znovu 🔄</button>
+        </div>
+      `;
       return;
     }
 
@@ -505,7 +514,7 @@ function renderScreen() {
     bSubj.style.display = "flex";
     bSubj.innerText = "Matematika";
     bGroup.style.display = "none";
-    renderMathOpSelection();
+    if (typeof renderMathOpSelection === "function") renderMathOpSelection();
   }
 
   // 4. VÝBĚR SKUPINY (LEKCE / TÉMATA)
@@ -610,7 +619,7 @@ function renderScreen() {
       `;
     }
 
-    iif (quickMode) {
+    if (quickMode) {
       const labels = {
         "DER_DIE_DAS": "DER / DIE / DAS",
         "A_AN": "A / AN",
@@ -685,7 +694,13 @@ function renderScreen() {
   }
 }
 
-// Spustit až po úplném načtení všech 3 skriptů do paměti!
-window.addEventListener('DOMContentLoaded', () => {
+// SPOUŠTĚNÍ: Okamžitý start i při hotovém načtení DOMu
+function startApp() {
   loadData();
-});
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", startApp);
+} else {
+  startApp();
+}
