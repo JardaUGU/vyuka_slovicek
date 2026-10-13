@@ -1,5 +1,5 @@
 /**
- * JÁDRO APLIKACE, ČASOVAČ, SYNCHRONIZACE A NAVIGACE
+ * JÁDRO APLIKACE, ČASOVAČ, SYNCHRONIZACE, SDRÍLENÉ POMOCNÉ FUNKCE A NAVIGACE
  */
 const API_URL = "https://script.google.com/macros/s/AKfycbxaxBIXP-ECpWstcqRDw8RuT_ds6UwcplU_3pZ9_-ksELN5FVeGt5EHjjexkJVmx1FR_w/exec";
 
@@ -19,6 +19,45 @@ let testingDirection = localStorage.getItem("testing_dir") || "DIR_OUT";
 
 function forceHardReload() {
   window.location.href = window.location.origin + window.location.pathname + '?reload=' + Date.now();
+}
+
+// --- SDRÍLENÉ DIDAKTICKÉ POMOCNÉ FUNKCE ---
+function getVocabItems() { return (activeItems || []).filter(it => it.type === "SLOVO"); }
+function getQuizItems()  { return (activeItems || []).filter(it => it.type === "KVIZ"); }
+function getSeqItems()   { return (activeItems || []).filter(it => it.type === "RADA"); }
+
+function getAdaptiveWindowSize(grade) {
+  const g = parseInt(grade) || 2;
+  if (g >= 90) return 12;
+  if (g >= 10) return 10;
+  return Math.max(3, g);
+}
+
+function getGraphemes(str) {
+  if (window.Intl && Intl.Segmenter) {
+    const segmenter = new Intl.Segmenter('und', { granularity: 'grapheme' });
+    return Array.from(segmenter.segment(str), s => s.segment);
+  }
+  return str.split('');
+}
+
+function getQuickChoiceMode() {
+  const vItems = getVocabItems();
+  const s = (selectedSubject || '').toLowerCase();
+
+  if (s.includes("nemc") || s === "de") {
+    const count = vItems.filter(it => /^(der|die|das)\s/i.test(it.question)).length;
+    if (count >= 3) return "DER_DIE_DAS";
+  }
+  if (s.includes("angli") || s === "en") {
+    const count = vItems.filter(it => /^(a|an)\s/i.test(it.question)).length;
+    if (count >= 3) return "A_AN";
+  }
+  if (s.includes("cest") || s === "cs") {
+    const count = vItems.filter(it => it.question.includes('_')).length;
+    if (count >= 3) return "I_Y";
+  }
+  return null;
 }
 
 // --- ČASOVAČ & STREAK ---
@@ -366,7 +405,7 @@ function chooseGroup(groupName) {
 function toggleTestingDirection() {
   testingDirection = (testingDirection === "DIR_OUT") ? "DIR_IN" : "DIR_OUT";
   localStorage.setItem("testing_dir", testingDirection);
-  initGameState();
+  if (typeof initGameState === "function") initGameState();
   renderScreen();
 }
 
@@ -637,8 +676,11 @@ function renderScreen() {
     bSubj.innerText = selectedSubject;
     bGroup.style.display = "flex";
     bGroup.innerText = selectedGroupKey;
-    renderActiveGame();
+    if (typeof renderActiveGame === "function") renderActiveGame();
   }
 }
 
-loadData();
+// Spustit až po úplném načtení všech 3 skriptů do paměti!
+window.addEventListener('DOMContentLoaded', () => {
+  loadData();
+});
