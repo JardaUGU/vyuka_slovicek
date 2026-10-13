@@ -354,7 +354,9 @@ function getGroupMasteryPercent(groupItems, subjName) {
   return Math.min(100, Math.round((points / totalPossible) * 100));
 }
 
+// Změna v funkci goBack() pro bezpečné ukončení běžící smyčky:
 function goBack() {
+  if (typeof stopArcadeLoop === "function") stopArcadeLoop();
   if (currentScreen === "PLAYING" && selectedGame === "PEXESO") setScreen("SELECT_PEXESO_SIZE");
   else if (currentScreen === "SELECT_PEXESO_SIZE") setScreen("SELECT_GAME");
   else if (currentScreen === "PLAYING") {
@@ -366,7 +368,6 @@ function goBack() {
   else if (currentScreen === "SELECT_GROUP") setScreen("SELECT_SUBJECT");
   else if (currentScreen === "SELECT_SUBJECT") setScreen("SELECT_USER");
 }
-
 function setScreen(scr) {
   currentScreen = scr;
   registerUserAction();
@@ -609,16 +610,20 @@ function renderScreen() {
       `;
     }
 
-    if (quickMode) {
+    iif (quickMode) {
       const labels = {
-        "DER_DIE_DAS": "⚡ DER / DIE / DAS",
-        "A_AN": "⚡ A / AN",
-        "I_Y": "⚡ I / Y"
+        "DER_DIE_DAS": "DER / DIE / DAS",
+        "A_AN": "A / AN",
+        "I_Y": "I / Y"
       };
       tilesHtml += `
+        <div class="tile" style="border-color:var(--col-orange);grid-column: span 2;background:#231a0a;" onclick="startArcadeGame()">
+          <h2 style="color:var(--col-orange);">☄️ Padající slova (${labels[quickMode]})</h2>
+          <p>Arkáda: 3 životy, zrychlující se pád!</p>
+        </div>
         <div class="tile" style="border-color:var(--col-yellow);grid-column: span 2;" onclick="startGame('QUICK_CHOICE')">
-          <h2 style="color:var(--col-yellow);">${labels[quickMode]}</h2>
-          <p>Rychlé reakční třídění</p>
+          <h2 style="color:var(--col-yellow);">⚡ Trénink volby (${labels[quickMode]})</h2>
+          <p>Klidné procvičování bez stresu</p>
         </div>
       `;
     }
