@@ -1,37 +1,6 @@
 /**
  * HERNÍ REŽIMY: KARTY, OBOUSMĚRNÉ ZKOUŠENÍ, CHYTRÉ SKLÁDÁNÍ, RYCHLÁ VOLBA, PEXESO, KVÍZ, ŘADA
  */
-function getVocabItems() { return (activeItems || []).filter(it => it.type === "SLOVO"); }
-function getQuizItems()  { return (activeItems || []).filter(it => it.type === "KVIZ"); }
-function getSeqItems()   { return (activeItems || []).filter(it => it.type === "RADA"); }
-
-function getGraphemes(str) {
-  if (window.Intl && Intl.Segmenter) {
-    const segmenter = new Intl.Segmenter('und', { granularity: 'grapheme' });
-    return Array.from(segmenter.segment(str), s => s.segment);
-  }
-  return str.split('');
-}
-
-// PŘÍSNÁ DETEKCE RYCHLÉ VOLBY: Povolí se POUZE, pokud daná lekce reálně obsahuje min. 3 vhodné položky
-function getQuickChoiceMode() {
-  const vItems = getVocabItems();
-  const s = selectedSubject.toLowerCase();
-
-  if (s.includes("nemc") || s === "de") {
-    const count = vItems.filter(it => /^(der|die|das)\s/i.test(it.question)).length;
-    if (count >= 3) return "DER_DIE_DAS";
-  }
-  if (s.includes("angli") || s === "en") {
-    const count = vItems.filter(it => /^(a|an)\s/i.test(it.question)).length;
-    if (count >= 3) return "A_AN";
-  }
-  if (s.includes("cest") || s === "cs") {
-    const count = vItems.filter(it => it.question.includes('_')).length;
-    if (count >= 3) return "I_Y";
-  }
-  return null;
-}
 
 // ========================================================
 // 1. ZKOUŠENÍ Z HLAVY (LEITNER BEZ NECHTĚNÉHO OPAKOVÁNÍ)
@@ -55,7 +24,7 @@ function initGameState() {
       if (m >= 2) masteredCount++;
     });
 
-    const baseWin = getAdaptiveWindowSize(currentUser.grade);
+    const baseWin = getAdaptiveWindowSize(currentUser ? currentUser.grade : 2);
     vActivePool = Math.min(vItems.length, Math.max(baseWin, masteredCount + baseWin));
     vLastWord = -1;
 
@@ -101,7 +70,6 @@ function pickNextAdaptiveWord() {
     return;
   }
 
-  // Zajistíme, aby v aktivním okně byla dostupná neprobíraná slova
   while (vActivePool < vItems.length) {
     const unmasteredInPool = [];
     for (let i = 0; i < vActivePool; i++) {
@@ -111,7 +79,6 @@ function pickNextAdaptiveWord() {
     vActivePool++;
   }
 
-  // Sebereme VÝHRADNĚ slova s úrovní < 2 (naučená slova nevracíme!)
   const available = [];
   for (let i = 0; i < vActivePool; i++) {
     if ((vMastery[i] || 0) < 2) available.push(i);
@@ -123,13 +90,11 @@ function pickNextAdaptiveWord() {
     }
   }
 
-  // Vyloučíme okamžité opakování stejného slova, pokud jich máme více
   let candidates = available;
   if (available.length > 1 && vLastWord !== -1) {
     candidates = available.filter(idx => idx !== vLastWord);
   }
 
-  // Prioritizujeme slova s 0 hvězdami (chybná) před slovy s 1 hvězdou
   const mistakes = candidates.filter(idx => (vMastery[idx] || 0) === 0);
   if (mistakes.length > 0 && Math.random() < 0.75) {
     vCurrentWord = mistakes[Math.floor(Math.random() * mistakes.length)];
@@ -568,7 +533,7 @@ function startGame(game) {
 
 function renderActiveGame() {
   const main = document.getElementById("main-content");
-  const isHebrew = selectedSubject.toLowerCase().includes('hebr') || selectedSubject === 'HE';
+  const isHebrew = (selectedSubject || '').toLowerCase().includes('hebr') || selectedSubject === 'HE';
   const vItems = getVocabItems();
   const qItems = getQuizItems();
   const sItems = getSeqItems();
