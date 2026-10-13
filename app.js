@@ -155,24 +155,81 @@ function updateStudyTimerUI() {
   }
 }
 
-// --- AUDIO & HLASOVÁ VÝSLOVNOST (TTS) ---
+// --- ROBUSTNÍ HLASOVÁ VÝSLOVNOST (TTS) PRO SAFARI & CHROME ---
 let isAutoTTS = localStorage.getItem("auto_tts") !== "false";
-function toggleAutoTTS() { isAutoTTS = !isAutoTTS; localStorage.setItem("auto_tts", isAutoTTS); updateTTSBtnUI(); }
+let availableVoices = [];
+
+function loadVoicesList() {
+  if ('speechSynthesis' in window) {
+    availableVoices = window.speechSynthesis.getVoices() || [];
+  }
+}
+if ('speechSynthesis' in window) {
+  loadVoicesList();
+  window.speechSynthesis.onvoiceschanged = loadVoicesList;
+}
+
+function toggleAutoTTS() { 
+  isAutoTTS = !isAutoTTS; 
+  localStorage.setItem("auto_tts", isAutoTTS); 
+  updateTTSBtnUI(); 
+}
+
 function updateTTSBtnUI() {
   const btn = document.getElementById("btn-tts-auto");
-  if (btn) { btn.className = isAutoTTS ? "tts-toggle-btn active" : "tts-toggle-btn"; btn.innerText = isAutoTTS ? "🔊 Auto" : "🔇 Vyp"; }
+  if (btn) { 
+    btn.className = isAutoTTS ? "tts-toggle-btn active" : "tts-toggle-btn"; 
+    btn.innerText = isAutoTTS ? "🔊 Auto" : "🔇 Vyp"; 
+  }
 }
+
+// Spolehlivá detekce jazyka bez ohledu na diakritiku (Němčina -> nemcina -> de-DE)
+function getTargetLang(subjectName) {
+  const s = (subjectName || selectedSubject || '')
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, ""); // Odstraní háčky a čárky
+
+  if (s.includes('angli') || s === 'en') return 'en-US';
+  if (s.includes('nemc') || s === 'de') return 'de-DE';
+  if (s.includes('hebr') || s === 'he') return 'he-IL';
+  return 'cs-CZ';
+}
+
 function speakWord(text, subjectName) {
   if (!('speechSynthesis' in window)) return;
   window.speechSynthesis.cancel();
+
   let toSpeak = text.replace(/\//g, ' or ').replace(/-/g, ', ');
   const u = new SpeechSynthesisUtterance(toSpeak);
-  const s = (subjectName || selectedSubject || '').toLowerCase();
-  let targetLang = 'cs-CZ';
-  if (s.includes('angli') || s === 'en') targetLang = 'en-US';
-  else if (s.includes('nemc') || s === 'de') targetLang = 'de-DE';
-  else if (s.includes('hebr') || s === 'he') targetLang = 'he-IL';
-  u.lang = targetLang; u.rate = 0.86;
+  const targetLang = getTargetLang(subjectName);
+  const langPrefix = targetLang.split('-')[0]; // 'de', 'en', 'cs', 'he'
+
+  u.lang = targetLang;
+  u.rate = 0.86;
+
+  // Vyhledání nativního hlasu v iOS (např. Anna pro němčinu)
+  const voices = availableVoices.length ? availableVoices : window.speechSynthesis.getVoices();
+  if (voices && voices.length > 0) {
+    let match = voices.find(v => {
+      const vLang = (v.lang || '').toLowerCase().replace('_', '-');
+      return vLang === targetLang.toLowerCase();
+    });
+
+    if (!match) {
+      match = voices.find(v => (v.lang || '').toLowerCase().replace('_', '-').startsWith(langPrefix));
+    }
+
+    // Speciální fallback pro iOS Safari (hledání hlasu Anna / Samantha podle jména)
+    if (!match && langPrefix === 'de') {
+      match = voices.find(v => (v.name || '').toLowerCase().includes('anna') || (v.name || '').toLowerCase().includes('petra'));
+    }
+
+    if (match) {
+      u.voice = match;
+    }
+  }
+
   window.speechSynthesis.speak(u);
 }
 
