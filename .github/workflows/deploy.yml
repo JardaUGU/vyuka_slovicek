@@ -1,0 +1,51 @@
+name: Deploy Main and Dev to Pages
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Stáhnout ostrou verzi (main)
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: site
+
+      - name: Stáhnout vývojovou verzi (dev)
+        uses: actions/checkout@v4
+        with:
+          ref: dev
+          path: site/dev
+
+      - name: Vypnout Jekyll formátování
+        run: touch site/.nojekyll
+
+      - name: Nastavení GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Příprava balíčku k nasazení
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - name: Vystavení na web
+        id: deployment
+        uses: actions/deploy-pages@v4
