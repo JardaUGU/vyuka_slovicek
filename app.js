@@ -1,5 +1,5 @@
 /**
- * JÁDRO APLIKACE, ČASOVAČ, SYNCHRONIZACE, ROČNÍKOVÉ FILTRY A VÝSLOVNOST PRO SAFARI
+ * JÁDRO APLIKACE, ČASOVAČ (BONUS TIME VŽDY VIDITELNÝ), CLOUD SYNC MINUT, VÝSLOVNOST
  */
 const API_URL = "https://script.google.com/macros/s/AKfycbxaxBIXP-ECpWstcqRDw8RuT_ds6UwcplU_3pZ9_-ksELN5FVeGt5EHjjexkJVmx1FR_w/exec";
 
@@ -24,7 +24,6 @@ function cleanCzechTranslation(text) {
   return text.replace(/\s*\([^)]*r\.\)/gi, '').replace(/\s*\((sg|pl)\.\)/gi, '').trim();
 }
 
-// --- POMOCNÉ FILTRAČNÍ FUNKCE ---
 function getVocabItems() { return (activeItems || []).filter(it => it.type === "SLOVO"); }
 function getQuizItems()  { return (activeItems || []).filter(it => it.type === "KVIZ"); }
 function getSeqItems()   { return (activeItems || []).filter(it => it.type === "RADA"); }
@@ -96,11 +95,8 @@ function updateUserStreak(userName, targetMinutes) {
   const yest = new Date(Date.now() - 86400000);
   const yestStr = `${yest.getFullYear()}-${yest.getMonth() + 1}-${yest.getDate()}`;
 
-  if (lastCompleted === yestStr) {
-    streak += 1;
-  } else {
-    streak = 1;
-  }
+  if (lastCompleted === yestStr) streak += 1;
+  else streak = 1;
 
   localStorage.setItem(`streak_${uKey}`, streak);
   localStorage.setItem(`streak_last_date_${uKey}`, todayStr);
@@ -109,6 +105,7 @@ function updateUserStreak(userName, targetMinutes) {
 let todaySecondsStudied = currentUser ? loadUserStudyTime(currentUser.name) : 0;
 let lastUserActivityTime = Date.now();
 let isTimerPaused = false;
+let lastCloudSyncSec = 0;
 
 function registerUserAction() {
   lastUserActivityTime = Date.now();
@@ -118,6 +115,7 @@ function registerUserAction() {
 window.addEventListener('click', registerUserAction, true);
 window.addEventListener('touchstart', registerUserAction, true);
 
+// Přísná pauza po 15 s nečinnosti + odeslání času do cloudu každých 45 s
 setInterval(() => {
   if (currentScreen === "PLAYING" && currentUser) {
     const idleTime = Date.now() - lastUserActivityTime;
@@ -130,6 +128,12 @@ setInterval(() => {
       if (todaySecondsStudied >= targetSec) {
         updateUserStreak(currentUser.name, currentUser.targetMinutes || 15);
       }
+
+      // Synchronizace času do Google Sheets každých 45 sekund čistého studia
+      if (todaySecondsStudied - lastCloudSyncSec >= 45) {
+        lastCloudSyncSec = todaySecondsStudied;
+        sendTimeHeartbeatToGoogle();
+      }
     } else {
       isTimerPaused = true;
     }
@@ -139,23 +143,61 @@ setInterval(() => {
   updateStudyTimerUI();
 }, 1000);
 
+// OPRAVA: Bonusový čas je viditelný VŽDY po dosažení limitu (i v pauze a v menu)
 function updateStudyTimerUI() {
   const box = document.getElementById("study-timer");
   const footerGoal = document.getElementById("footer-goal");
   if (!box || !currentUser) return;
+
   const targetSec = (currentUser.targetMinutes || 15) * 60;
-  const format = s => `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
-  if (footerGoal) footerGoal.innerText = `${Math.floor(todaySecondsStudied/60)} / ${currentUser.targetMinutes || 15} min ⏱️`;
-  if (currentScreen !== "PLAYING" || isTimerPaused) {
-    box.className = "study-timer-box paused"; box.innerText = `⏸️ ${format(todaySecondsStudied)} / ${format(targetSec)}`;
-  } else if (todaySecondsStudied < targetSec) {
-    box.className = "study-timer-box"; box.innerText = `⏱️ ${format(todaySecondsStudied)} / ${format(targetSec)}`;
+  const isGoalReached = todaySecondsStudied >= targetSec;
+  const bonusSec = Math.max(0, todaySecondsStudied - targetSec);
+
+  const format = s => {
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+    return `${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+  };
+
+  const spentMin = Math.floor(todaySecondsStudied / 60);
+  const targetMin = currentUser.targetMinutes || 15;
+
+  if (footerGoal) {
+    if (isGoalReached) {
+      const bMin = Math.floor(bonusSec / 60);
+      footerGoal.innerHTML = `<span style="color:var(--col-yellow);font-weight:bold;">★ ${spentMin} / ${targetMin} min (+${bMin} min)</span>`;
+    } else {
+      footerGoal.innerText = `${spentMin} / ${targetMin} min ⏱️`;
+    }
+  }
+
+  const isPaused = (currentScreen !== "PLAYING" || isTimerPaused);
+
+  if (isGoalReached) {
+    box.className = isPaused ? "study-timer-box bonus paused" : "study-timer-box bonus";
+    box.innerText = isPaused ? `⏸️ ★ BONUS: +${format(bonusSec)}` : `★ BONUS: +${format(bonusSec)}`;
   } else {
-    box.className = "study-timer-box bonus"; box.innerText = `★ BONUS: +${format(todaySecondsStudied - targetSec)}`;
+    box.className = isPaused ? "study-timer-box paused" : "study-timer-box";
+    box.innerText = isPaused ? `⏸️ ${format(todaySecondsStudied)} / ${format(targetSec)}` : `⏱️ ${format(todaySecondsStudied)} / ${format(targetSec)}`;
   }
 }
 
-// --- ROBUSTNÍ HLASOVÁ VÝSLOVNOST (TTS) PRO SAFARI NA IPHONE SE ---
+// Odeslání času do Google Sheets (pro synchronizaci mezi mobily a PC)
+function sendTimeHeartbeatToGoogle() {
+  if (!currentUser) return;
+  try {
+    const fd = new URLSearchParams();
+    fd.append("action", "log_activity");
+    fd.append("user", currentUser.name);
+    fd.append("subject", selectedSubject || "Výuka");
+    fd.append("section", "Časomíra");
+    fd.append("stars", 0);
+    fd.append("minutes", (todaySecondsStudied / 60).toFixed(1));
+    fetch(API_URL, { method: "POST", mode: "no-cors", body: fd });
+  } catch(e) {}
+}
+
+// --- VÝSLOVNOST (TTS) PRO SAFARI NA IPHONE SE ---
 let isAutoTTS = localStorage.getItem("auto_tts") !== "false";
 let cachedVoices = [];
 
@@ -188,7 +230,7 @@ function getTargetLang(subjectName) {
   const s = (subjectName || selectedSubject || '')
     .toLowerCase()
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, ""); // "němčina" -> "nemcina"
+    .replace(/[\u0300-\u036f]/g, "");
 
   if (s.includes('angli') || s === 'en') return 'en-US';
   if (s.includes('nemc') || s === 'de') return 'de-DE';
@@ -203,7 +245,7 @@ function speakWord(text, subjectName) {
   const toSpeak = text.replace(/\//g, ' or ').replace(/-/g, ', ');
   const u = new SpeechSynthesisUtterance(toSpeak);
   const targetLang = getTargetLang(subjectName);
-  const langPrefix = targetLang.split('-')[0]; // 'en', 'de', 'cs', 'he'
+  const langPrefix = targetLang.split('-')[0];
 
   u.lang = targetLang;
   u.rate = 0.86;
@@ -211,7 +253,6 @@ function speakWord(text, subjectName) {
   if (cachedVoices.length === 0) updateVoices();
   let voices = cachedVoices.length ? cachedVoices : window.speechSynthesis.getVoices();
 
-  // Záchrana pro Safari: pokud jsou hlasy ještě prázdné, zkusit po 50 ms
   if ((!voices || voices.length === 0) && 'speechSynthesis' in window) {
     setTimeout(() => {
       updateVoices();
@@ -230,14 +271,9 @@ function speakWord(text, subjectName) {
   if (voices && voices.length > 0) {
     let match = voices.find(v => (v.lang || '').toLowerCase().replace('_', '-') === targetLang.toLowerCase());
     if (!match) match = voices.find(v => (v.lang || '').toLowerCase().replace('_', '-').startsWith(langPrefix));
-    
-    // Explicitní přiřazení nativního hlasu v iOS (Anna pro němčinu)
     if (!match && langPrefix === 'de') match = voices.find(v => /anna|petra|markus/i.test(v.name));
     if (!match && langPrefix === 'en') match = voices.find(v => /samantha|daniel|karen|alex/i.test(v.name));
-
-    if (match) {
-      u.voice = match; // ZDE SE SAFARI DONUTÍ MLUVIT CIZÍM JAZYKEM!
-    }
+    if (match) u.voice = match;
   }
 
   window.speechSynthesis.speak(u);
@@ -278,7 +314,7 @@ function updateFooter() {
   document.getElementById("footer-user").innerHTML = `${currentUser.name} (${gradeLabel}) <span class="streak-badge">🔥 ${getUserStreak(currentUser.name)}</span>`;
 }
 
-// --- SYNCHRONIZACE DAT (15s LIMIT PRO CLOUD GOOGLU) ---
+// --- SYNCHRONIZACE DAT (STÁHNE I DNEŠNÍ ČAS Z JINÝCH ZAŘÍZENÍ) ---
 async function loadData() {
   const cached = localStorage.getItem("app_data");
   if (cached) {
@@ -308,11 +344,21 @@ async function syncData() {
       localStorage.setItem("app_data", JSON.stringify(json));
       if (statusEl) statusEl.innerText = `OK: ${appData.items.length} úloh`;
 
+      // SYNCHRONIZACE ČASU Z CLOUDU: Přenesení minut z jiného zařízení
       if (currentUser && appData.users) {
         const foundU = appData.users.find(u => u.name.toLowerCase() === currentUser.name.toLowerCase());
         if (foundU) {
           currentUser.targetMinutes = foundU.targetMinutes || 15;
           currentUser.grade = parseInt(foundU.grade) || 2;
+          
+          // Pokud jiné zařízení nahrálo do Google Sheets více minut, použít maximum
+          if (foundU.todayMinutes !== undefined) {
+            const cloudSec = Math.round(Number(foundU.todayMinutes) * 60);
+            if (cloudSec > todaySecondsStudied) {
+              todaySecondsStudied = cloudSec;
+              localStorage.setItem(getStudyTimeKey(currentUser.name), todaySecondsStudied);
+            }
+          }
           localStorage.setItem("cur_user", JSON.stringify(currentUser));
         }
       }
@@ -364,6 +410,7 @@ function getGroupMasteryPercent(groupItems, subjName) {
 // --- NAVIGACE ---
 function goBack() {
   if (typeof stopArcadeLoop === "function") stopArcadeLoop();
+  sendTimeHeartbeatToGoogle(); // Uložit čas při opuštění cvičení
   if (currentScreen === "PLAYING" && selectedGame === "PEXESO") setScreen("SELECT_PEXESO_SIZE");
   else if (currentScreen === "SELECT_PEXESO_SIZE") setScreen("SELECT_GAME");
   else if (currentScreen === "PLAYING") {
@@ -416,7 +463,7 @@ function renderScreen() {
   const bGroup = document.getElementById("badge-group");
   bUser.innerText = currentUser ? currentUser.name : "Uživatel";
 
-  // 1. VÝBĚR UŽIVATELE
+  // 1. VÝBĚR UŽIVATELE (UKAZUJE DNEŠNÍ MINUTY A BONUS)
   if (currentScreen === "SELECT_USER" || !currentUser) {
     bSubj.style.display = "none"; bGroup.style.display = "none";
     const uList = appData.users || [];
@@ -435,10 +482,17 @@ function renderScreen() {
         ${uList.map(u => {
           const g = parseInt(u.grade) || 2;
           const grLabel = g >= 10 && g < 90 ? `${g - 9}. ročník SŠ` : (g <= 9 ? `${g}. třída ZŠ` : 'Dospělý');
+          const uSec = loadUserStudyTime(u.name);
+          const uMin = Math.floor(uSec / 60);
+          const targetM = u.targetMinutes || 15;
+          const isDone = uMin >= targetM;
           return `
-            <div class="tile" onclick="selectUser('${u.name}', ${g}, ${u.targetMinutes||15})">
+            <div class="tile" style="${isDone ? 'border-color:var(--col-yellow);background:#1a2512;' : ''}" onclick="selectUser('${u.name}', ${g}, ${targetM})">
               <h2>${u.name}</h2><p>${grLabel}</p>
               <p style="color:var(--col-orange);margin-top:4px;">🔥 Série: ${getUserStreak(u.name)} dní</p>
+              <p style="color:${isDone ? 'var(--col-yellow)' : 'var(--col-text-muted)'};margin-top:2px;font-weight:bold;">
+                ⏱️ Dnes: ${uMin} / ${targetM} min ${isDone ? '★' : ''}
+              </p>
             </div>
           `;
         }).join('')}
