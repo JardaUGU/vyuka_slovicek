@@ -27,16 +27,21 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: main
-          path: site
+          path: main-files
 
       - name: Stáhnout vývojovou verzi (dev)
         uses: actions/checkout@v4
         with:
           ref: dev
-          path: site/dev
+          path: dev-files
 
-      - name: Vypnout Jekyll formátování
-        run: touch site/.nojekyll
+      - name: Sestavit web pro GitHub Pages
+        run: |
+          mkdir -p site
+          cp -r main-files/* site/
+          mkdir -p site/dev
+          cp -r dev-files/* site/dev/
+          touch site/.nojekyll
 
       - name: Nastavení GitHub Pages
         uses: actions/configure-pages@v5
