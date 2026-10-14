@@ -1,5 +1,5 @@
 /**
- * JÁDRO APLIKACE, ČASOVAČ, SYNCHRONIZACE, ROČNÍKOVÉ FILTRY A NAVIGACE
+ * JÁDRO APLIKACE, ČASOVAČ, SYNCHRONIZACE, ROČNÍKOVÉ FILTRY A VÝSLOVNOST PRO SAFARI
  */
 const API_URL = "https://script.google.com/macros/s/AKfycbxaxBIXP-ECpWstcqRDw8RuT_ds6UwcplU_3pZ9_-ksELN5FVeGt5EHjjexkJVmx1FR_w/exec";
 
@@ -59,7 +59,7 @@ function getQuickChoiceMode() {
   return null;
 }
 
-// Pravidlo pro ročníky: Výjimka pro nepravidelná slovesa od 5. ročníku výše
+// Výjimka ze specifikace: Nepravidelná slovesa vidí 5. třída i všechny vyšší ročníky
 function isItemAllowedForGrade(it, userG) {
   const itemG = parseInt(it.minGrade) || 2;
   const isVerbGroup = (it.lesson || '').toLowerCase().includes('sloves') || (it.topic || '').toLowerCase().includes('sloves');
@@ -113,11 +113,11 @@ let isTimerPaused = false;
 function registerUserAction() {
   lastUserActivityTime = Date.now();
   if (isTimerPaused) { isTimerPaused = false; updateStudyTimerUI(); }
+  if (cachedVoices.length === 0) updateVoices();
 }
 window.addEventListener('click', registerUserAction, true);
 window.addEventListener('touchstart', registerUserAction, true);
 
-// Přísná pauza po 15 sekundách nečinnosti
 setInterval(() => {
   if (currentScreen === "PLAYING" && currentUser) {
     const idleTime = Date.now() - lastUserActivityTime;
@@ -155,18 +155,19 @@ function updateStudyTimerUI() {
   }
 }
 
-// --- ROBUSTNÍ HLASOVÁ VÝSLOVNOST (TTS) PRO SAFARI & CHROME ---
+// --- ROBUSTNÍ HLASOVÁ VÝSLOVNOST (TTS) PRO SAFARI NA IPHONE SE ---
 let isAutoTTS = localStorage.getItem("auto_tts") !== "false";
-let availableVoices = [];
+let cachedVoices = [];
 
-function loadVoicesList() {
+function updateVoices() {
   if ('speechSynthesis' in window) {
-    availableVoices = window.speechSynthesis.getVoices() || [];
+    const v = window.speechSynthesis.getVoices();
+    if (v && v.length > 0) cachedVoices = v;
   }
 }
 if ('speechSynthesis' in window) {
-  loadVoicesList();
-  window.speechSynthesis.onvoiceschanged = loadVoicesList;
+  updateVoices();
+  window.speechSynthesis.onvoiceschanged = updateVoices;
 }
 
 function toggleAutoTTS() { 
@@ -183,12 +184,11 @@ function updateTTSBtnUI() {
   }
 }
 
-// Spolehlivá detekce jazyka bez ohledu na diakritiku (Němčina -> nemcina -> de-DE)
 function getTargetLang(subjectName) {
   const s = (subjectName || selectedSubject || '')
     .toLowerCase()
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, ""); // Odstraní háčky a čárky
+    .replace(/[\u0300-\u036f]/g, ""); // "němčina" -> "nemcina"
 
   if (s.includes('angli') || s === 'en') return 'en-US';
   if (s.includes('nemc') || s === 'de') return 'de-DE';
@@ -200,33 +200,43 @@ function speakWord(text, subjectName) {
   if (!('speechSynthesis' in window)) return;
   window.speechSynthesis.cancel();
 
-  let toSpeak = text.replace(/\//g, ' or ').replace(/-/g, ', ');
+  const toSpeak = text.replace(/\//g, ' or ').replace(/-/g, ', ');
   const u = new SpeechSynthesisUtterance(toSpeak);
   const targetLang = getTargetLang(subjectName);
-  const langPrefix = targetLang.split('-')[0]; // 'de', 'en', 'cs', 'he'
+  const langPrefix = targetLang.split('-')[0]; // 'en', 'de', 'cs', 'he'
 
   u.lang = targetLang;
   u.rate = 0.86;
 
-  // Vyhledání nativního hlasu v iOS (např. Anna pro němčinu)
-  const voices = availableVoices.length ? availableVoices : window.speechSynthesis.getVoices();
+  if (cachedVoices.length === 0) updateVoices();
+  let voices = cachedVoices.length ? cachedVoices : window.speechSynthesis.getVoices();
+
+  // Záchrana pro Safari: pokud jsou hlasy ještě prázdné, zkusit po 50 ms
+  if ((!voices || voices.length === 0) && 'speechSynthesis' in window) {
+    setTimeout(() => {
+      updateVoices();
+      const v2 = cachedVoices.length ? cachedVoices : window.speechSynthesis.getVoices();
+      if (v2 && v2.length > 0) {
+        let m2 = v2.find(v => (v.lang || '').toLowerCase().replace('_', '-').startsWith(langPrefix));
+        if (!m2 && langPrefix === 'de') m2 = v2.find(v => /anna|petra|markus/i.test(v.name));
+        if (!m2 && langPrefix === 'en') m2 = v2.find(v => /samantha|daniel|karen|alex/i.test(v.name));
+        if (m2) u.voice = m2;
+      }
+      window.speechSynthesis.speak(u);
+    }, 50);
+    return;
+  }
+
   if (voices && voices.length > 0) {
-    let match = voices.find(v => {
-      const vLang = (v.lang || '').toLowerCase().replace('_', '-');
-      return vLang === targetLang.toLowerCase();
-    });
-
-    if (!match) {
-      match = voices.find(v => (v.lang || '').toLowerCase().replace('_', '-').startsWith(langPrefix));
-    }
-
-    // Speciální fallback pro iOS Safari (hledání hlasu Anna / Samantha podle jména)
-    if (!match && langPrefix === 'de') {
-      match = voices.find(v => (v.name || '').toLowerCase().includes('anna') || (v.name || '').toLowerCase().includes('petra'));
-    }
+    let match = voices.find(v => (v.lang || '').toLowerCase().replace('_', '-') === targetLang.toLowerCase());
+    if (!match) match = voices.find(v => (v.lang || '').toLowerCase().replace('_', '-').startsWith(langPrefix));
+    
+    // Explicitní přiřazení nativního hlasu v iOS (Anna pro němčinu)
+    if (!match && langPrefix === 'de') match = voices.find(v => /anna|petra|markus/i.test(v.name));
+    if (!match && langPrefix === 'en') match = voices.find(v => /samantha|daniel|karen|alex/i.test(v.name));
 
     if (match) {
-      u.voice = match;
+      u.voice = match; // ZDE SE SAFARI DONUTÍ MLUVIT CIZÍM JAZYKEM!
     }
   }
 
@@ -268,7 +278,7 @@ function updateFooter() {
   document.getElementById("footer-user").innerHTML = `${currentUser.name} (${gradeLabel}) <span class="streak-badge">🔥 ${getUserStreak(currentUser.name)}</span>`;
 }
 
-// --- SYNCHRONIZACE DAT (S 15s TIMEOUTEM PRO CLOUD GOOGLU) ---
+// --- SYNCHRONIZACE DAT (15s LIMIT PRO CLOUD GOOGLU) ---
 async function loadData() {
   const cached = localStorage.getItem("app_data");
   if (cached) {
@@ -288,7 +298,7 @@ async function syncData() {
   if (statusEl) statusEl.innerText = "Stahuji...";
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 sekund pro bezpečný náběh Google Apps Scriptu
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
     const res = await fetch(API_URL, { signal: controller.signal });
     clearTimeout(timeoutId);
     
@@ -397,7 +407,7 @@ function toggleTestingDirection() {
   renderScreen();
 }
 
-// --- RENDERÉR HLAVNÍCH OBRAZOVEK ---
+// --- HLAVNÍ RENDERÉR ---
 function renderScreen() {
   updateFooter(); updateStudyTimerUI(); updateTTSBtnUI();
   const main = document.getElementById("main-content");
@@ -559,7 +569,7 @@ function renderScreen() {
   }
 }
 
-// Spuštění po načtení DOMu
+// Spuštění po načtení
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", () => loadData());
 } else {
