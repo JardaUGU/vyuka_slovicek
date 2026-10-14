@@ -1,5 +1,5 @@
 /**
- * HERNÍ REŽIMY: VÝSLOVNOST, LIŠTY POKROKU (BARGRAFY), LEITNER, ARKÁDA
+ * HERNÍ REŽIMY: VÝSLOVNOST, LIŠTY POKROKU (BARGRAFY), LEITNER,  ARKÁDA
  */
 
 // ==========================================
