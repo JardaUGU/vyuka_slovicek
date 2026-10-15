@@ -468,7 +468,7 @@ function renderActiveGame() {
       ${w.help ? `<div style="text-align:center;color:var(--col-active-tab);font-size:18px;margin-bottom:12px;font-weight:bold;">[ ${w.help} ]</div>` : ''}
       <div class="grid-2">
         <div class="action-btn" onclick="vCardPrev()">Předchozí</div>
-        <div class="action-btn" onclick="vCardNext()">Další (${vCardIdx + 1} / ${vItems.length})</div>
+        <div class="action-btn" onclick="vCardNext()">Další</div>
       </div>
     `;
   }
