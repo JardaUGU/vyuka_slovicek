@@ -243,13 +243,24 @@ function speakWord(text, subjectName) {
   if (!('speechSynthesis' in window)) return;
   window.speechSynthesis.cancel();
 
-  const toSpeak = text.replace(/\//g, ' or ').replace(/-/g, ', ');
+  let toSpeak = text;
+
+  // 1. Fonetické ošetření nepravidelného slovesa read - read - read -> vysloví [ ríd, red, red ]
+  if (/read\s*-\s*read\s*-\s*read/i.test(toSpeak)) {
+    toSpeak = "read, red, red";
+  } else {
+    // 2. Nahrazení pomlček čárkou s mezerou pro přirozenou pauzu syntezátoru (např. lie, lay, lain / lay, laid, laid)
+    toSpeak = toSpeak
+      .replace(/\//g, ' or ')
+      .replace(/\s*-\s*/g, ', ');
+  }
+
   const u = new SpeechSynthesisUtterance(toSpeak);
   const targetLang = getTargetLang(subjectName);
   const langPrefix = targetLang.split('-')[0];
 
   u.lang = targetLang;
-  u.rate = 0.86;
+  u.rate = 0.88; // Přirozené tempo
 
   if (cachedVoices.length === 0) updateVoices();
   let voices = cachedVoices.length ? cachedVoices : window.speechSynthesis.getVoices();
