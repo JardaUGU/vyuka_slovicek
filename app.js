@@ -1,5 +1,5 @@
 /**
- * JÁDRO APLIKACE, ČASOVAČ, SYNCHRONIZACE, ROČNÍKOVÉ FILTRY A VÝSLOVNOST PRO SAFARI
+ * JÁDRO APLIKACE, ČASOVAČ, SYNCHRONIZACE, EKONOMIKA (ZLAŤÁKY A SRDÍČKA)
  */
 const API_URL = "https://script.google.com/macros/s/AKfycbxaxBIXP-ECpWstcqRDw8RuT_ds6UwcplU_3pZ9_-ksELN5FVeGt5EHjjexkJVmx1FR_w/exec";
 
@@ -24,16 +24,13 @@ function cleanCzechTranslation(text) {
   return text.replace(/\s*\([^)]*r\.\)/gi, '').replace(/\s*\((sg|pl)\.\)/gi, '').trim();
 }
 
-// --- POMOCNÉ FILTRAČNÍ FUNKCE ---
 function getVocabItems() { return (activeItems || []).filter(it => it.type === "SLOVO"); }
 function getQuizItems()  { return (activeItems || []).filter(it => it.type === "KVIZ"); }
 function getSeqItems()   { return (activeItems || []).filter(it => it.type === "RADA"); }
 
 function getAdaptiveWindowSize(grade) {
   const g = parseInt(grade) || 2;
-  if (g >= 90) return 12;
-  if (g >= 10) return 10;
-  return Math.max(3, g);
+  return g >= 90 ? 12 : (g >= 10 ? 10 : Math.max(3, g));
 }
 
 function getGraphemes(str) {
@@ -59,25 +56,52 @@ function getQuickChoiceMode() {
   return null;
 }
 
-// Výjimka ze specifikace: Nepravidelná slovesa vidí 5. třída i všechny vyšší ročníky
 function isItemAllowedForGrade(it, userG) {
   const itemG = parseInt(it.minGrade) || 2;
   const isVerbGroup = (it.lesson || '').toLowerCase().includes('sloves') || (it.topic || '').toLowerCase().includes('sloves');
   if (isVerbGroup && userG >= 5) return true;
-
   if (!filterExactGradeOnly || userG >= 90) return true;
   return itemG === userG;
 }
+
+// --- EKONOMIKA: ZLAŤÁKY A ZMRAZENÍ ---
+function getUserCoins(userName) {
+  if (!userName) return 0;
+  return Number(localStorage.getItem(`coins_${userName.toLowerCase().trim()}`) || 0);
+}
+
+function addCoins(userName, amount) {
+  if (!userName) return;
+  const uKey = userName.toLowerCase().trim();
+  const current = getUserCoins(userName);
+  localStorage.setItem(`coins_${uKey}`, current + amount);
+}
+
+window.buyFreeze = function() {
+  const coins = getUserCoins(currentUser.name);
+  if (coins >= 20) {
+    addCoins(currentUser.name, -20);
+    const uKey = currentUser.name.toLowerCase().trim();
+    let freezes = Number(localStorage.getItem(`freeze_${uKey}`) || 0);
+    localStorage.setItem(`freeze_${uKey}`, freezes + 1);
+    alert("Úspěšně zakoupeno! 🧊\nZmrazení série tě ochrání, pokud zítra zapomeneš cvičit.");
+    renderScreen();
+  } else {
+    alert("Nemáš dostatek zlaťáků! 💰\nMusíš v tréninku zachránit více srdíček.");
+  }
+};
 
 // --- ČASOVAČ & STREAK ---
 function getStudyTimeKey(userName) {
   const d = new Date();
   return `study_sec_${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}_${(userName || 'user').toLowerCase().trim()}`;
 }
+
 function loadUserStudyTime(userName) {
   if (!userName) return 0;
   return Number(localStorage.getItem(getStudyTimeKey(userName)) || 0);
 }
+
 function getUserStreak(userName) {
   if (!userName) return 0;
   return Number(localStorage.getItem(`streak_${userName.toLowerCase().trim()}`) || 0);
@@ -96,8 +120,20 @@ function updateUserStreak(userName, targetMinutes) {
   const yest = new Date(Date.now() - 86400000);
   const yestStr = `${yest.getFullYear()}-${yest.getMonth() + 1}-${yest.getDate()}`;
 
-  if (lastCompleted === yestStr) streak += 1;
-  else streak = 1;
+  if (lastCompleted === yestStr) {
+    streak += 1;
+  } else if (lastCompleted) {
+    let freezes = Number(localStorage.getItem(`freeze_${uKey}`) || 0);
+    if (freezes > 0) {
+      localStorage.setItem(`freeze_${uKey}`, freezes - 1);
+      streak += 1;
+      alert("🧊 Tvoje série byla zachráněna pomocí zmrazení, které jsi koupil v obchodě!");
+    } else {
+      streak = 1;
+    }
+  } else {
+    streak = 1;
+  }
 
   localStorage.setItem(`streak_${uKey}`, streak);
   localStorage.setItem(`streak_last_date_${uKey}`, todayStr);
@@ -116,7 +152,6 @@ function registerUserAction() {
 window.addEventListener('click', registerUserAction, true);
 window.addEventListener('touchstart', registerUserAction, true);
 
-// Přísná pauza po 15 s nečinnosti + odeslání času do cloudu každých 45 s
 setInterval(() => {
   if (currentScreen === "PLAYING" && currentUser) {
     const idleTime = Date.now() - lastUserActivityTime;
@@ -130,7 +165,6 @@ setInterval(() => {
         updateUserStreak(currentUser.name, currentUser.targetMinutes || 15);
       }
 
-      // Synchronizace času do Google Sheets každých 45 sekund čistého studia
       if (todaySecondsStudied - lastCloudSyncSec >= 45) {
         lastCloudSyncSec = todaySecondsStudied;
         sendTimeHeartbeatToGoogle();
@@ -144,7 +178,6 @@ setInterval(() => {
   updateStudyTimerUI();
 }, 1000);
 
-// Bonusový čas je viditelný VŽDY po dosažení limitu (i v pauze a v menu)
 function updateStudyTimerUI() {
   const box = document.getElementById("study-timer");
   const footerGoal = document.getElementById("footer-goal");
@@ -154,12 +187,7 @@ function updateStudyTimerUI() {
   const isGoalReached = todaySecondsStudied >= targetSec;
   const bonusSec = Math.max(0, todaySecondsStudied - targetSec);
 
-  const format = s => {
-    const m = Math.floor(s / 60);
-    const sec = s % 60;
-    return `${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
-  };
-
+  const format = s => `${String(Math.floor(s / 60)).padStart(2,'0')}:${String(s % 60).padStart(2,'0')}`;
   const spentMin = Math.floor(todaySecondsStudied / 60);
   const targetMin = currentUser.targetMinutes || 15;
 
@@ -173,7 +201,6 @@ function updateStudyTimerUI() {
   }
 
   const isPaused = (currentScreen !== "PLAYING" || isTimerPaused);
-
   if (isGoalReached) {
     box.className = isPaused ? "study-timer-box bonus paused" : "study-timer-box bonus";
     box.innerText = isPaused ? `⏸️ ★ BONUS: +${format(bonusSec)}` : `★ BONUS: +${format(bonusSec)}`;
@@ -183,22 +210,18 @@ function updateStudyTimerUI() {
   }
 }
 
-// Odeslání času do Google Sheets
 function sendTimeHeartbeatToGoogle() {
   if (!currentUser) return;
   try {
     const fd = new URLSearchParams();
-    fd.append("action", "log_activity");
-    fd.append("user", currentUser.name);
-    fd.append("subject", selectedSubject || "Výuka");
-    fd.append("section", "Časomíra");
-    fd.append("stars", 0);
-    fd.append("minutes", (todaySecondsStudied / 60).toFixed(1));
+    fd.append("action", "log_activity"); fd.append("user", currentUser.name);
+    fd.append("subject", selectedSubject || "Výuka"); fd.append("section", "Časomíra");
+    fd.append("stars", 0); fd.append("minutes", (todaySecondsStudied / 60).toFixed(1));
     fetch(API_URL, { method: "POST", mode: "no-cors", body: fd });
   } catch(e) {}
 }
 
-// --- VÝSLOVNOST (TTS) PRO SAFARI NA IPHONE SE ---
+// --- VÝSLOVNOST (TTS) ---
 let isAutoTTS = localStorage.getItem("auto_tts") !== "false";
 let cachedVoices = [];
 
@@ -209,30 +232,20 @@ function updateVoices() {
   }
 }
 if ('speechSynthesis' in window) {
-  updateVoices();
-  window.speechSynthesis.onvoiceschanged = updateVoices;
+  updateVoices(); window.speechSynthesis.onvoiceschanged = updateVoices;
 }
 
 function toggleAutoTTS() { 
-  isAutoTTS = !isAutoTTS; 
-  localStorage.setItem("auto_tts", isAutoTTS); 
-  updateTTSBtnUI(); 
+  isAutoTTS = !isAutoTTS; localStorage.setItem("auto_tts", isAutoTTS); updateTTSBtnUI(); 
 }
 
 function updateTTSBtnUI() {
   const btn = document.getElementById("btn-tts-auto");
-  if (btn) { 
-    btn.className = isAutoTTS ? "tts-toggle-btn active" : "tts-toggle-btn"; 
-    btn.innerText = isAutoTTS ? "🔊 Auto" : "🔇 Vyp"; 
-  }
+  if (btn) { btn.className = isAutoTTS ? "tts-toggle-btn active" : "tts-toggle-btn"; btn.innerText = isAutoTTS ? "🔊 Auto" : "🔇 Vyp"; }
 }
 
 function getTargetLang(subjectName) {
-  const s = (subjectName || selectedSubject || '')
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
-
+  const s = (subjectName || selectedSubject || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   if (s.includes('angli') || s === 'en') return 'en-US';
   if (s.includes('nemc') || s === 'de') return 'de-DE';
   if (s.includes('hebr') || s === 'he') return 'he-IL';
@@ -242,25 +255,16 @@ function getTargetLang(subjectName) {
 function speakWord(text, subjectName) {
   if (!('speechSynthesis' in window)) return;
   window.speechSynthesis.cancel();
-
+  
   let toSpeak = text;
-
-  // 1. Fonetické ošetření nepravidelného slovesa read - read - read -> vysloví [ ríd, red, red ]
-  if (/read\s*-\s*read\s*-\s*read/i.test(toSpeak)) {
-    toSpeak = "read, red, red";
-  } else {
-    // 2. Nahrazení pomlček čárkou s mezerou pro přirozenou pauzu syntezátoru (např. lie, lay, lain / lay, laid, laid)
-    toSpeak = toSpeak
-      .replace(/\//g, ' or ')
-      .replace(/\s*-\s*/g, ', ');
-  }
+  if (/read\s*-\s*read\s*-\s*read/i.test(toSpeak)) toSpeak = "read, red, red";
+  else toSpeak = toSpeak.replace(/\//g, ' or ').replace(/\s*-\s*/g, ', ');
 
   const u = new SpeechSynthesisUtterance(toSpeak);
   const targetLang = getTargetLang(subjectName);
   const langPrefix = targetLang.split('-')[0];
 
-  u.lang = targetLang;
-  u.rate = 0.88; // Přirozené tempo
+  u.lang = targetLang; u.rate = 0.88;
 
   if (cachedVoices.length === 0) updateVoices();
   let voices = cachedVoices.length ? cachedVoices : window.speechSynthesis.getVoices();
@@ -287,7 +291,6 @@ function speakWord(text, subjectName) {
     if (!match && langPrefix === 'en') match = voices.find(v => /samantha|daniel|karen|alex/i.test(v.name));
     if (match) u.voice = match;
   }
-
   window.speechSynthesis.speak(u);
 }
 
@@ -319,14 +322,7 @@ function addReward(count = 1, section = "Lekce") {
   } catch(e) {}
 }
 
-function updateFooter() {
-  if (!currentUser) return;
-  const g = parseInt(currentUser.grade) || 2;
-  const gradeLabel = g >= 10 && g < 90 ? `${g - 9}. ročník SŠ` : (g <= 9 ? `${g}. tř.` : 'Dospělý');
-  document.getElementById("footer-user").innerHTML = `${currentUser.name} (${gradeLabel}) <span class="streak-badge">🔥 ${getUserStreak(currentUser.name)}</span>`;
-}
-
-// --- SYNCHRONIZACE DAT (STÁHNE I DNEŠNÍ ČAS Z JINÝCH ZAŘÍZENÍ) ---
+// --- SYNCHRONIZACE DAT ---
 async function loadData() {
   const cached = localStorage.getItem("app_data");
   if (cached) {
@@ -349,14 +345,12 @@ async function syncData() {
     const timeoutId = setTimeout(() => controller.abort(), 15000);
     const res = await fetch(API_URL, { signal: controller.signal });
     clearTimeout(timeoutId);
-    
     const json = await res.json();
     if (json && json.items) {
       appData = json;
       localStorage.setItem("app_data", JSON.stringify(json));
       if (statusEl) statusEl.innerText = `OK: ${appData.items.length} úloh`;
 
-      // Přenesení minut z jiného zařízení
       if (currentUser && appData.users) {
         const foundU = appData.users.find(u => u.name.toLowerCase() === currentUser.name.toLowerCase());
         if (foundU) {
@@ -425,9 +419,11 @@ function goBack() {
   if (currentScreen === "PLAYING" && selectedGame === "PEXESO") setScreen("SELECT_PEXESO_SIZE");
   else if (currentScreen === "SELECT_PEXESO_SIZE") setScreen("SELECT_GAME");
   else if (currentScreen === "PLAYING") {
-    if (selectedSubject === "Matematika") setScreen("SELECT_MATH_OP");
+    if (selectedGame === "CAMPAIGN") setScreen("CAMPAIGN_HUB");
+    else if (selectedSubject === "Matematika") setScreen("SELECT_MATH_OP");
     else setScreen("SELECT_GAME");
   }
+  else if (currentScreen === "CAMPAIGN_HUB") setScreen("SELECT_SUBJECT"); // Z hubu přímo na předměty
   else if (currentScreen === "SELECT_MATH_OP") setScreen("SELECT_SUBJECT");
   else if (currentScreen === "SELECT_GAME") setScreen("SELECT_GROUP");
   else if (currentScreen === "SELECT_GROUP") setScreen("SELECT_SUBJECT");
@@ -445,7 +441,22 @@ function selectUser(name, grade, targetMinutes) {
   setScreen("SELECT_SUBJECT");
 }
 
-function chooseSubject(subj) { selectedSubject = subj; setScreen("SELECT_GROUP"); }
+function chooseSubject(subj) { 
+  selectedSubject = subj; 
+  const userG = parseInt(currentUser.grade) || 2;
+  activeItems = (appData.items || []).filter(it => {
+    if (it.subject !== selectedSubject) return false;
+    if (!isItemAllowedForGrade(it, userG)) return false;
+    return true;
+  });
+
+  // PŘÍMÝ SKOK DO HUBU PRO KAMPAŇ (Přeskočí výběr lekcí)
+  if (selectedSubject.toLowerCase().includes("cesta") || selectedSubject.toLowerCase().includes("postupn")) {
+    setScreen("CAMPAIGN_HUB");
+  } else {
+    setScreen("SELECT_GROUP");
+  }
+}
 
 function chooseGroup(groupName) {
   selectedGroupKey = groupName;
@@ -474,17 +485,12 @@ function renderScreen() {
   const bGroup = document.getElementById("badge-group");
   bUser.innerText = currentUser ? currentUser.name : "Uživatel";
 
-  // 1. VÝBĚR UŽIVATELE (UKAZUJE DNEŠNÍ MINUTY A BONUS)
+  // 1. VÝBĚR UŽIVATELE
   if (currentScreen === "SELECT_USER" || !currentUser) {
     bSubj.style.display = "none"; bGroup.style.display = "none";
     const uList = appData.users || [];
     if (uList.length === 0) {
-      main.innerHTML = `
-        <div style="text-align:center;padding:30px;color:var(--col-text-muted);">
-          <p style="margin-bottom:15px;">Načítám profily z tabulky...</p>
-          <button class="action-btn" onclick="syncData()">Zkusit znovu 🔄</button>
-        </div>
-      `;
+      main.innerHTML = `<div style="text-align:center;padding:30px;"><p style="margin-bottom:15px;">Načítám profily z tabulky...</p><button class="action-btn" onclick="syncData()">Zkusit znovu 🔄</button></div>`;
       return;
     }
     main.innerHTML = `
@@ -492,18 +498,15 @@ function renderScreen() {
       <div class="grid-2">
         ${uList.map(u => {
           const g = parseInt(u.grade) || 2;
-          const grLabel = g >= 10 && g < 90 ? `${g - 9}. ročník SŠ` : (g <= 9 ? `${g}. třída ZŠ` : 'Dospělý');
           const uSec = loadUserStudyTime(u.name);
           const uMin = Math.floor(uSec / 60);
           const targetM = u.targetMinutes || 15;
           const isDone = uMin >= targetM;
           return `
             <div class="tile" style="${isDone ? 'border-color:var(--col-yellow);background:#1a2512;' : ''}" onclick="selectUser('${u.name}', ${g}, ${targetM})">
-              <h2>${u.name}</h2><p>${grLabel}</p>
+              <h2>${u.name}</h2><p>${g >= 10 && g < 90 ? `${g-9}. ročník SŠ` : (g<=9 ? `${g}. tř.` : 'Dospělý')}</p>
               <p style="color:var(--col-orange);margin-top:4px;">🔥 Série: ${getUserStreak(u.name)} dní</p>
-              <p style="color:${isDone ? 'var(--col-yellow)' : 'var(--col-text-muted)'};margin-top:2px;font-weight:bold;">
-                ⏱️ Dnes: ${uMin} / ${targetM} min ${isDone ? '★' : ''}
-              </p>
+              <p style="color:${isDone ? 'var(--col-yellow)' : 'var(--col-text-muted)'};margin-top:2px;font-weight:bold;">⏱️ Dnes: ${uMin}/${targetM} min ${isDone?'★':''}</p>
             </div>
           `;
         }).join('')}
@@ -522,8 +525,6 @@ function renderScreen() {
       subjs[it.subject] = (subjs[it.subject] || 0) + 1;
     });
 
-    const availableNames = Object.keys(subjs);
-
     let html = `
       <div class="filter-bar">
         <span>Filtr: ${filterExactGradeOnly ? 'Jen ' + userG + '. třída' : 'Všechny ročníky'}</span>
@@ -536,11 +537,12 @@ function renderScreen() {
           <h2 style="color:var(--col-active-tab);">🔢 Matematika</h2><p>Výběr operací a dril</p>
         </div>
     `;
-
-    availableNames.forEach(s => {
-      html += `<div class="tile" onclick="chooseSubject('${s}')"><h2>${s}</h2><p>${subjs[s]} úloh</p></div>`;
+    Object.keys(subjs).forEach(s => {
+      const isCesta = s.toLowerCase().includes("cesta") || s.toLowerCase().includes("postupn");
+      const stl = isCesta ? 'border-color:var(--col-green);background:#112a1f;' : '';
+      const ikn = isCesta ? '🚀 ' : '';
+      html += `<div class="tile" style="${stl}" onclick="chooseSubject('${s}')"><h2>${ikn}${s}</h2><p>${subjs[s]} úloh</p></div>`;
     });
-
     html += `</div>`;
     main.innerHTML = html;
   }
@@ -583,7 +585,52 @@ function renderScreen() {
     `;
   }
 
-  // 5. VÝBĚR HRY
+  // 5. KAMPAŇ HUB (PRO "CESTA" PŘEDMĚTY)
+  else if (currentScreen === "CAMPAIGN_HUB") {
+    bSubj.style.display = "flex"; bSubj.innerText = selectedSubject; 
+    bGroup.style.display = "none";
+    const coins = getUserCoins(currentUser.name);
+
+    // Zjistíme aktuální level (první lekce, co nemá 95%+)
+    const vItems = getVocabItems();
+    let lessons = [...new Set(vItems.map(it => it.lesson))].sort();
+    let currentLesson = lessons[0] || "Trénink";
+    let currentPct = 0;
+    
+    for (let l of lessons) {
+        let lItems = vItems.filter(it => it.lesson === l);
+        let pct = getGroupMasteryPercent(lItems, selectedSubject);
+        if (pct < 95) {
+            currentLesson = l;
+            currentPct = pct;
+            break;
+        }
+    }
+
+    main.innerHTML = `
+      <div style="text-align:center;padding:10px;">
+        <h2 style="color:var(--col-active-tab);font-size:26px;margin-bottom:5px;">Spirálová výuka</h2>
+        <p style="color:var(--col-text-muted);font-size:15px;margin-bottom:5px;">Aktuálně: <b>${currentLesson}</b> (${currentPct} %)</p>
+
+        <div class="action-btn green" style="padding:20px;font-size:20px;box-shadow: 0 6px 15px rgba(34,197,94,0.3);margin-top:20px;" onclick="startCampaign()">
+           ▶️ SPUSTIT DNEŠNÍ TRÉNINK
+        </div>
+        <p style="font-size:13px;color:var(--col-text-muted);margin-top:10px;">Vyzkoušej udržet všech 5 ❤️ srdíček pro maximální zisk zlaťáků!</p>
+
+        <div style="margin-top:30px;background:var(--col-card);padding:15px;border-radius:10px;border:1px solid var(--col-yellow);">
+           <h3 style="color:var(--col-yellow);font-size:20px;margin-bottom:10px;">🛒 Obchod</h3>
+           <p style="font-size:18px;">Tvoje zlaťáky: <b style="color:var(--col-yellow);">${coins} 💰</b></p>
+           
+           <div class="action-btn" style="background:#2d2605;border-color:var(--col-yellow);color:var(--col-yellow);margin-top:15px;" onclick="buyFreeze()">
+              🧊 Zmrazit sérii (Cena: 20 💰)
+           </div>
+           <p style="font-size:12px;color:var(--col-text-muted);margin-top:8px;">Ochrání tě před ztrátou ohně, pokud zítra zapomeneš cvičit.</p>
+        </div>
+      </div>
+    `;
+  }
+
+  // 6. VÝBĚR HRY (KLASICKÝ PŘEDMĚT)
   else if (currentScreen === "SELECT_GAME") {
     bSubj.style.display = "flex"; bGroup.style.display = "flex"; bGroup.innerText = selectedGroupKey;
     const vItems = getVocabItems(), qItems = getQuizItems(), quickMode = getQuickChoiceMode();
@@ -601,7 +648,7 @@ function renderScreen() {
     if (quickMode) {
       html += `
         <div class="tile" style="border-color:var(--col-orange);grid-column: span 2;background:#231a0a;" onclick="startArcadeGame()">
-          <h2 style="color:var(--col-orange);">☄️ Padající slova (${quickMode.replace(/_/g, ' ')})</h2><p>Arkáda: 3 životy, zrychlování po celé ploše!</p>
+          <h2 style="color:var(--col-orange);">☄️ Padající slova (${quickMode.replace(/_/g, ' ')})</h2><p>Arkáda: 3 životy, zrychlování!</p>
         </div>
       `;
     }
@@ -612,7 +659,7 @@ function renderScreen() {
     main.innerHTML = html;
   }
 
-  // 6. VELIKOST PEXESA
+  // 7. VELIKOST PEXESA
   else if (currentScreen === "SELECT_PEXESO_SIZE") {
     bGroup.style.display = "flex"; bGroup.innerText = selectedGroupKey;
     main.innerHTML = `
@@ -626,7 +673,7 @@ function renderScreen() {
     `;
   }
 
-  // 7. AKTIVNÍ HRA
+  // 8. AKTIVNÍ HRA
   else if (currentScreen === "PLAYING") {
     bSubj.style.display = "flex"; bSubj.innerText = selectedSubject;
     bGroup.style.display = "flex"; bGroup.innerText = selectedGroupKey;
