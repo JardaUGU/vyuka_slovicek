@@ -734,4 +734,210 @@ function renderActiveGame() {
       `}
     `;
   }
+  // --- RENDER KAMPAŇOVÉHO REŽIMU ---
+  else if (selectedGame === "CAMPAIGN") {
+    if (cmpIdx >= cmpQueue.length) {
+      const coinsEarned = cmpHearts * 5;
+      main.innerHTML = `
+        <div style="text-align:center;padding:30px;">
+          <h2 style="color:var(--col-green);font-size:28px;">TRÉNINK DOKONČEN! 🎉</h2>
+          <p style="font-size:22px;color:#fff;margin:15px 0;">Přežilo: ${"❤️".repeat(cmpHearts)}</p>
+          <p style="font-size:24px;color:var(--col-yellow);margin-bottom:25px;">Získáváš: +${coinsEarned} 💰</p>
+          <div class="action-btn green" onclick="finishCampaign(${coinsEarned})">PŘIPSAT ZLAŤÁKY A ZPĚT</div>
+        </div>
+      `;
+      return;
+    }
+
+    const task = cmpQueue[cmpIdx];
+    const pct = Math.round((cmpIdx / cmpQueue.length) * 100);
+    const heartsHtml = "❤️".repeat(cmpHearts) + "🖤".repeat(5 - cmpHearts);
+
+    let html = `
+      <div class="bargraph-container">
+        <div class="bargraph-header">
+          <span>Trénink: Úkol ${cmpIdx + 1} z ${cmpQueue.length}</span>
+          <span style="font-size:14px;">${heartsHtml}</span>
+        </div>
+        <div class="bargraph-track"><div class="bargraph-fill" style="width:${pct}%;"></div></div>
+      </div>
+    `;
+
+    if (task.type === 'KVIZ' || task.type.startsWith('QUIZ')) {
+      const isEval = cmpState === 'EVAL';
+      html += `<div class="prompt-box" style="font-size:24px;color:#fff;margin:20px 0;">
+                 ${task.prompt}
+                 ${(isEval && getTargetLang(selectedSubject) !== 'cs-CZ' && task.type !== 'QUIZ_IN') ? `<span class="audio-btn" onclick="speakWord('${(task.type==='KVIZ' && task.data.question.includes('___') ? task.data.question.replace(/___+/g, task.data.answer) : task.data.question).replace(/[*_]/g, '')}', '${selectedSubject}')">🔊</span>` : ''}
+               </div>`;
+      
+      html += `<div class="grid-2">`;
+      task.opts.forEach(opt => {
+        let btnCls = "";
+        if (isEval) {
+          if (opt === task.correctAns) btnCls = "correct";
+          else if (opt === cmpChosenOpt) btnCls = "wrong";
+        }
+        html += `<div class="opt-btn ${btnCls}" onclick="clickCmpQuizOpt('${opt.replace(/'/g, "\\'")}')">${opt}</div>`;
+      });
+      html += `</div>`;
+
+      if (isEval) {
+        if (task.data.help) html += `<div style="text-align:center;color:var(--col-yellow);margin:12px 0;font-weight:bold;">[ ${task.data.help} ]</div>`;
+        html += `<div class="action-btn green" style="margin-top:15px;" onclick="nextCmpTask()">DALŠÍ ➔</div>`;
+      }
+    }
+    else if (task.type === 'SCRAMBLE') {
+      html += `
+        <div class="prompt-box">Slož: <b>${cleanCzechTranslation(task.data.answer)}</b></div>
+        <div class="slots-row ${isHebrew ? 'hebrew-text' : ''}">
+          ${task.tiles.map((t, i) => `<div class="letter-slot ${task.isWordMode?'word-slot':''} ${i<task.placed.length?'filled':''}">${i<task.placed.length?task.placed[i]:'_'}</div>`).join('')}
+        </div>
+      `;
+      if (cmpState !== 'EVAL') {
+        html += `
+          <div class="letters-row">
+            ${task.tiles.map((t, i) => `<div class="letter-tile ${task.isWordMode?'word-tile':''} ${isHebrew ? 'hebrew' : ''} ${t.used?'used':''}" onclick="clickCmpScrambleTile(${i})">${t.text}</div>`).join('')}
+          </div>
+        `;
+      } else {
+        if (task.data.help) html += `<div style="text-align:center;color:var(--col-active-tab);font-weight:bold;margin:10px 0;">[ ${task.data.help} ]</div>`;
+        html += `<div class="action-btn green" onclick="nextCmpTask()">DALŠÍ ➔</div>`;
+      }
+    }
+
+    main.innerHTML = html;
+  }
+}
+// ==========================================
+// 8. KAMPAŇ ENGINE (MIXOVANÝ TRÉNINK)
+// ==========================================
+let cmpQueue = [];
+let cmpIdx = 0;
+let cmpHearts = 5;
+let cmpState = 'PLAYING'; // PLAYING, EVAL
+let cmpChosenOpt = null;
+
+function startCampaign() {
+  let q = [];
+  const vItems = getVocabItems();
+  const qItems = getQuizItems();
+
+  // Natažení hotových kvízů z tabulky
+  qItems.forEach(it => {
+    q.push({ type: 'KVIZ', data: it });
+  });
+
+  // Inteligentní přetvoření slov a frází na různé typy úloh
+  vItems.forEach(it => {
+    const r = Math.random();
+    if (r < 0.4) {
+      q.push({ type: 'QUIZ_OUT', data: it }); // CZ -> Cizí výběr
+    } else if (r < 0.8) {
+      q.push({ type: 'QUIZ_IN', data: it });  // Cizí -> CZ výběr
+    } else {
+      q.push({ type: 'SCRAMBLE', data: it }); // Skládání
+    }
+  });
+
+  // Zamíchání a výběr max 15 úloh (ideální délka na udržení pozornosti)
+  q.sort(() => Math.random() - 0.5);
+  if (q.length > 15) q = q.slice(0, 15);
+
+  // Inicializace stavu každé úlohy
+  q.forEach(task => {
+    if (task.type === 'QUIZ_OUT' || task.type === 'QUIZ_IN') {
+       const isOut = task.type === 'QUIZ_OUT';
+       const correctAns = isOut ? task.data.question : cleanCzechTranslation(task.data.answer);
+       let pool = vItems.map(i => isOut ? i.question : cleanCzechTranslation(i.answer)).filter(ans => ans !== correctAns);
+       pool.sort(() => Math.random() - 0.5);
+       task.opts = [correctAns, ...pool.slice(0, 3)].sort(() => Math.random() - 0.5);
+       task.correctAns = correctAns;
+       task.prompt = isOut ? cleanCzechTranslation(task.data.answer) : task.data.question;
+    } else if (task.type === 'SCRAMBLE') {
+       const raw = task.data.question.trim();
+       const isWordMode = (raw.split(/\s+/).length >= 3 || raw.length > 15);
+       const tokens = isWordMode ? (raw.includes('-') ? raw.split('-').map(s=>s.trim()) : raw.split(/\s+/)) : getGraphemes(raw);
+       task.tokens = tokens;
+       task.tiles = tokens.map((t, i) => ({ text: t, used: false, id: i })).sort(() => Math.random() - 0.5);
+       task.placed = [];
+       task.isWordMode = isWordMode;
+    } else if (task.type === 'KVIZ') {
+       task.opts = task.data.options;
+       task.correctAns = task.data.answer;
+       task.prompt = formatPromptText(task.data.question);
+    }
+  });
+
+  cmpQueue = q;
+  cmpIdx = 0;
+  cmpHearts = 5;
+  cmpState = 'PLAYING';
+  cmpChosenOpt = null;
+
+  selectedGame = 'CAMPAIGN';
+  setScreen('PLAYING');
+}
+
+function clickCmpQuizOpt(opt) {
+  if (cmpState !== 'PLAYING') return;
+  const task = cmpQueue[cmpIdx];
+  cmpChosenOpt = opt;
+  cmpState = 'EVAL';
+
+  if (opt === task.correctAns) {
+    sndOk();
+  } else {
+    sndErr();
+    cmpHearts = Math.max(0, cmpHearts - 1);
+    // Chyba -> Naklonuje a pošle na konec fronty k opětovnému vyřešení
+    let newTask = JSON.parse(JSON.stringify(task));
+    if (newTask.opts) newTask.opts.sort(() => Math.random() - 0.5);
+    cmpQueue.push(newTask);
+  }
+
+  if (isAutoTTS && task.type !== 'QUIZ_IN') {
+    let toRead = task.type === 'KVIZ' ? task.data.question.replace(/___+/g, task.data.answer) : task.data.question;
+    speakWord(toRead.replace(/[*_]/g, ''), selectedSubject);
+  }
+  renderActiveGame();
+}
+
+function clickCmpScrambleTile(idx) {
+  if (cmpState !== 'PLAYING') return;
+  const task = cmpQueue[cmpIdx];
+  const tile = task.tiles[idx];
+  if (tile.used) return;
+
+  const expected = task.tokens[task.placed.length];
+  if (tile.text === expected) {
+    sndOk();
+    tile.used = true;
+    task.placed.push(tile.text);
+    if (task.placed.length === task.tokens.length) {
+      cmpState = 'EVAL';
+      if (isAutoTTS) speakWord(task.data.question, selectedSubject);
+    }
+  } else {
+    sndErr();
+    cmpHearts = Math.max(0, cmpHearts - 1);
+    // Při chybě se mu to pošle na konec fronty, aby to musel poskládat znovu od nuly
+    let newTask = { type: 'SCRAMBLE', data: task.data, tokens: task.tokens, isWordMode: task.isWordMode };
+    newTask.tiles = task.tokens.map((t, i) => ({ text: t, used: false, id: i })).sort(() => Math.random() - 0.5);
+    newTask.placed = [];
+    cmpQueue.push(newTask);
+  }
+  renderActiveGame();
+}
+
+function nextCmpTask() {
+  cmpIdx++;
+  cmpState = 'PLAYING';
+  cmpChosenOpt = null;
+  renderActiveGame();
+}
+
+function finishCampaign(coins) {
+  addCoins(currentUser.name, coins);
+  addReward(1, selectedGroupKey);
+  setScreen("CAMPAIGN_HUB");
 }
