@@ -1,17 +1,60 @@
 /**
- * HERNÍ REŽIMY: VÝSLOVNOST, LIŠTY POKROKU (BARGRAFY), LEITNER,  ARKÁDA
+ * HERNÍ REŽIMY: KARTY (OPRAVENO DALŠÍ/PŘEDCHOZÍ), ZKOUŠENÍ, SKLÁDÁNÍ, ARKÁDA, PEXESO, KVÍZ, ŘADA
  */
 
+// Pomocná funkce pro zvýraznění textu mezi hvězdičkami: *slovo* -> žlutě a podtrženě
+function formatPromptText(text) {
+  if (!text) return "";
+  return text.replace(/\*([^*]+)\*/g, '<b style="color:var(--col-yellow);text-decoration:underline;">$1</b>');
+}
+
 // ==========================================
-// 1. ZKOUŠENÍ Z HLAVY (LEITNER + VÝSLOVNOST + BARGRAF)
+// 1. OVLÁDÁNÍ KARET (DALŠÍ / PŘEDCHOZÍ / ZVUK)
 // ==========================================
-let vMastery = {}, vActivePool = 3, vCurrentWord = 0, vLastWord = -1, vCardIdx = 0, vQuizRevealed = false;
+let vCardIdx = 0;
+
+function vCardNext() {
+  const vItems = getVocabItems();
+  if (vItems.length === 0) return;
+  vCardIdx = (vCardIdx + 1) % vItems.length;
+  renderActiveGame();
+  if (isAutoTTS && vItems.length > 0) {
+    speakWord(vItems[vCardIdx].question, selectedSubject);
+  }
+}
+
+function vCardPrev() {
+  const vItems = getVocabItems();
+  if (vItems.length === 0) return;
+  vCardIdx = (vCardIdx + vItems.length - 1) % vItems.length;
+  renderActiveGame();
+  if (isAutoTTS && vItems.length > 0) {
+    speakWord(vItems[vCardIdx].question, selectedSubject);
+  }
+}
+
+function speakCurrentCard() {
+  const vItems = getVocabItems();
+  if (vItems[vCardIdx]) {
+    speakWord(vItems[vCardIdx].question, selectedSubject);
+  }
+}
+
+// ==========================================
+// 2. ZKOUŠENÍ Z HLAVY (LEITNER + VÝSLOVNOST + BARGRAF)
+// ==========================================
+let vMastery = {}, vActivePool = 3, vCurrentWord = 0, vLastWord = -1, vQuizRevealed = false;
 let scrambleDeck = [], scramblePlaced = [], scrambleTiles = [], scrambleIsWordMode = false, scrambleHadMistake = false, scrambleDone = false, scrambleSolvedCount = 0;
 let pexesoPairCount = 4, pexesoCards = [], pexesoFlipped = [], pexesoMatched = [], pexesoLocked = false, pexesoAttempts = 0;
-let qCurStep = 0, qAnswered = false;
+let qCurStep = 0, qAnswered = false, qChosenOpt = null;
+
+let seqTargetIdx = 0, seqSlots = [], seqStartTime = 0, seqTimerInterval = null, seqHintActive = false, seqInactivityTimer = null;
 
 function initGameState() {
   const vItems = getVocabItems();
+  const qItems = getQuizItems();
+  const sItems = getSeqItems();
+
   if (vItems.length > 0) {
     vMastery = {}; let masteredCount = 0;
     vItems.forEach((w, i) => {
@@ -20,11 +63,24 @@ function initGameState() {
     });
     vActivePool = Math.min(vItems.length, Math.max(getAdaptiveWindowSize(currentUser ? currentUser.grade : 2), masteredCount + 3));
     vLastWord = -1;
-    if (selectedGame === "CARDS") { vCardIdx = 0; if (isAutoTTS) speakWord(vItems[0].question, selectedSubject); }
+    vCardIdx = 0;
+
+    if (selectedGame === "CARDS") {
+      if (isAutoTTS) speakWord(vItems[0].question, selectedSubject);
+    }
     if (selectedGame === "ADAPTIVE") pickNextAdaptiveWord();
     if (selectedGame === "SCRAMBLE") { scrambleDeck = []; scrambleSolvedCount = 0; initScramble(); }
   }
-  if (selectedGame === "QUIZ") { qCurStep = 0; qAnswered = false; }
+
+  if (selectedGame === "QUIZ" && qItems.length > 0) {
+    qCurStep = 0;
+    qAnswered = false;
+    qChosenOpt = null;
+  }
+
+  if (selectedGame === "SEQ" && sItems.length > 0) {
+    initSequence();
+  }
 }
 
 function getMasteryStats() {
@@ -77,6 +133,13 @@ function revealAdaptiveQuiz() {
   }
 }
 
+function speakAdaptiveCurrent() {
+  const vItems = getVocabItems();
+  if (vItems[vCurrentWord]) {
+    speakWord(vItems[vCurrentWord].question, selectedSubject);
+  }
+}
+
 function answerAdaptive(known) {
   const vItems = getVocabItems();
   const w = vItems[vCurrentWord];
@@ -94,7 +157,7 @@ function answerAdaptive(known) {
 }
 
 // ==========================================
-// 2. SKLÁDÁNÍ SLOV A FRÁZÍ
+// 3. SKLÁDÁNÍ SLOV A FRÁZÍ
 // ==========================================
 function initScramble() {
   const vItems = getVocabItems();
@@ -135,7 +198,7 @@ function clickScrambleTile(idx) {
 }
 
 // ==========================================
-// 3. ARKÁDA PADAJÍCÍ SLOVA
+// 4. ARKÁDA PADAJÍCÍ SLOVA
 // ==========================================
 let arcadeDeck = [], arcadeCurrent = null, arcadeLives = 3, arcadeScore = 0, arcadeLevel = 1, arcadeY = 0, arcadeX = 50, arcadeSpeed = 0.8, arcadeAnimId = null, arcadeState = "PLAYING";
 
@@ -169,7 +232,7 @@ function spawnArcadeWord() {
   }
   arcadeCurrent = arcadeDeck.pop();
   arcadeY = 5;
-  arcadeX = Math.floor(Math.random() * 64) + 18; // Náhodná pozice na šířku
+  arcadeX = Math.floor(Math.random() * 64) + 18;
   arcadeState = "PLAYING";
   renderActiveGame();
   runArcadeLoop();
@@ -225,7 +288,7 @@ function handleArcadeMiss() {
 }
 
 // ==========================================
-// 4. PEXESO
+// 5. PEXESO
 // ==========================================
 function startPexesoGame(pairCount) {
   pexesoPairCount = pairCount; selectedGame = "PEXESO";
@@ -263,17 +326,130 @@ function clickPexesoCard(idx) {
   }
 }
 
+// ==========================================
+// 6. KVÍZ (ČTENÍ CELÉ VĚTY + SPRÁVNÁ VOLBA)
+// ==========================================
+function clickQuizOpt(optIdx) {
+  if (qAnswered) return;
+  const qItems = getQuizItems();
+  const q = qItems[qCurStep];
+  const chosen = q.options[optIdx];
+  qAnswered = true;
+  qChosenOpt = chosen;
+
+  if (chosen === q.answer) {
+    sndOk();
+    addReward(1, selectedGroupKey);
+  } else {
+    sndErr();
+  }
+
+  // U cizích jazyků přečte celou správně zkompletovanou větu
+  const targetLang = getTargetLang(selectedSubject);
+  if (targetLang !== 'cs-CZ') {
+    let toRead = q.question;
+    if (toRead.includes('___')) {
+      toRead = toRead.replace(/___+/g, q.answer);
+    } else {
+      toRead = toRead + ". " + q.answer;
+    }
+    toRead = toRead.replace(/[*_]/g, '');
+    speakWord(toRead, selectedSubject);
+  }
+
+  renderActiveGame();
+}
+
+function nextQuizStep() {
+  const qItems = getQuizItems();
+  qCurStep++;
+  qAnswered = false;
+  qChosenOpt = null;
+  renderActiveGame();
+}
+
+// ==========================================
+// 7. ŘADA NA ČAS
+// ==========================================
+function resetInactivityTimer() {
+  if (seqInactivityTimer) clearTimeout(seqInactivityTimer);
+  seqInactivityTimer = setTimeout(() => {
+    seqHintActive = true;
+    renderActiveGame();
+  }, 3000);
+}
+
+function initSequence() {
+  const sItems = getSeqItems();
+  if (sItems.length === 0) return;
+  const itemsList = sItems[0].answer.split('|').map(s => s.trim()).filter(Boolean);
+
+  seqTargetIdx = 0;
+  seqHintActive = false;
+  seqSlots = [-1, -1, -1, -1];
+  seqSlots[0] = 0;
+  if (itemsList.length > 1) seqSlots[1] = 1;
+  for (let s = 2; s < Math.min(4, itemsList.length); s++) seqSlots[s] = s;
+  seqSlots.sort(() => Math.random() - 0.5);
+
+  seqStartTime = Date.now();
+  if (seqTimerInterval) clearInterval(seqTimerInterval);
+  seqTimerInterval = setInterval(() => {
+    const el = document.getElementById("seq-timer");
+    if (el && seqTargetIdx < itemsList.length) {
+      el.innerText = ((Date.now() - seqStartTime) / 1000).toFixed(1) + " s";
+    }
+  }, 100);
+
+  resetInactivityTimer();
+}
+
+function clickSeqSlot(slot) {
+  const sItems = getSeqItems();
+  const itemsList = sItems[0].answer.split('|').map(s => s.trim()).filter(Boolean);
+  const btnEl = document.getElementById(`seq-btn-${slot}`);
+
+  if (seqSlots[slot] === seqTargetIdx) {
+    sndOk();
+    seqTargetIdx++;
+    seqHintActive = false;
+
+    if (seqTargetIdx >= itemsList.length) {
+      clearInterval(seqTimerInterval);
+      if (seqInactivityTimer) clearTimeout(seqInactivityTimer);
+      sndFanfare();
+      addReward(3, selectedGroupKey);
+    } else {
+      const next = seqTargetIdx + 1;
+      seqSlots[slot] = next < itemsList.length ? next : -1;
+      resetInactivityTimer();
+    }
+    renderActiveGame();
+  } else {
+    sndErr();
+    if (btnEl) {
+      btnEl.classList.add("wrong");
+      setTimeout(() => { if (btnEl) btnEl.classList.remove("wrong"); }, 250);
+    }
+    seqHintActive = true;
+    resetInactivityTimer();
+    renderActiveGame();
+  }
+}
+
 function startGame(game) { stopArcadeLoop(); selectedGame = game; initGameState(); setScreen("PLAYING"); }
 
 // ==========================================
-// 5. HLAVNÍ RENDERÉR HER (S LIŠTAMI A POMŮCKOU)
+// 8. HLAVNÍ RENDERÉR VŠECH HER
 // ==========================================
 function renderActiveGame() {
   const main = document.getElementById("main-content");
   const isHebrew = (selectedSubject || '').toLowerCase().includes('hebr') || selectedSubject === 'HE';
   const vItems = getVocabItems();
+  const qItems = getQuizItems();
+  const sItems = getSeqItems();
 
-  // KARTY
+  // KARTY (OPRAVENO: Samostatné funkce pro posun i zvuk)
   if (selectedGame === "CARDS") {
     const w = vItems[vCardIdx];
     const pct = Math.round(((vCardIdx + 1) / vItems.length) * 100);
@@ -286,13 +462,13 @@ function renderActiveGame() {
         <div class="bargraph-track"><div class="bargraph-fill" style="width:${pct}%;"></div></div>
       </div>
       <div class="prompt-box ${isHebrew ? 'hebrew-text' : ''}">
-        ${w.question} <span class="audio-btn" onclick="speakWord('${w.question}')">🔊</span>
+        ${w.question} <span class="audio-btn" onclick="speakCurrentCard()">🔊</span>
       </div>
       <div class="prompt-box" style="color:#fff;">${cleanCzechTranslation(w.answer)}</div>
       ${w.help ? `<div style="text-align:center;color:var(--col-active-tab);font-size:18px;margin-bottom:12px;font-weight:bold;">[ ${w.help} ]</div>` : ''}
       <div class="grid-2">
-        <div class="action-btn" onclick="vCardIdx=(vCardIdx+vItems.length-1)%vItems.length;renderActiveGame();">Předchozí</div>
-        <div class="action-btn" onclick="vCardIdx=(vCardIdx+1)%vItems.length;renderActiveGame();">Další (${vCardIdx+1}/${vItems.length})</div>
+        <div class="action-btn" onclick="vCardPrev()">Předchozí</div>
+        <div class="action-btn" onclick="vCardNext()">Další</div>
       </div>
     `;
   }
@@ -330,11 +506,11 @@ function renderActiveGame() {
       </div>
       <div class="prompt-box" style="color:#fff;">
         ${isDirOut ? cleanCzechTranslation(w.answer) : w.question}
-        ${!isDirOut ? `<span class="audio-btn" onclick="speakWord('${w.question}')">🔊</span>` : ''}
+        ${!isDirOut ? `<span class="audio-btn" onclick="speakAdaptiveCurrent()">🔊</span>` : ''}
       </div>
-      <div class="prompt-box ${(!isDirOut && isHebrew) ? 'hebrew-text' : (isDirOut && isHebrew && vQuizRevealed ? 'hebrew-text' : '')}" style="color:${vQuizRevealed?'var(--col-yellow)':'var(--col-text-muted)'};">
+      <div class="prompt-box ${(!isDirOut && isHebrew) ? 'hebrew-text' : (isDirOut && isHebrew && vQuizRevealed ? 'hebrew-text' : '')}" style="color:${vQuizRevealed?'var(--col-yellow)' : 'var(--col-text-muted)'};">
         ${vQuizRevealed ? (isDirOut ? w.question : cleanCzechTranslation(w.answer)) : '[ ? ? ? ]'}
-        ${(vQuizRevealed && isDirOut) ? `<span class="audio-btn" onclick="speakWord('${w.question}')">🔊</span>` : ''}
+        ${(vQuizRevealed && isDirOut) ? `<span class="audio-btn" onclick="speakAdaptiveCurrent()">🔊</span>` : ''}
       </div>
       ${vQuizRevealed ? `
         ${w.help ? `<div style="text-align:center;color:var(--col-active-tab);font-size:18px;margin-bottom:10px;font-weight:bold;">[ ${w.help} ]</div>` : ''}
@@ -460,6 +636,101 @@ function renderActiveGame() {
           <div class="action-btn green" onclick="startPexesoGame(pexesoPairCount)">HRÁT ZNOVU</div>
           <div class="action-btn" onclick="setScreen('SELECT_PEXESO_SIZE')">ZMĚNIT VELIKOST</div>
         </div>
+      `}
+    `;
+  }
+
+  // KVÍZ (ČTENÍ CELÉ VĚTY + ZVÝRAZNĚNÍ *SLOVA* + JEMNÉ BARVY)
+  else if (selectedGame === "QUIZ") {
+    if (qItems.length === 0) {
+      main.innerHTML = `<div style="text-align:center;padding:30px;"><h2>V této lekci není žádný kvíz.</h2><div class="action-btn" onclick="setScreen('SELECT_GAME')">ZPĚT</div></div>`;
+      return;
+    }
+
+    if (qCurStep >= qItems.length) {
+      main.innerHTML = `
+        <div style="text-align:center;padding:30px;">
+          <h2 style="color:var(--col-green);margin-bottom:10px;">KVÍZ DOKONČEN! 🎉</h2>
+          <p style="color:#fff;margin-bottom:15px;">Zvládl jsi všech ${qItems.length} otázek!</p>
+          <div class="action-btn green" onclick="setScreen('SELECT_GAME')">ZPĚT DO MENU</div>
+        </div>
+      `;
+      return;
+    }
+
+    const q = qItems[qCurStep];
+    const pct = Math.round(((qCurStep + 1) / qItems.length) * 100);
+
+    main.innerHTML = `
+      <div class="bargraph-container">
+        <div class="bargraph-header">
+          <span>Kvíz: Otázka ${qCurStep + 1} z ${qItems.length}</span>
+          <span style="color:var(--col-active-tab);">${pct} %</span>
+        </div>
+        <div class="bargraph-track"><div class="bargraph-fill" style="width:${pct}%;"></div></div>
+      </div>
+      <div class="prompt-box" style="font-size:22px;color:#fff;margin:15px 0;">
+        ${formatPromptText(q.question)}
+        ${(qAnswered && getTargetLang(selectedSubject) !== 'cs-CZ') ? `<span class="audio-btn" onclick="speakWord('${(q.question.includes('___') ? q.question.replace(/___+/g, q.answer) : q.question + ' ' + q.answer).replace(/[*_]/g, '')}', '${selectedSubject}')">🔊</span>` : ''}
+      </div>
+      <div class="grid-2">
+        ${q.options.map((opt, optIdx) => {
+          let btnCls = "";
+          if (qAnswered) {
+            if (opt === q.answer) {
+              btnCls = "correct";
+            } else if (opt === qChosenOpt) {
+              btnCls = "wrong";
+            }
+          }
+          return `
+            <div class="opt-btn ${btnCls}" onclick="clickQuizOpt(${optIdx})">
+              ${opt}
+            </div>
+          `;
+        }).join('')}
+      </div>
+      ${qAnswered ? `
+        ${q.help ? `<div style="text-align:center;color:var(--col-yellow);margin:10px 0;font-size:16px;font-weight:bold;">[ ${q.help} ]</div>` : ''}
+        <div class="action-btn green" style="margin-top:12px;" onclick="nextQuizStep()">DALŠÍ OTÁZKA ➔</div>
+      ` : ''}
+    `;
+  }
+
+  // ŘADA NA ČAS
+  else if (selectedGame === "SEQ") {
+    if (sItems.length === 0) return;
+    const seqConfig = sItems[0];
+    const itemsList = seqConfig.answer.split('|').map(s => s.trim()).filter(Boolean);
+    const isFinished = seqTargetIdx >= itemsList.length;
+    const targetWord = itemsList[seqTargetIdx];
+    const pct = Math.round((seqTargetIdx / itemsList.length) * 100);
+
+    main.innerHTML = `
+      <div class="bargraph-container">
+        <div class="bargraph-header">
+          <span>Položka ${Math.min(seqTargetIdx + 1, itemsList.length)} z ${itemsList.length} ${seqHintActive ? '<b style="color:var(--col-yellow);">[NÁPOVĚDA]</b>' : ''}</span>
+          <span id="seq-timer" style="color:var(--col-yellow);font-weight:bold;">0.0 s</span>
+        </div>
+        <div class="bargraph-track"><div class="bargraph-fill" style="width:${pct}%;"></div></div>
+      </div>
+      <div class="prompt-box ${isHebrew ? 'hebrew-text' : ''}" style="margin:8px 0;min-height:56px;color:#fff;font-size:22px;">
+        ${itemsList.slice(0, seqTargetIdx).join(' ')} 
+        <span style="color:var(--col-yellow);">${seqHintActive ? `[ ${targetWord}! ]` : '[ ??? ]'}</span>
+      </div>
+      ${!isFinished ? `
+        <div class="grid-2">
+          ${seqSlots.map((itemIdx, slot) => {
+            const isHintSlot = (seqHintActive && itemIdx === seqTargetIdx);
+            return `
+              <div id="seq-btn-${slot}" class="opt-btn ${isHebrew ? 'hebrew' : ''} ${isHintSlot ? 'hint' : ''}" onclick="clickSeqSlot(${slot})">
+                ${itemIdx !== -1 ? itemsList[itemIdx] : ''}
+              </div>
+            `;
+          }).join('')}
+        </div>
+      ` : `
+        <div class="action-btn green" onclick="initSequence();renderActiveGame();">DOKONČENO! HRÁT ZNOVU</div>
       `}
     `;
   }
