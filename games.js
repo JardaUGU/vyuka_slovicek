@@ -1,6 +1,12 @@
 /**
- * HERNÍ REŽIMY: KARTY, ZKOUŠENÍ, SKLÁDÁNÍ, ARKÁDA, PEXESO, KVÍZ, ŘADA NA ČAS
+ * HERNÍ REŽIMY: KARTY, ZKOUŠENÍ, SKLÁDÁNÍ, ARKÁDA, PEXESO, KVÍZ (S ČTENÍM VĚTY A BEZ FALEŠNÉ ČERVENÉ), ŘADA
  */
+
+// Pomocná funkce pro zvýraznění textu mezi hvězdičkami: *slovo* -> žlutě a podtrženě
+function formatPromptText(text) {
+  if (!text) return "";
+  return text.replace(/\*([^*]+)\*/g, '<b style="color:var(--col-yellow);text-decoration:underline;">$1</b>');
+}
 
 // ==========================================
 // 1. ZKOUŠENÍ Z HLAVY (LEITNER + VÝSLOVNOST + BARGRAF)
@@ -8,7 +14,7 @@
 let vMastery = {}, vActivePool = 3, vCurrentWord = 0, vLastWord = -1, vCardIdx = 0, vQuizRevealed = false;
 let scrambleDeck = [], scramblePlaced = [], scrambleTiles = [], scrambleIsWordMode = false, scrambleHadMistake = false, scrambleDone = false, scrambleSolvedCount = 0;
 let pexesoPairCount = 4, pexesoCards = [], pexesoFlipped = [], pexesoMatched = [], pexesoLocked = false, pexesoAttempts = 0;
-let qCurStep = 0, qAnswered = false;
+let qCurStep = 0, qAnswered = false, qChosenOpt = null;
 
 let seqTargetIdx = 0, seqSlots = [], seqStartTime = 0, seqTimerInterval = null, seqHintActive = false, seqInactivityTimer = null;
 
@@ -33,6 +39,7 @@ function initGameState() {
   if (selectedGame === "QUIZ" && qItems.length > 0) {
     qCurStep = 0;
     qAnswered = false;
+    qChosenOpt = null;
   }
 
   if (selectedGame === "SEQ" && sItems.length > 0) {
@@ -277,19 +284,35 @@ function clickPexesoCard(idx) {
 }
 
 // ==========================================
-// 5. KVÍZ (GRAMATIKA A OTÁZKY S VÝBĚREM)
+// 5. KVÍZ: ČTENÍ CELÉ VĚTY A JEMNÉ BARVY
 // ==========================================
 function clickQuizOpt(chosen) {
   if (qAnswered) return;
   const qItems = getQuizItems();
   const q = qItems[qCurStep];
   qAnswered = true;
+  qChosenOpt = chosen;
+
   if (chosen === q.answer) {
     sndOk();
     addReward(1, selectedGroupKey);
   } else {
     sndErr();
   }
+
+  // U cizích jazyků přečte celou správně zkompletovanou větu
+  const targetLang = getTargetLang(selectedSubject);
+  if (targetLang !== 'cs-CZ') {
+    let toRead = q.question;
+    if (toRead.includes('___')) {
+      toRead = toRead.replace(/___+/g, q.answer);
+    } else {
+      toRead = toRead + ". " + q.answer;
+    }
+    toRead = toRead.replace(/[*_]/g, '');
+    speakWord(toRead, selectedSubject);
+  }
+
   renderActiveGame();
 }
 
@@ -297,11 +320,12 @@ function nextQuizStep() {
   const qItems = getQuizItems();
   qCurStep++;
   qAnswered = false;
+  qChosenOpt = null;
   renderActiveGame();
 }
 
 // ==========================================
-// 6. ŘADA NA ČAS (POSLOUPNOSTI A BÁSNIČKY)
+// 6. ŘADA NA ČAS
 // ==========================================
 function resetInactivityTimer() {
   if (seqInactivityTimer) clearTimeout(seqInactivityTimer);
@@ -372,7 +396,7 @@ function clickSeqSlot(slot) {
 function startGame(game) { stopArcadeLoop(); selectedGame = game; initGameState(); setScreen("PLAYING"); }
 
 // ==========================================
-// 7. HLAVNÍ RENDERÉR VŠECH HER (S POMŮCKOU A LIŠTOU)
+// 7. HLAVNÍ RENDERÉR VŠECH HER
 // ==========================================
 function renderActiveGame() {
   const main = document.getElementById("main-content");
@@ -572,15 +596,10 @@ function renderActiveGame() {
     `;
   }
 
-  // KVÍZ (OPRAVENO A PLNĚ ZOBRAZENO)
+  // KVÍZ (S ČTENÍM CELÉ VĚTY, ZVÝRAZNĚNÍM *SLOVA* A BEZ FALEŠNÝCH ČERVENÝCH TLAČÍTEK)
   else if (selectedGame === "QUIZ") {
     if (qItems.length === 0) {
-      main.innerHTML = `
-        <div style="text-align:center;padding:30px;">
-          <h2>V této lekci není žádný kvíz.</h2>
-          <div class="action-btn" onclick="setScreen('SELECT_GAME')">ZPĚT</div>
-        </div>
-      `;
+      main.innerHTML = `<div style="text-align:center;padding:30px;"><h2>V této lekci není žádný kvíz.</h2><div class="action-btn" onclick="setScreen('SELECT_GAME')">ZPĚT</div></div>`;
       return;
     }
 
@@ -606,13 +625,26 @@ function renderActiveGame() {
         </div>
         <div class="bargraph-track"><div class="bargraph-fill" style="width:${pct}%;"></div></div>
       </div>
-      <div class="prompt-box" style="font-size:22px;color:#fff;margin:15px 0;">${q.question}</div>
+      <div class="prompt-box" style="font-size:22px;color:#fff;margin:15px 0;">
+        ${formatPromptText(q.question)}
+        ${(qAnswered && getTargetLang(selectedSubject) !== 'cs-CZ') ? `<span class="audio-btn" onclick="speakWord('${(q.question.includes('___') ? q.question.replace(/___+/g, q.answer) : q.question + ' ' + q.answer).replace(/[*_]/g, '')}', '${selectedSubject}')">🔊</span>` : ''}
+      </div>
       <div class="grid-2">
-        ${q.options.map(opt => `
-          <div class="opt-btn ${qAnswered ? (opt === q.answer ? 'correct' : 'wrong') : ''}" onclick="clickQuizOpt('${opt.replace(/'/g, "\\'")}')">
-            ${opt}
-          </div>
-        `).join('')}
+        ${q.options.map(opt => {
+          let btnCls = "";
+          if (qAnswered) {
+            if (opt === q.answer) {
+              btnCls = "correct"; // Správná je vždy zelená
+            } else if (opt === qChosenOpt) {
+              btnCls = "wrong"; // Červená JE POUZE TA ŠPATNÁ, NA KTEROU ŽÁK KLIKNUL
+            }
+          }
+          return `
+            <div class="opt-btn ${btnCls}" onclick="clickQuizOpt('${opt.replace(/'/g, "\\'")}')">
+              ${opt}
+            </div>
+          `;
+        }).join('')}
       </div>
       ${qAnswered ? `
         ${q.help ? `<div style="text-align:center;color:var(--col-yellow);margin:10px 0;font-size:16px;font-weight:bold;">[ ${q.help} ]</div>` : ''}
@@ -621,7 +653,7 @@ function renderActiveGame() {
     `;
   }
 
-  // ŘADA NA ČAS (POSLOUPNOSTI A BÁSNIČKY)
+  // ŘADA NA ČAS
   else if (selectedGame === "SEQ") {
     if (sItems.length === 0) return;
     const seqConfig = sItems[0];
