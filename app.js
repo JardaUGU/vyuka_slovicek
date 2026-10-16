@@ -47,7 +47,7 @@ function getQuickChoiceMode() {
   if (s.includes("nemc") || s === "de") {
     if (vItems.filter(it => /^(der|die|das)\s/i.test(it.question)).length >= 3) return "DER_DIE_DAS";
   }
-  if (s.includes("angli") || s === "en") {
+  if (s.includes("angli") || s === "en" || s.includes("inteligentn")) {
     if (vItems.filter(it => /^(a|an)\s/i.test(it.question)).length >= 3) return "A_AN";
   }
   if (s.includes("cest") || s === "cs") {
@@ -58,6 +58,8 @@ function getQuickChoiceMode() {
 
 function isItemAllowedForGrade(it, userG) {
   const itemG = parseInt(it.minGrade) || 2;
+  const subjLow = (it.subject || '').toLowerCase();
+  if (subjLow.includes('cesta') || subjLow.includes('postupn') || subjLow.includes('inteligentn')) return true;
   const isVerbGroup = (it.lesson || '').toLowerCase().includes('sloves') || (it.topic || '').toLowerCase().includes('sloves');
   if (isVerbGroup && userG >= 5) return true;
   if (!filterExactGradeOnly || userG >= 90) return true;
@@ -91,7 +93,12 @@ window.buyFreeze = function() {
   }
 };
 
-// --- ČASOVAČ & STREAK ---
+// --- ČASOVAČ & STREAK & ZÁPATÍ ---
+function updateFooter() {
+  const fUser = document.getElementById("footer-user");
+  if (fUser) fUser.innerText = currentUser ? `Žák: ${currentUser.name}` : "Žák: --";
+}
+
 function getStudyTimeKey(userName) {
   const d = new Date();
   return `study_sec_${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}_${(userName || 'user').toLowerCase().trim()}`;
@@ -123,7 +130,6 @@ function updateUserStreak(userName, targetMinutes) {
   if (lastCompleted === yestStr) {
     streak += 1;
   } else if (lastCompleted) {
-    // Kontrola zmrazení
     let freezes = Number(localStorage.getItem(`freeze_${uKey}`) || 0);
     if (freezes > 0) {
       localStorage.setItem(`freeze_${uKey}`, freezes - 1);
@@ -162,9 +168,7 @@ setInterval(() => {
       isTimerPaused = false;
 
       const targetSec = (currentUser.targetMinutes || 15) * 60;
-      if (todaySecondsStudied >= targetSec) {
-        updateUserStreak(currentUser.name, currentUser.targetMinutes || 15);
-      }
+      if (todaySecondsStudied >= targetSec) updateUserStreak(currentUser.name, currentUser.targetMinutes || 15);
 
       if (todaySecondsStudied - lastCloudSyncSec >= 45) {
         lastCloudSyncSec = todaySecondsStudied;
@@ -187,7 +191,6 @@ function updateStudyTimerUI() {
   const targetSec = (currentUser.targetMinutes || 15) * 60;
   const isGoalReached = todaySecondsStudied >= targetSec;
   const bonusSec = Math.max(0, todaySecondsStudied - targetSec);
-
   const format = s => `${String(Math.floor(s / 60)).padStart(2,'0')}:${String(s % 60).padStart(2,'0')}`;
   const spentMin = Math.floor(todaySecondsStudied / 60);
   const targetMin = currentUser.targetMinutes || 15;
@@ -222,7 +225,7 @@ function sendTimeHeartbeatToGoogle() {
   } catch(e) {}
 }
 
-// --- VÝSLOVNOST (TTS) ---
+// --- VÝSLOVNOST (TTS) S OPRAVOU PŘERUŠOVÁNÍ ---
 let isAutoTTS = localStorage.getItem("auto_tts") !== "false";
 let cachedVoices = [];
 
@@ -232,13 +235,9 @@ function updateVoices() {
     if (v && v.length > 0) cachedVoices = v;
   }
 }
-if ('speechSynthesis' in window) {
-  updateVoices(); window.speechSynthesis.onvoiceschanged = updateVoices;
-}
+if ('speechSynthesis' in window) { updateVoices(); window.speechSynthesis.onvoiceschanged = updateVoices; }
 
-function toggleAutoTTS() { 
-  isAutoTTS = !isAutoTTS; localStorage.setItem("auto_tts", isAutoTTS); updateTTSBtnUI(); 
-}
+function toggleAutoTTS() { isAutoTTS = !isAutoTTS; localStorage.setItem("auto_tts", isAutoTTS); updateTTSBtnUI(); }
 
 function updateTTSBtnUI() {
   const btn = document.getElementById("btn-tts-auto");
@@ -247,7 +246,7 @@ function updateTTSBtnUI() {
 
 function getTargetLang(subjectName) {
   const s = (subjectName || selectedSubject || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-  if (s.includes('angli') || s === 'en') return 'en-US';
+  if (s.includes('angli') || s === 'en' || s.includes('inteligentn')) return 'en-US';
   if (s.includes('nemc') || s === 'de') return 'de-DE';
   if (s.includes('hebr') || s === 'he') return 'he-IL';
   return 'cs-CZ';
@@ -255,44 +254,49 @@ function getTargetLang(subjectName) {
 
 function speakWord(text, subjectName) {
   if (!('speechSynthesis' in window)) return;
+  
+  // Zrušíme aktuálně hrající zvuk
   window.speechSynthesis.cancel();
   
-  let toSpeak = text;
-  if (/read\s*-\s*read\s*-\s*read/i.test(toSpeak)) toSpeak = "read, red, red";
-  else toSpeak = toSpeak.replace(/\//g, ' or ').replace(/\s*-\s*/g, ', ');
+  // Ochrana před browser bugem (při okamžitém volání po cancel() občas zvuk přeskočí)
+  setTimeout(() => {
+    let toSpeak = text;
+    if (/read\s*-\s*read\s*-\s*read/i.test(toSpeak)) toSpeak = "read, red, red";
+    else toSpeak = toSpeak.replace(/\//g, ' or ').replace(/\s*-\s*/g, ', ');
 
-  const u = new SpeechSynthesisUtterance(toSpeak);
-  const targetLang = getTargetLang(subjectName);
-  const langPrefix = targetLang.split('-')[0];
+    const u = new SpeechSynthesisUtterance(toSpeak);
+    const targetLang = getTargetLang(subjectName);
+    const langPrefix = targetLang.split('-')[0];
 
-  u.lang = targetLang; u.rate = 0.88;
+    u.lang = targetLang; u.rate = 0.88;
 
-  if (cachedVoices.length === 0) updateVoices();
-  let voices = cachedVoices.length ? cachedVoices : window.speechSynthesis.getVoices();
+    if (cachedVoices.length === 0) updateVoices();
+    let voices = cachedVoices.length ? cachedVoices : window.speechSynthesis.getVoices();
 
-  if ((!voices || voices.length === 0) && 'speechSynthesis' in window) {
-    setTimeout(() => {
-      updateVoices();
-      const v2 = cachedVoices.length ? cachedVoices : window.speechSynthesis.getVoices();
-      if (v2 && v2.length > 0) {
-        let m2 = v2.find(v => (v.lang || '').toLowerCase().replace('_', '-').startsWith(langPrefix));
-        if (!m2 && langPrefix === 'de') m2 = v2.find(v => /anna|petra|markus/i.test(v.name));
-        if (!m2 && langPrefix === 'en') m2 = v2.find(v => /samantha|daniel|karen|alex/i.test(v.name));
-        if (m2) u.voice = m2;
-      }
-      window.speechSynthesis.speak(u);
-    }, 50);
-    return;
-  }
+    if ((!voices || voices.length === 0) && 'speechSynthesis' in window) {
+      setTimeout(() => {
+        updateVoices();
+        const v2 = cachedVoices.length ? cachedVoices : window.speechSynthesis.getVoices();
+        if (v2 && v2.length > 0) {
+          let m2 = v2.find(v => (v.lang || '').toLowerCase().replace('_', '-').startsWith(langPrefix));
+          if (!m2 && langPrefix === 'de') m2 = v2.find(v => /anna|petra|markus/i.test(v.name));
+          if (!m2 && langPrefix === 'en') m2 = v2.find(v => /samantha|daniel|karen|alex/i.test(v.name));
+          if (m2) u.voice = m2;
+        }
+        window.speechSynthesis.speak(u);
+      }, 50);
+      return;
+    }
 
-  if (voices && voices.length > 0) {
-    let match = voices.find(v => (v.lang || '').toLowerCase().replace('_', '-') === targetLang.toLowerCase());
-    if (!match) match = voices.find(v => (v.lang || '').toLowerCase().replace('_', '-').startsWith(langPrefix));
-    if (!match && langPrefix === 'de') match = voices.find(v => /anna|petra|markus/i.test(v.name));
-    if (!match && langPrefix === 'en') match = voices.find(v => /samantha|daniel|karen|alex/i.test(v.name));
-    if (match) u.voice = match;
-  }
-  window.speechSynthesis.speak(u);
+    if (voices && voices.length > 0) {
+      let match = voices.find(v => (v.lang || '').toLowerCase().replace('_', '-') === targetLang.toLowerCase());
+      if (!match) match = voices.find(v => (v.lang || '').toLowerCase().replace('_', '-').startsWith(langPrefix));
+      if (!match && langPrefix === 'de') match = voices.find(v => /anna|petra|markus/i.test(v.name));
+      if (!match && langPrefix === 'en') match = voices.find(v => /samantha|daniel|karen|alex/i.test(v.name));
+      if (match) u.voice = match;
+    }
+    window.speechSynthesis.speak(u);
+  }, 40); // 40ms pauza zachrání plynulost TTS
 }
 
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -323,7 +327,6 @@ function addReward(count = 1, section = "Lekce") {
   } catch(e) {}
 }
 
-// --- SYNCHRONIZACE DAT ---
 async function loadData() {
   const cached = localStorage.getItem("app_data");
   if (cached) {
@@ -332,9 +335,7 @@ async function loadData() {
       if (!appData.items) appData.items = [];
       renderScreen();
     } catch(e) {}
-  } else {
-    renderScreen();
-  }
+  } else { renderScreen(); }
   await syncData();
 }
 
@@ -357,7 +358,6 @@ async function syncData() {
         if (foundU) {
           currentUser.targetMinutes = foundU.targetMinutes || 15;
           currentUser.grade = parseInt(foundU.grade) || 2;
-          
           if (foundU.todayMinutes !== undefined) {
             const cloudSec = Math.round(Number(foundU.todayMinutes) * 60);
             if (cloudSec > todaySecondsStudied) {
@@ -369,9 +369,7 @@ async function syncData() {
         }
       }
     }
-  } catch(e) {
-    if (statusEl) statusEl.innerText = "Offline";
-  }
+  } catch(e) { if (statusEl) statusEl.innerText = "Offline"; }
   renderScreen();
 }
 
@@ -407,13 +405,10 @@ function getGroupMasteryPercent(groupItems, subjName) {
   const vList = groupItems.filter(it => it.type === "SLOVO");
   if (vList.length === 0) return 0;
   let points = 0;
-  vList.forEach(it => {
-    points += getSavedMastery(it.question, "DIR_OUT") + getSavedMastery(it.question, "DIR_IN");
-  });
+  vList.forEach(it => { points += getSavedMastery(it.question, "DIR_OUT") + getSavedMastery(it.question, "DIR_IN"); });
   return Math.min(100, Math.round((points / (vList.length * 4)) * 100));
 }
 
-// --- NAVIGACE ---
 function goBack() {
   if (typeof stopArcadeLoop === "function") stopArcadeLoop();
   sendTimeHeartbeatToGoogle();
@@ -424,7 +419,7 @@ function goBack() {
     else if (selectedSubject === "Matematika") setScreen("SELECT_MATH_OP");
     else setScreen("SELECT_GAME");
   }
-  else if (currentScreen === "CAMPAIGN_HUB") setScreen("SELECT_GROUP");
+  else if (currentScreen === "CAMPAIGN_HUB") setScreen("SELECT_SUBJECT"); 
   else if (currentScreen === "SELECT_MATH_OP") setScreen("SELECT_SUBJECT");
   else if (currentScreen === "SELECT_GAME") setScreen("SELECT_GROUP");
   else if (currentScreen === "SELECT_GROUP") setScreen("SELECT_SUBJECT");
@@ -442,7 +437,22 @@ function selectUser(name, grade, targetMinutes) {
   setScreen("SELECT_SUBJECT");
 }
 
-function chooseSubject(subj) { selectedSubject = subj; setScreen("SELECT_GROUP"); }
+function chooseSubject(subj) { 
+  selectedSubject = subj; 
+  const userG = parseInt(currentUser.grade) || 2;
+  activeItems = (appData.items || []).filter(it => {
+    if (it.subject !== selectedSubject) return false;
+    if (!isItemAllowedForGrade(it, userG)) return false;
+    return true;
+  });
+
+  const sLow = selectedSubject.toLowerCase();
+  if (sLow.includes("cesta") || sLow.includes("postupn") || sLow.includes("inteligentn")) {
+    setScreen("CAMPAIGN_HUB");
+  } else {
+    setScreen("SELECT_GROUP");
+  }
+}
 
 function chooseGroup(groupName) {
   selectedGroupKey = groupName;
@@ -452,13 +462,7 @@ function chooseGroup(groupName) {
     if (!isItemAllowedForGrade(it, userG)) return false;
     return (viewMode === "LESSONS" ? it.lesson : it.topic) === groupName;
   });
-
-  // DETEKCE KAMPAŇOVÉHO REŽIMU
-  if (selectedSubject.toLowerCase().includes("cesta") || selectedSubject.toLowerCase().includes("postupn")) {
-    setScreen("CAMPAIGN_HUB");
-  } else {
-    setScreen("SELECT_GAME");
-  }
+  setScreen("SELECT_GAME");
 }
 
 function toggleTestingDirection() {
@@ -477,7 +481,6 @@ function renderScreen() {
   const bGroup = document.getElementById("badge-group");
   bUser.innerText = currentUser ? currentUser.name : "Uživatel";
 
-  // 1. VÝBĚR UŽIVATELE
   if (currentScreen === "SELECT_USER" || !currentUser) {
     bSubj.style.display = "none"; bGroup.style.display = "none";
     const uList = appData.users || [];
@@ -506,16 +509,11 @@ function renderScreen() {
     `;
   }
 
-  // 2. VÝBĚR PŘEDMĚTU
   else if (currentScreen === "SELECT_SUBJECT") {
     bSubj.style.display = "none"; bGroup.style.display = "none";
     const userG = parseInt(currentUser.grade) || 2;
     const subjs = {};
-    
-    (appData.items || []).forEach(it => {
-      if (!isItemAllowedForGrade(it, userG)) return;
-      subjs[it.subject] = (subjs[it.subject] || 0) + 1;
-    });
+    (appData.items || []).forEach(it => { if (!isItemAllowedForGrade(it, userG)) return; subjs[it.subject] = (subjs[it.subject] || 0) + 1; });
 
     let html = `
       <div class="filter-bar">
@@ -530,8 +528,8 @@ function renderScreen() {
         </div>
     `;
     Object.keys(subjs).forEach(s => {
-      // Vizuálně odlišit spirálový trénink
-      const isCesta = s.toLowerCase().includes("cesta") || s.toLowerCase().includes("postupn");
+      const sLow = s.toLowerCase();
+      const isCesta = sLow.includes("cesta") || sLow.includes("postupn") || sLow.includes("inteligentn");
       const stl = isCesta ? 'border-color:var(--col-green);background:#112a1f;' : '';
       const ikn = isCesta ? '🚀 ' : '';
       html += `<div class="tile" style="${stl}" onclick="chooseSubject('${s}')"><h2>${ikn}${s}</h2><p>${subjs[s]} úloh</p></div>`;
@@ -540,18 +538,15 @@ function renderScreen() {
     main.innerHTML = html;
   }
 
-  // 3. VÝBĚR MATEMATIKY
   else if (currentScreen === "SELECT_MATH_OP") {
     bSubj.style.display = "flex"; bSubj.innerText = "Matematika"; bGroup.style.display = "none";
     if (typeof renderMathOpSelection === "function") renderMathOpSelection();
   }
 
-  // 4. VÝBĚR SKUPINY (LEKCE / TÉMATA)
   else if (currentScreen === "SELECT_GROUP") {
     bSubj.style.display = "flex"; bSubj.innerText = selectedSubject; bGroup.style.display = "none";
     const userG = parseInt(currentUser.grade) || 2;
     const groupsMap = {};
-    
     (appData.items || []).filter(it => it.subject === selectedSubject && isItemAllowedForGrade(it, userG)).forEach(it => {
       const k = viewMode === "LESSONS" ? it.lesson : it.topic;
       if (!k) return;
@@ -578,26 +573,32 @@ function renderScreen() {
     `;
   }
 
-  // 5. KAMPAŇ HUB (PRO "CESTA" PŘEDMĚTY)
   else if (currentScreen === "CAMPAIGN_HUB") {
     bSubj.style.display = "flex"; bSubj.innerText = selectedSubject; 
-    bGroup.style.display = "flex"; bGroup.innerText = selectedGroupKey;
+    bGroup.style.display = "none";
     const coins = getUserCoins(currentUser.name);
+    const vItems = getVocabItems();
+    let lessons = [...new Set(vItems.map(it => it.lesson))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
+    let currentLesson = lessons[0] || "Trénink";
+    let currentPct = 0;
+    
+    for (let l of lessons) {
+        let lItems = vItems.filter(it => it.lesson === l);
+        let pct = getGroupMasteryPercent(lItems, selectedSubject);
+        if (pct < 95) { currentLesson = l; currentPct = pct; break; }
+    }
 
     main.innerHTML = `
       <div style="text-align:center;padding:10px;">
-        <h2 style="color:var(--col-active-tab);font-size:26px;margin-bottom:5px;">${selectedGroupKey}</h2>
-        <p style="color:var(--col-text-muted);font-size:15px;margin-bottom:20px;">Spirálový trénink gramatiky a frází</p>
-
-        <div class="action-btn green" style="padding:20px;font-size:20px;box-shadow: 0 6px 15px rgba(34,197,94,0.3);" onclick="startCampaign()">
+        <h2 style="color:var(--col-active-tab);font-size:26px;margin-bottom:5px;">Spirálová výuka</h2>
+        <p style="color:var(--col-text-muted);font-size:15px;margin-bottom:5px;">Aktuálně: <b>${currentLesson}</b> (${currentPct} %)</p>
+        <div class="action-btn green" style="padding:20px;font-size:20px;box-shadow: 0 6px 15px rgba(34,197,94,0.3);margin-top:20px;" onclick="startCampaign()">
            ▶️ SPUSTIT DNEŠNÍ TRÉNINK
         </div>
         <p style="font-size:13px;color:var(--col-text-muted);margin-top:10px;">Vyzkoušej udržet všech 5 ❤️ srdíček pro maximální zisk zlaťáků!</p>
-
         <div style="margin-top:30px;background:var(--col-card);padding:15px;border-radius:10px;border:1px solid var(--col-yellow);">
            <h3 style="color:var(--col-yellow);font-size:20px;margin-bottom:10px;">🛒 Obchod</h3>
            <p style="font-size:18px;">Tvoje zlaťáky: <b style="color:var(--col-yellow);">${coins} 💰</b></p>
-           
            <div class="action-btn" style="background:#2d2605;border-color:var(--col-yellow);color:var(--col-yellow);margin-top:15px;" onclick="buyFreeze()">
               🧊 Zmrazit sérii (Cena: 20 💰)
            </div>
@@ -607,11 +608,12 @@ function renderScreen() {
     `;
   }
 
-  // 6. VÝBĚR HRY (KLASICKÝ PŘEDMĚT)
+  // PŘIDÁNO TLAČÍTKO PRO "ŘADA NA ČAS" A OŠETŘENÍ PRÁZDNÉ OBRAZOVKY
   else if (currentScreen === "SELECT_GAME") {
     bSubj.style.display = "flex"; bGroup.style.display = "flex"; bGroup.innerText = selectedGroupKey;
-    const vItems = getVocabItems(), qItems = getQuizItems(), quickMode = getQuickChoiceMode();
+    const vItems = getVocabItems(), qItems = getQuizItems(), sItems = getSeqItems(), quickMode = getQuickChoiceMode();
     let html = `<div class="grid-2">`;
+    
     if (vItems.length > 0) {
       html += `
         <div class="tile" onclick="startGame('CARDS')"><h2>1. Karty</h2><p>Čtení (${vItems.length})</p></div>
@@ -632,11 +634,20 @@ function renderScreen() {
     if (qItems.length > 0) {
       html += `<div class="tile" style="border-color:var(--col-green);" onclick="startGame('QUIZ')"><h2 style="color:var(--col-green);">📝 Kvíz</h2><p>${qItems.length} otázek</p></div>`;
     }
+    
+    // OPRAVA BUGU S PRÁZDNOU OBRAZOVKOU
+    if (sItems.length > 0) {
+      html += `<div class="tile" style="border-color:var(--col-yellow);" onclick="startGame('SEQ')"><h2 style="color:var(--col-yellow);">⏱️ Řada na čas</h2><p>${sItems.length} úloh</p></div>`;
+    }
+
+    if (vItems.length === 0 && qItems.length === 0 && sItems.length === 0) {
+      html += `<div style="grid-column:span 2;text-align:center;padding:20px;color:var(--col-text-muted);">V této lekci nejsou žádná data ke hraní.</div>`;
+    }
+
     html += `</div>`;
     main.innerHTML = html;
   }
 
-  // 7. VELIKOST PEXESA
   else if (currentScreen === "SELECT_PEXESO_SIZE") {
     bGroup.style.display = "flex"; bGroup.innerText = selectedGroupKey;
     main.innerHTML = `
@@ -650,7 +661,6 @@ function renderScreen() {
     `;
   }
 
-  // 8. AKTIVNÍ HRA
   else if (currentScreen === "PLAYING") {
     bSubj.style.display = "flex"; bSubj.innerText = selectedSubject;
     bGroup.style.display = "flex"; bGroup.innerText = selectedGroupKey;
@@ -658,9 +668,4 @@ function renderScreen() {
   }
 }
 
-// Spuštění po načtení
-if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", () => loadData());
-} else {
-  loadData();
-}
+if (document.readyState === "loading") { document.addEventListener("DOMContentLoaded", () => loadData()); } else { loadData(); }
