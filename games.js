@@ -824,7 +824,8 @@ function startCampaign() {
   let allVItems = getVocabItems();
   let allQItems = getQuizItems();
 
-  let lessons = [...new Set(allVItems.map(it => it.lesson))].sort();
+  // Přirozené řazení lekcí (Level 2 bude po Level 1, Level 10 až po Level 9)
+  let lessons = [...new Set(allVItems.map(it => it.lesson))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
   let currentLesson = lessons[0];
   
   for (let l of lessons) {
