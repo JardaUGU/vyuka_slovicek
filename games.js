@@ -661,6 +661,17 @@ function renderActiveGame() {
     const q = qItems[qCurStep];
     const pct = Math.round(((qCurStep + 1) / qItems.length) * 100);
 
+    // Do věty se po kliknutí VŽDY doplní pouze SPRÁVNÝ tvar v zelené barvě
+    let promptDisplay = formatPromptText(q.question);
+    if (qAnswered) {
+      const fillHtml = `<span style="color:var(--col-green);font-weight:bold;text-decoration:underline;">${q.answer}</span>`;
+      if (q.question.includes('___')) {
+        promptDisplay = formatPromptText(q.question.replace(/___+/g, fillHtml));
+      } else {
+        promptDisplay = formatPromptText(q.question) + " " + fillHtml;
+      }
+    }
+
     main.innerHTML = `
       <div class="bargraph-container">
         <div class="bargraph-header">
@@ -670,7 +681,7 @@ function renderActiveGame() {
         <div class="bargraph-track"><div class="bargraph-fill" style="width:${pct}%;"></div></div>
       </div>
       <div class="prompt-box" style="font-size:22px;color:#fff;margin:15px 0;">
-        ${formatPromptText(q.question)}
+        ${promptDisplay}
         ${(qAnswered && getTargetLang(selectedSubject) !== 'cs-CZ') ? `<span class="audio-btn" onclick="speakWord('${(q.question.includes('___') ? q.question.replace(/___+/g, q.answer) : q.question + ' ' + q.answer).replace(/[*_]/g, '')}', '${selectedSubject}')">🔊</span>` : ''}
       </div>
       <div class="grid-2">
@@ -696,7 +707,6 @@ function renderActiveGame() {
       ` : ''}
     `;
   }
-
   // ŘADA NA ČAS
   else if (selectedGame === "SEQ") {
     if (sItems.length === 0) return;
@@ -766,8 +776,20 @@ function renderActiveGame() {
 
     if (task.type === 'KVIZ' || task.type.startsWith('QUIZ')) {
       const isEval = cmpState === 'EVAL';
+      let promptDisplay = task.prompt;
+
+      // Do věty se po kliknutí VŽDY doplní pouze SPRÁVNÝ tvar v zelené barvě
+      if (isEval && task.type === 'KVIZ') {
+        const fillHtml = `<span style="color:var(--col-green);font-weight:bold;text-decoration:underline;">${task.correctAns}</span>`;
+        if (task.data.question.includes('___')) {
+          promptDisplay = formatPromptText(task.data.question.replace(/___+/g, fillHtml));
+        } else {
+          promptDisplay = formatPromptText(task.data.question) + " " + fillHtml;
+        }
+      }
+
       html += `<div class="prompt-box" style="font-size:24px;color:#fff;margin:20px 0;">
-                 ${task.prompt}
+                 ${promptDisplay}
                  ${(isEval && getTargetLang(selectedSubject) !== 'cs-CZ' && task.type !== 'QUIZ_IN') ? `<span class="audio-btn" onclick="speakWord('${(task.type==='KVIZ' && task.data.question.includes('___') ? task.data.question.replace(/___+/g, task.data.answer) : task.data.question).replace(/[*_]/g, '')}', '${selectedSubject}')">🔊</span>` : ''}
                </div>`;
       
@@ -786,7 +808,7 @@ function renderActiveGame() {
         if (task.data.help) html += `<div style="text-align:center;color:var(--col-yellow);margin:12px 0;font-weight:bold;">[ ${task.data.help} ]</div>`;
         html += `<div class="action-btn green" style="margin-top:15px;" onclick="nextCmpTask()">DALŠÍ ➔</div>`;
       }
-    }
+    } 
     else if (task.type === 'SCRAMBLE') {
       html += `
         <div class="prompt-box">Slož: <b>${cleanCzechTranslation(task.data.answer)}</b></div>

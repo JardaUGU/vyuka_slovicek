@@ -1,5 +1,5 @@
 /**
- * JÁDRO APLIKACE, ČASOVAČ, SYNCHRONIZACE, EKONOMIKA (ZLAŤÁKY A SRDÍČKA)
+ * JÁDRO APLIKACE, ČASOVAČ, SYNCHRONIZACE, EKONOMIKA A ROZHRANÍ
  */
 const API_URL = "https://script.google.com/macros/s/AKfycbxaxBIXP-ECpWstcqRDw8RuT_ds6UwcplU_3pZ9_-ksELN5FVeGt5EHjjexkJVmx1FR_w/exec";
 
@@ -66,26 +66,53 @@ function isItemAllowedForGrade(it, userG) {
   return itemG === userG;
 }
 
-// --- EKONOMIKA: ZLAŤÁKY A ZMRAZENÍ ---
+// --- EKONOMIKA PROPOJENÁ S CLOUDEM ---
 function getUserCoins(userName) {
   if (!userName) return 0;
-  return Number(localStorage.getItem(`coins_${userName.toLowerCase().trim()}`) || 0);
+  const uKey = userName.toLowerCase().trim();
+  if (appData && appData.users) {
+    const u = appData.users.find(x => x.name.toLowerCase().trim() === uKey);
+    if (u && u.coins !== undefined) return Number(u.coins);
+  }
+  return Number(localStorage.getItem(`coins_${uKey}`) || 0);
+}
+
+function getUserFreezes(userName) {
+  if (!userName) return 0;
+  const uKey = userName.toLowerCase().trim();
+  if (appData && appData.users) {
+    const u = appData.users.find(x => x.name.toLowerCase().trim() === uKey);
+    if (u && u.freezes !== undefined) return Number(u.freezes);
+  }
+  return Number(localStorage.getItem(`freeze_${uKey}`) || 0);
 }
 
 function addCoins(userName, amount) {
   if (!userName) return;
   const uKey = userName.toLowerCase().trim();
   const current = getUserCoins(userName);
-  localStorage.setItem(`coins_${uKey}`, current + amount);
+  const updated = Math.max(0, current + amount);
+  localStorage.setItem(`coins_${uKey}`, updated);
+  if (appData && appData.users) {
+    const u = appData.users.find(x => x.name.toLowerCase().trim() === uKey);
+    if (u) u.coins = updated;
+  }
+  syncEconomyToCloud(userName, updated, getUserFreezes(userName));
 }
 
 window.buyFreeze = function() {
   const coins = getUserCoins(currentUser.name);
   if (coins >= 20) {
-    addCoins(currentUser.name, -20);
+    const newCoins = coins - 20;
     const uKey = currentUser.name.toLowerCase().trim();
-    let freezes = Number(localStorage.getItem(`freeze_${uKey}`) || 0);
-    localStorage.setItem(`freeze_${uKey}`, freezes + 1);
+    let freezes = getUserFreezes(currentUser.name) + 1;
+    localStorage.setItem(`coins_${uKey}`, newCoins);
+    localStorage.setItem(`freeze_${uKey}`, freezes);
+    if (appData && appData.users) {
+      const u = appData.users.find(x => x.name.toLowerCase().trim() === uKey);
+      if (u) { u.coins = newCoins; u.freezes = freezes; }
+    }
+    syncEconomyToCloud(currentUser.name, newCoins, freezes);
     alert("Úspěšně zakoupeno! 🧊\nZmrazení série tě ochrání, pokud zítra zapomeneš cvičit.");
     renderScreen();
   } else {
@@ -93,7 +120,18 @@ window.buyFreeze = function() {
   }
 };
 
-// --- ČASOVAČ & STREAK & ZÁPATÍ ---
+function syncEconomyToCloud(userName, coins, freezes) {
+  try {
+    const fd = new URLSearchParams();
+    fd.append("action", "save_economy");
+    fd.append("user", userName);
+    fd.append("coins", coins);
+    fd.append("freezes", freezes);
+    fetch(API_URL, { method: "POST", mode: "no-cors", body: fd });
+  } catch(e) {}
+}
+
+// --- ČASOVAČ, STREAK & ZÁPATÍ ---
 function updateFooter() {
   const fUser = document.getElementById("footer-user");
   if (fUser) fUser.innerText = currentUser ? `Žák: ${currentUser.name}` : "Žák: --";
@@ -130,9 +168,15 @@ function updateUserStreak(userName, targetMinutes) {
   if (lastCompleted === yestStr) {
     streak += 1;
   } else if (lastCompleted) {
-    let freezes = Number(localStorage.getItem(`freeze_${uKey}`) || 0);
+    let freezes = getUserFreezes(userName);
     if (freezes > 0) {
-      localStorage.setItem(`freeze_${uKey}`, freezes - 1);
+      freezes -= 1;
+      localStorage.setItem(`freeze_${uKey}`, freezes);
+      if (appData && appData.users) {
+        const u = appData.users.find(x => x.name.toLowerCase().trim() === uKey);
+        if (u) u.freezes = freezes;
+      }
+      syncEconomyToCloud(userName, getUserCoins(userName), freezes);
       streak += 1;
       alert("🧊 Tvoje série byla zachráněna pomocí zmrazení, které jsi koupil v obchodě!");
     } else {
@@ -225,7 +269,7 @@ function sendTimeHeartbeatToGoogle() {
   } catch(e) {}
 }
 
-// --- VÝSLOVNOST (TTS) S OPRAVOU PŘERUŠOVÁNÍ ---
+// --- VÝSLOVNOST (TTS) ---
 let isAutoTTS = localStorage.getItem("auto_tts") !== "false";
 let cachedVoices = [];
 
@@ -246,7 +290,7 @@ function updateTTSBtnUI() {
 
 function getTargetLang(subjectName) {
   const s = (subjectName || selectedSubject || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-  if (s.includes('angli') || s === 'en' || s.includes('inteligentn')) return 'en-US';
+  if (s.includes('angli') || s === 'en' || s.includes('inteligentn')) return 'en-GB';
   if (s.includes('nemc') || s === 'de') return 'de-DE';
   if (s.includes('hebr') || s === 'he') return 'he-IL';
   return 'cs-CZ';
@@ -254,15 +298,17 @@ function getTargetLang(subjectName) {
 
 function speakWord(text, subjectName) {
   if (!('speechSynthesis' in window)) return;
-  
-  // Zrušíme aktuálně hrající zvuk
   window.speechSynthesis.cancel();
   
-  // Ochrana před browser bugem (při okamžitém volání po cancel() občas zvuk přeskočí)
   setTimeout(() => {
     let toSpeak = text;
     if (/read\s*-\s*read\s*-\s*read/i.test(toSpeak)) toSpeak = "read, red, red";
     else toSpeak = toSpeak.replace(/\//g, ' or ').replace(/\s*-\s*/g, ', ');
+
+    // OPRAVA PRO SAMOTNÉ "I": prohlížeče ho jinak čtou jako "capital I"
+    if (/^\s*I\s*[.!?]?\s*$/i.test(toSpeak)) {
+      toSpeak = "eye";
+    }
 
     const u = new SpeechSynthesisUtterance(toSpeak);
     const targetLang = getTargetLang(subjectName);
@@ -296,7 +342,7 @@ function speakWord(text, subjectName) {
       if (match) u.voice = match;
     }
     window.speechSynthesis.speak(u);
-  }, 40); // 40ms pauza zachrání plynulost TTS
+  }, 40);
 }
 
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -327,6 +373,7 @@ function addReward(count = 1, section = "Lekce") {
   } catch(e) {}
 }
 
+// --- SYNCHRONIZACE DAT ---
 async function loadData() {
   const cached = localStorage.getItem("app_data");
   if (cached) {
@@ -409,6 +456,7 @@ function getGroupMasteryPercent(groupItems, subjName) {
   return Math.min(100, Math.round((points / (vList.length * 4)) * 100));
 }
 
+// --- NAVIGACE ---
 function goBack() {
   if (typeof stopArcadeLoop === "function") stopArcadeLoop();
   sendTimeHeartbeatToGoogle();
@@ -431,7 +479,19 @@ function setScreen(scr) { currentScreen = scr; registerUserAction(); renderScree
 function selectUser(name, grade, targetMinutes) {
   currentUser = { name, grade: parseInt(grade) || 2, targetMinutes: parseInt(targetMinutes) || 15, stars: 0 };
   localStorage.setItem("cur_user", JSON.stringify(currentUser));
-  todaySecondsStudied = loadUserStudyTime(currentUser.name);
+
+  // Kontrola a porovnání s časem v cloudu
+  let localSec = loadUserStudyTime(currentUser.name);
+  let cloudSec = 0;
+  if (appData && appData.users) {
+    const foundU = appData.users.find(u => u.name.toLowerCase().trim() === currentUser.name.toLowerCase().trim());
+    if (foundU && foundU.todayMinutes) {
+      cloudSec = Math.round(Number(foundU.todayMinutes) * 60);
+    }
+  }
+  todaySecondsStudied = Math.max(localSec, cloudSec);
+  localStorage.setItem(getStudyTimeKey(currentUser.name), todaySecondsStudied);
+
   isTimerPaused = false;
   updateStudyTimerUI();
   setScreen("SELECT_SUBJECT");
@@ -472,7 +532,7 @@ function toggleTestingDirection() {
   renderScreen();
 }
 
-// --- HLAVNÍ RENDERÉR ---
+// --- HLAVNÍ RENDERÉR OBRAZOVEK ---
 function renderScreen() {
   updateFooter(); updateStudyTimerUI(); updateTTSBtnUI();
   const main = document.getElementById("main-content");
@@ -481,6 +541,7 @@ function renderScreen() {
   const bGroup = document.getElementById("badge-group");
   bUser.innerText = currentUser ? currentUser.name : "Uživatel";
 
+  // 1. VÝBĚR UŽIVATELE (CLOUDOVÝ STREAK A ČAS)
   if (currentScreen === "SELECT_USER" || !currentUser) {
     bSubj.style.display = "none"; bGroup.style.display = "none";
     const uList = appData.users || [];
@@ -493,14 +554,15 @@ function renderScreen() {
       <div class="grid-2">
         ${uList.map(u => {
           const g = parseInt(u.grade) || 2;
-          const uSec = loadUserStudyTime(u.name);
+          const uSec = Math.max(loadUserStudyTime(u.name), Math.round((u.todayMinutes || 0) * 60));
           const uMin = Math.floor(uSec / 60);
           const targetM = u.targetMinutes || 15;
           const isDone = uMin >= targetM;
+          const streakDays = (u.streak !== undefined) ? u.streak : getUserStreak(u.name);
           return `
             <div class="tile" style="${isDone ? 'border-color:var(--col-yellow);background:#1a2512;' : ''}" onclick="selectUser('${u.name}', ${g}, ${targetM})">
               <h2>${u.name}</h2><p>${g >= 10 && g < 90 ? `${g-9}. ročník SŠ` : (g<=9 ? `${g}. tř.` : 'Dospělý')}</p>
-              <p style="color:var(--col-orange);margin-top:4px;">🔥 Série: ${getUserStreak(u.name)} dní</p>
+              <p style="color:var(--col-orange);margin-top:4px;">🔥 Série: ${streakDays} dní</p>
               <p style="color:${isDone ? 'var(--col-yellow)' : 'var(--col-text-muted)'};margin-top:2px;font-weight:bold;">⏱️ Dnes: ${uMin}/${targetM} min ${isDone?'★':''}</p>
             </div>
           `;
@@ -509,6 +571,7 @@ function renderScreen() {
     `;
   }
 
+  // 2. VÝBĚR PŘEDMĚTU
   else if (currentScreen === "SELECT_SUBJECT") {
     bSubj.style.display = "none"; bGroup.style.display = "none";
     const userG = parseInt(currentUser.grade) || 2;
@@ -538,11 +601,13 @@ function renderScreen() {
     main.innerHTML = html;
   }
 
+  // 3. VÝBĚR MATEMATIKY
   else if (currentScreen === "SELECT_MATH_OP") {
     bSubj.style.display = "flex"; bSubj.innerText = "Matematika"; bGroup.style.display = "none";
     if (typeof renderMathOpSelection === "function") renderMathOpSelection();
   }
 
+  // 4. VÝBĚR SKUPINY (LEKCE / TÉMATA)
   else if (currentScreen === "SELECT_GROUP") {
     bSubj.style.display = "flex"; bSubj.innerText = selectedSubject; bGroup.style.display = "none";
     const userG = parseInt(currentUser.grade) || 2;
@@ -573,13 +638,14 @@ function renderScreen() {
     `;
   }
 
+  // 5. KAMPAŇ HUB (SPIRÁLOVÁ / INTELIGENTNÍ ANGLIČTINA)
   else if (currentScreen === "CAMPAIGN_HUB") {
     bSubj.style.display = "flex"; bSubj.innerText = selectedSubject; 
     bGroup.style.display = "none";
     const coins = getUserCoins(currentUser.name);
     const vItems = getVocabItems();
     let lessons = [...new Set(vItems.map(it => it.lesson))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
-    let currentLesson = lessons[0] || "Trénink";
+    let currentLesson = lessons[0] || "Level 1";
     let currentPct = 0;
     
     for (let l of lessons) {
@@ -595,7 +661,7 @@ function renderScreen() {
         <div class="action-btn green" style="padding:20px;font-size:20px;box-shadow: 0 6px 15px rgba(34,197,94,0.3);margin-top:20px;" onclick="startCampaign()">
            ▶️ SPUSTIT DNEŠNÍ TRÉNINK
         </div>
-        <p style="font-size:13px;color:var(--col-text-muted);margin-top:10px;">Vyzkoušej udržet všech 5 ❤️ srdíček pro maximální zisk zlaťáků!</p>
+        <p style="font-size:13px;color:var(--col-text-muted);margin-top:10px;">Vyzkoušej udržet všech 5 ❤️ srdíček pro zisk zlaťáků!</p>
         <div style="margin-top:30px;background:var(--col-card);padding:15px;border-radius:10px;border:1px solid var(--col-yellow);">
            <h3 style="color:var(--col-yellow);font-size:20px;margin-bottom:10px;">🛒 Obchod</h3>
            <p style="font-size:18px;">Tvoje zlaťáky: <b style="color:var(--col-yellow);">${coins} 💰</b></p>
@@ -608,7 +674,7 @@ function renderScreen() {
     `;
   }
 
-  // PŘIDÁNO TLAČÍTKO PRO "ŘADA NA ČAS" A OŠETŘENÍ PRÁZDNÉ OBRAZOVKY
+  // 6. VÝBĚR HRY (KLASICKÝ PŘEDMĚT)
   else if (currentScreen === "SELECT_GAME") {
     bSubj.style.display = "flex"; bGroup.style.display = "flex"; bGroup.innerText = selectedGroupKey;
     const vItems = getVocabItems(), qItems = getQuizItems(), sItems = getSeqItems(), quickMode = getQuickChoiceMode();
@@ -634,12 +700,9 @@ function renderScreen() {
     if (qItems.length > 0) {
       html += `<div class="tile" style="border-color:var(--col-green);" onclick="startGame('QUIZ')"><h2 style="color:var(--col-green);">📝 Kvíz</h2><p>${qItems.length} otázek</p></div>`;
     }
-    
-    // OPRAVA BUGU S PRÁZDNOU OBRAZOVKOU
     if (sItems.length > 0) {
       html += `<div class="tile" style="border-color:var(--col-yellow);" onclick="startGame('SEQ')"><h2 style="color:var(--col-yellow);">⏱️ Řada na čas</h2><p>${sItems.length} úloh</p></div>`;
     }
-
     if (vItems.length === 0 && qItems.length === 0 && sItems.length === 0) {
       html += `<div style="grid-column:span 2;text-align:center;padding:20px;color:var(--col-text-muted);">V této lekci nejsou žádná data ke hraní.</div>`;
     }
@@ -648,6 +711,7 @@ function renderScreen() {
     main.innerHTML = html;
   }
 
+  // 7. VELIKOST PEXESA
   else if (currentScreen === "SELECT_PEXESO_SIZE") {
     bGroup.style.display = "flex"; bGroup.innerText = selectedGroupKey;
     main.innerHTML = `
@@ -661,6 +725,7 @@ function renderScreen() {
     `;
   }
 
+  // 8. AKTIVNÍ HRA
   else if (currentScreen === "PLAYING") {
     bSubj.style.display = "flex"; bSubj.innerText = selectedSubject;
     bGroup.style.display = "flex"; bGroup.innerText = selectedGroupKey;
@@ -668,4 +733,9 @@ function renderScreen() {
   }
 }
 
-if (document.readyState === "loading") { document.addEventListener("DOMContentLoaded", () => loadData()); } else { loadData(); }
+// Spuštění po načtení dokumentu
+if (document.readyState === "loading") { 
+  document.addEventListener("DOMContentLoaded", () => loadData()); 
+} else { 
+  loadData(); 
+}
