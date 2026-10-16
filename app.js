@@ -47,7 +47,7 @@ function getQuickChoiceMode() {
   if (s.includes("nemc") || s === "de") {
     if (vItems.filter(it => /^(der|die|das)\s/i.test(it.question)).length >= 3) return "DER_DIE_DAS";
   }
-  if (s.includes("angli") || s === "en") {
+  if (s.includes("angli") || s === "en" || s.includes("inteligentn")) {
     if (vItems.filter(it => /^(a|an)\s/i.test(it.question)).length >= 3) return "A_AN";
   }
   if (s.includes("cest") || s === "cs") {
@@ -58,8 +58,15 @@ function getQuickChoiceMode() {
 
 function isItemAllowedForGrade(it, userG) {
   const itemG = parseInt(it.minGrade) || 2;
+  
+  // VÝJIMKA 1: Spirálová výuka a Inteligentní angličtina jedou od nuly pro všechny
+  const subjLow = (it.subject || '').toLowerCase();
+  if (subjLow.includes('cesta') || subjLow.includes('postupn') || subjLow.includes('inteligentn')) return true;
+
+  // VÝJIMKA 2: Nepravidelná slovesa pro 5. ročník a vyšší
   const isVerbGroup = (it.lesson || '').toLowerCase().includes('sloves') || (it.topic || '').toLowerCase().includes('sloves');
   if (isVerbGroup && userG >= 5) return true;
+  
   if (!filterExactGradeOnly || userG >= 90) return true;
   return itemG === userG;
 }
@@ -91,7 +98,14 @@ window.buyFreeze = function() {
   }
 };
 
-// --- ČASOVAČ & STREAK ---
+// --- ČASOVAČ & STREAK & ZÁPATÍ ---
+function updateFooter() {
+  const fUser = document.getElementById("footer-user");
+  if (fUser) {
+    fUser.innerText = currentUser ? `Žák: ${currentUser.name}` : "Žák: --";
+  }
+}
+
 function getStudyTimeKey(userName) {
   const d = new Date();
   return `study_sec_${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}_${(userName || 'user').toLowerCase().trim()}`;
@@ -246,7 +260,7 @@ function updateTTSBtnUI() {
 
 function getTargetLang(subjectName) {
   const s = (subjectName || selectedSubject || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-  if (s.includes('angli') || s === 'en') return 'en-US';
+  if (s.includes('angli') || s === 'en' || s.includes('inteligentn')) return 'en-US';
   if (s.includes('nemc') || s === 'de') return 'de-DE';
   if (s.includes('hebr') || s === 'he') return 'he-IL';
   return 'cs-CZ';
@@ -451,7 +465,8 @@ function chooseSubject(subj) {
   });
 
   // PŘÍMÝ SKOK DO HUBU PRO KAMPAŇ (Přeskočí výběr lekcí)
-  if (selectedSubject.toLowerCase().includes("cesta") || selectedSubject.toLowerCase().includes("postupn")) {
+  const sLow = selectedSubject.toLowerCase();
+  if (sLow.includes("cesta") || sLow.includes("postupn") || sLow.includes("inteligentn")) {
     setScreen("CAMPAIGN_HUB");
   } else {
     setScreen("SELECT_GROUP");
@@ -538,7 +553,8 @@ function renderScreen() {
         </div>
     `;
     Object.keys(subjs).forEach(s => {
-      const isCesta = s.toLowerCase().includes("cesta") || s.toLowerCase().includes("postupn");
+      const sLow = s.toLowerCase();
+      const isCesta = sLow.includes("cesta") || sLow.includes("postupn") || sLow.includes("inteligentn");
       const stl = isCesta ? 'border-color:var(--col-green);background:#112a1f;' : '';
       const ikn = isCesta ? '🚀 ' : '';
       html += `<div class="tile" style="${stl}" onclick="chooseSubject('${s}')"><h2>${ikn}${s}</h2><p>${subjs[s]} úloh</p></div>`;
@@ -585,7 +601,7 @@ function renderScreen() {
     `;
   }
 
-  // 5. KAMPAŇ HUB (PRO "CESTA" PŘEDMĚTY)
+  // 5. KAMPAŇ HUB (PRO "CESTA" NEBO "INTELIGENTNÍ" PŘEDMĚTY)
   else if (currentScreen === "CAMPAIGN_HUB") {
     bSubj.style.display = "flex"; bSubj.innerText = selectedSubject; 
     bGroup.style.display = "none";
@@ -593,7 +609,7 @@ function renderScreen() {
 
     // Zjistíme aktuální level (první lekce, co nemá 95%+)
     const vItems = getVocabItems();
-    let lessons = [...new Set(vItems.map(it => it.lesson))].sort();
+    let lessons = [...new Set(vItems.map(it => it.lesson))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
     let currentLesson = lessons[0] || "Trénink";
     let currentPct = 0;
     
