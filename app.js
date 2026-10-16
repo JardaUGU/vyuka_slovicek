@@ -335,10 +335,20 @@ function speakWord(text, subjectName) {
     }
 
     if (voices && voices.length > 0) {
-      let match = voices.find(v => (v.lang || '').toLowerCase().replace('_', '-') === targetLang.toLowerCase());
-      if (!match) match = voices.find(v => (v.lang || '').toLowerCase().replace('_', '-').startsWith(langPrefix));
-      if (!match && langPrefix === 'de') match = voices.find(v => /anna|petra|markus/i.test(v.name));
-      if (!match && langPrefix === 'en') match = voices.find(v => /samantha|daniel|karen|alex/i.test(v.name));
+      const isTarget = v => (v.lang || '').toLowerCase().replace('_', '-') === targetLang.toLowerCase() ||
+                            (v.lang || '').toLowerCase().replace('_', '-').startsWith(langPrefix);
+
+      // 1. Priorita: Stažený hlas vysoké kvality (Enhanced / Premium)
+      let match = voices.find(v => isTarget(v) && /enhanced|premium|natural/i.test(v.name));
+
+      // 2. Priorita: Doporučené britské hlasy (Daniel, Oliver, Serena, Stephanie)
+      if (!match && targetLang === 'en-GB') {
+        match = voices.find(v => isTarget(v) && /daniel|oliver|serena|stephanie|george/i.test(v.name));
+      }
+
+      // 3. Fallback: Jakýkoliv hlas pro daný jazyk
+      if (!match) match = voices.find(isTarget);
+
       if (match) u.voice = match;
     }
     window.speechSynthesis.speak(u);
