@@ -811,7 +811,7 @@ function renderActiveGame() {
 }
 
 // ==========================================
-// 9. KAMPAŇ ENGINE (MIXOVANÝ TRÉNINK)
+// 9. KAMPAŇ ENGINE (MIXOVANÝ TRÉNINK) - PRODLOUŽENO
 // ==========================================
 let cmpQueue = [];
 let cmpIdx = 0;
@@ -824,7 +824,6 @@ function startCampaign() {
   let allVItems = getVocabItems();
   let allQItems = getQuizItems();
 
-  // Přirozené řazení lekcí (Level 2 bude po Level 1, Level 10 až po Level 9)
   let lessons = [...new Set(allVItems.map(it => it.lesson))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
   let currentLesson = lessons[0];
   
@@ -843,22 +842,32 @@ function startCampaign() {
   let olderVItems = allVItems.filter(it => it.lesson !== currentLesson && it.lesson < currentLesson);
   let currentQItems = allQItems.filter(it => it.lesson === currentLesson);
 
+  // Kvízy z aktuální lekce
   currentQItems.forEach(it => q.push({ type: 'KVIZ', data: it }));
 
+  // Prodloužení: Dříve se pro každé slovo přidával 1 úkol. Nyní přidáme VŠECHNY 3 (Intenzivní drill)
   currentVItems.forEach(it => {
-      const r = Math.random();
-      if (r < 0.4) q.push({ type: 'QUIZ_OUT', data: it }); 
-      else if (r < 0.8) q.push({ type: 'QUIZ_IN', data: it }); 
-      else q.push({ type: 'SCRAMBLE', data: it }); 
+      q.push({ type: 'QUIZ_OUT', data: it }); // Překlad do cizího
+      q.push({ type: 'QUIZ_IN', data: it });  // Pasivní poznání
+      q.push({ type: 'SCRAMBLE', data: it }); // Skládání (pravopis/slovosled)
   });
 
+  // Opakování minulých lekcí (až 5 slov z minulosti, z každého pasivní překlad + pravopis)
   if (olderVItems.length > 0) {
-      let shuffledOlder = olderVItems.sort(() => Math.random() - 0.5).slice(0, 3);
-      shuffledOlder.forEach(it => q.push({ type: 'QUIZ_IN', data: it }));
+      let shuffledOlder = olderVItems.sort(() => Math.random() - 0.5).slice(0, 5);
+      shuffledOlder.forEach(it => {
+          q.push({ type: 'QUIZ_IN', data: it });
+          q.push({ type: 'SCRAMBLE', data: it });
+      });
   }
 
+  // Zamícháme celou obrovskou frontu
   q.sort(() => Math.random() - 0.5);
-  if (q.length > 15) q = q.slice(0, 15);
+  
+  // Zastropujeme na 40 úkolech (Dříve bylo 15).
+  // 40 úkolů x cca 8-10 sekund = 5,5 až 7 minut rychlého tempa.
+  // Jelikož dítě bude dělat chyby (úkoly se vrací nakonec fronty), herní čas se dostane na ideálních cca 10 minut.
+  if (q.length > 40) q = q.slice(0, 40);
 
   q.forEach(task => {
     if (task.type === 'QUIZ_OUT' || task.type === 'QUIZ_IN') {
