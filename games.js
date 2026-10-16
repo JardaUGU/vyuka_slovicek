@@ -811,7 +811,7 @@ function renderActiveGame() {
 }
 
 // ==========================================
-// 9. KAMPAŇ ENGINE (MIXOVANÝ TRÉNINK) - PRODLOUŽENO
+// 9. KAMPAŇ ENGINE (PEDAGOGICKÁ KŘIVKA)
 // ==========================================
 let cmpQueue = [];
 let cmpIdx = 0;
@@ -824,6 +824,7 @@ function startCampaign() {
   let allVItems = getVocabItems();
   let allQItems = getQuizItems();
 
+  // Přirozené řazení lekcí (Level 2 bude po Level 1, atd.)
   let lessons = [...new Set(allVItems.map(it => it.lesson))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
   let currentLesson = lessons[0];
   
@@ -842,33 +843,56 @@ function startCampaign() {
   let olderVItems = allVItems.filter(it => it.lesson !== currentLesson && it.lesson < currentLesson);
   let currentQItems = allQItems.filter(it => it.lesson === currentLesson);
 
-  // Kvízy z aktuální lekce
-  currentQItems.forEach(it => q.push({ type: 'KVIZ', data: it }));
+  // KATEGORIE ÚKOLŮ PRO LOGICKOU POSTUPNOST (PEDAGOGIKA)
+  let qRevision = [];
+  let qNewPassive = [];
+  let qNewActive = [];
+  let qGrammar = [];
+  let qSentences = [];
 
-  // Prodloužení: Dříve se pro každé slovo přidával 1 úkol. Nyní přidáme VŠECHNY 3 (Intenzivní drill)
-  currentVItems.forEach(it => {
-      q.push({ type: 'QUIZ_OUT', data: it }); // Překlad do cizího
-      q.push({ type: 'QUIZ_IN', data: it });  // Pasivní poznání
-      q.push({ type: 'SCRAMBLE', data: it }); // Skládání (pravopis/slovosled)
-  });
-
-  // Opakování minulých lekcí (až 5 slov z minulosti, z každého pasivní překlad + pravopis)
+  // Fáze 1: Zahřátí (Opakování starších slov a vět)
   if (olderVItems.length > 0) {
       let shuffledOlder = olderVItems.sort(() => Math.random() - 0.5).slice(0, 5);
       shuffledOlder.forEach(it => {
-          q.push({ type: 'QUIZ_IN', data: it });
-          q.push({ type: 'SCRAMBLE', data: it });
+          const isSentence = it.question.trim().includes(' ');
+          if (isSentence) {
+              qRevision.push({ type: 'SCRAMBLE', data: it }); // Věty z minula složí
+          } else {
+              qRevision.push({ type: 'QUIZ_IN', data: it }); // Slova z minula pozná pasivně
+          }
       });
   }
 
-  // Zamícháme celou obrovskou frontu
-  q.sort(() => Math.random() - 0.5);
-  
-  // Zastropujeme na 40 úkolech (Dříve bylo 15).
-  // 40 úkolů x cca 8-10 sekund = 5,5 až 7 minut rychlého tempa.
-  // Jelikož dítě bude dělat chyby (úkoly se vrací nakonec fronty), herní čas se dostane na ideálních cca 10 minut.
+  // Roztřídění aktuální lekce na Slova (bez mezer) a Věty (s mezerou)
+  currentVItems.forEach(it => {
+      const isSentence = it.question.trim().includes(' ') || it.question.trim().includes('-');
+      if (isSentence) {
+          // Věty jdou do skládání
+          qSentences.push({ type: 'SCRAMBLE', data: it });
+      } else {
+          // Samostatná slova se učí nejprve pasivně (Cizí -> CZ), pak aktivně (CZ -> Cizí)
+          qNewPassive.push({ type: 'QUIZ_IN', data: it });
+          qNewActive.push({ type: 'QUIZ_OUT', data: it });
+      }
+  });
+
+  // Gramatické kvízy
+  currentQItems.forEach(it => qGrammar.push({ type: 'KVIZ', data: it }));
+
+  // Zamícháme položky POUZE v rámci jednotlivých fází (aby testy nebyly vždy ve stejném pořadí, ale zachovala se křivka)
+  qRevision.sort(() => Math.random() - 0.5);
+  qNewPassive.sort(() => Math.random() - 0.5);
+  qNewActive.sort(() => Math.random() - 0.5);
+  qGrammar.sort(() => Math.random() - 0.5);
+  qSentences.sort(() => Math.random() - 0.5);
+
+  // SPOJENÍ DO JEDNÉ FRONTY (Od nejlehčího po nejtěžší)
+  q = [...qRevision, ...qNewPassive, ...qNewActive, ...qGrammar, ...qSentences];
+
+  // Omezení maximální délky (aby trénink netrval déle než 10 minut v kuse)
   if (q.length > 40) q = q.slice(0, 40);
 
+  // Vygenerování dat pro konkrétní typy úkolů
   q.forEach(task => {
     if (task.type === 'QUIZ_OUT' || task.type === 'QUIZ_IN') {
        const isOut = task.type === 'QUIZ_OUT';
@@ -902,7 +926,6 @@ function startCampaign() {
   selectedGame = 'CAMPAIGN';
   setScreen('PLAYING');
 }
-
 function clickCmpQuizOpt(opt) {
   if (cmpState !== 'PLAYING') return;
   const task = cmpQueue[cmpIdx];
