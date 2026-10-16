@@ -264,6 +264,11 @@ function speakWord(text, subjectName) {
     if (/read\s*-\s*read\s*-\s*read/i.test(toSpeak)) toSpeak = "read, red, red";
     else toSpeak = toSpeak.replace(/\//g, ' or ').replace(/\s*-\s*/g, ', ');
 
+    // OPRAVA PRO SAMOTNÉ "I": zabrání čtení "capital I" a vysloví čisté [ aj ]
+    if (/^\s*I\s*[.!?]?\s*$/i.test(toSpeak)) {
+      toSpeak = "eye";
+    }
+
     const u = new SpeechSynthesisUtterance(toSpeak);
     const targetLang = getTargetLang(subjectName);
     const langPrefix = targetLang.split('-')[0];
