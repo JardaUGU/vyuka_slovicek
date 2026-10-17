@@ -66,58 +66,57 @@ function isItemAllowedForGrade(it, userG) {
   return itemG === userG;
 }
 
-// --- EKONOMIKA PROPOJENÁ S CLOUDEM ---
+// --- MODULÁRNÍ EKONOMIKA A INVENTÁŘ ---
 function getUserCoins(userName) {
   if (!userName) return 0;
-  const uKey = userName.toLowerCase().trim();
-  if (appData && appData.users) {
-    const u = appData.users.find(x => x.name.toLowerCase().trim() === uKey);
-    if (u && u.coins !== undefined) return Number(u.coins);
-  }
-  return Number(localStorage.getItem(`coins_${uKey}`) || 0);
+  const u = (appData.users || []).find(x => x.name.toLowerCase().trim() === userName.toLowerCase().trim());
+  return u ? Number(u.coins || 0) : Number(localStorage.getItem(`coins_${userName.toLowerCase().trim()}`) || 0);
 }
 
-function getUserFreezes(userName) {
+function getUserItemCount(userName, itemKey) {
   if (!userName) return 0;
-  const uKey = userName.toLowerCase().trim();
-  if (appData && appData.users) {
-    const u = appData.users.find(x => x.name.toLowerCase().trim() === uKey);
-    if (u && u.freezes !== undefined) return Number(u.freezes);
-  }
-  return Number(localStorage.getItem(`freeze_${uKey}`) || 0);
+  const u = (appData.users || []).find(x => x.name.toLowerCase().trim() === userName.toLowerCase().trim());
+  if (u && u.inventory && u.inventory[itemKey] !== undefined) return Number(u.inventory[itemKey]);
+  return Number(localStorage.getItem(`item_${itemKey}_${userName.toLowerCase().trim()}`) || 0);
 }
 
 function addCoins(userName, amount) {
   if (!userName) return;
-  const uKey = userName.toLowerCase().trim();
-  const current = getUserCoins(userName);
-  const updated = Math.max(0, current + amount);
-  localStorage.setItem(`coins_${uKey}`, updated);
-  if (appData && appData.users) {
-    const u = appData.users.find(x => x.name.toLowerCase().trim() === uKey);
-    if (u) u.coins = updated;
-  }
-  syncEconomyToCloud(userName, updated, getUserFreezes(userName));
+  const u = (appData.users || []).find(x => x.name.toLowerCase().trim() === userName.toLowerCase().trim());
+  if (u) u.coins = Math.max(0, (u.coins || 0) + amount);
+  try {
+    const fd = new URLSearchParams();
+    fd.append("action", "add_coins"); fd.append("user", userName); fd.append("amount", amount);
+    fetch(API_URL, { method: "POST", mode: "no-cors", body: fd });
+  } catch(e) {}
 }
 
-window.buyFreeze = function() {
-  const coins = getUserCoins(currentUser.name);
-  if (coins >= 20) {
-    const newCoins = coins - 20;
-    const uKey = currentUser.name.toLowerCase().trim();
-    let freezes = getUserFreezes(currentUser.name) + 1;
-    localStorage.setItem(`coins_${uKey}`, newCoins);
-    localStorage.setItem(`freeze_${uKey}`, freezes);
-    if (appData && appData.users) {
-      const u = appData.users.find(x => x.name.toLowerCase().trim() === uKey);
-      if (u) { u.coins = newCoins; u.freezes = freezes; }
+function buyShopItem(itemKey, cost) {
+  if (!currentUser) return;
+  const currentCoins = getUserCoins(currentUser.name);
+  if (currentCoins >= cost) {
+    const u = (appData.users || []).find(x => x.name.toLowerCase().trim() === currentUser.name.toLowerCase().trim());
+    if (u) {
+      u.coins -= cost;
+      if (!u.inventory) u.inventory = {};
+      u.inventory[itemKey] = (u.inventory[itemKey] || 0) + 1;
     }
-    syncEconomyToCloud(currentUser.name, newCoins, freezes);
-    alert("Úspěšně zakoupeno! 🧊\nZmrazení série tě ochrání, pokud zítra zapomeneš cvičit.");
+    try {
+      const fd = new URLSearchParams();
+      fd.append("action", "buy_item"); fd.append("user", currentUser.name);
+      fd.append("itemKey", itemKey); fd.append("cost", cost);
+      fetch(API_URL, { method: "POST", mode: "no-cors", body: fd });
+    } catch(e) {}
+    alert(`Úspěšně zakoupeno! 🛒\nPoložka ${itemKey} byla přidána.`);
     renderScreen();
   } else {
-    alert("Nemáš dostatek zlaťáků! 💰\nMusíš v tréninku zachránit více srdíček.");
+    alert("Nemáš dostatek zlaťáků! 💰");
   }
+}
+
+// Zmrazení série využívá univerzální nákup
+window.buyFreeze = function() {
+  buyShopItem("Zmrazeni", 20);
 };
 
 function syncEconomyToCloud(userName, coins, freezes) {
@@ -487,18 +486,19 @@ function goBack() {
 function setScreen(scr) { currentScreen = scr; registerUserAction(); renderScreen(); }
 
 function selectUser(name, grade, targetMinutes) {
-  currentUser = { name, grade: parseInt(grade) || 2, targetMinutes: parseInt(targetMinutes) || 15, stars: 0 };
+  const foundU = (appData.users || []).find(u => u.name.toLowerCase().trim() === name.toLowerCase().trim());
+  currentUser = { 
+    name, 
+    grade: parseInt(grade) || 2, 
+    targetMinutes: parseInt(targetMinutes) || 15, 
+    stars: 0,
+    startLevels: (foundU && foundU.startLevels) ? foundU.startLevels : {},
+    inventory: (foundU && foundU.inventory) ? foundU.inventory : {}
+  };
   localStorage.setItem("cur_user", JSON.stringify(currentUser));
 
-  // Kontrola a porovnání s časem v cloudu
   let localSec = loadUserStudyTime(currentUser.name);
-  let cloudSec = 0;
-  if (appData && appData.users) {
-    const foundU = appData.users.find(u => u.name.toLowerCase().trim() === currentUser.name.toLowerCase().trim());
-    if (foundU && foundU.todayMinutes) {
-      cloudSec = Math.round(Number(foundU.todayMinutes) * 60);
-    }
-  }
+  let cloudSec = foundU ? Math.round(Number(foundU.todayMinutes || 0) * 60) : 0;
   todaySecondsStudied = Math.max(localSec, cloudSec);
   localStorage.setItem(getStudyTimeKey(currentUser.name), todaySecondsStudied);
 
@@ -648,37 +648,74 @@ function renderScreen() {
     `;
   }
 
-  // 5. KAMPAŇ HUB (SPIRÁLOVÁ / INTELIGENTNÍ ANGLIČTINA)
+  // 5. KAMPAŇ HUB (ČISTÝ STAV BEZ ROLETKY - ŘÍZENO TABULKOU)
   else if (currentScreen === "CAMPAIGN_HUB") {
-    bSubj.style.display = "flex"; bSubj.innerText = selectedSubject; 
+    bSubj.style.display = "flex"; 
+    bSubj.innerText = selectedSubject; 
     bGroup.style.display = "none";
+
     const coins = getUserCoins(currentUser.name);
     const vItems = getVocabItems();
     let lessons = [...new Set(vItems.map(it => it.lesson))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
-    let currentLesson = lessons[0] || "Level 1";
-    let currentPct = 0;
-    
-    for (let l of lessons) {
-        let lItems = vItems.filter(it => it.lesson === l);
-        let pct = getGroupMasteryPercent(lItems, selectedSubject);
-        if (pct < 95) { currentLesson = l; currentPct = pct; break; }
+
+    // 1. Zjistíme minimální level z Google Tabulky pro daný předmět
+    const subjNorm = selectedSubject.toLowerCase().replace(/[^a-z]/g, "");
+    let userMinLvl = 1;
+    if (currentUser && currentUser.startLevels) {
+      for (let k in currentUser.startLevels) {
+        if (subjNorm.includes(k) || k.includes(subjNorm)) {
+          userMinLvl = Number(currentUser.startLevels[k]) || 1;
+          break;
+        }
+      }
     }
 
+    // 2. Najdeme první nedokončený level (všechny pod nastaveným startem přeskočíme)
+    let currentLesson = lessons[0] || "Level 1";
+    for (let l of lessons) {
+      let num = parseInt(l.replace(/\D/g, '')) || 1;
+      if (num < userMinLvl) continue; // Přeskočí nižší levely podle tabulky!
+
+      let lItems = vItems.filter(it => it.lesson === l);
+      let pct = getGroupMasteryPercent(lItems, selectedSubject);
+      if (pct < 95) {
+        currentLesson = l;
+        break;
+      }
+    }
+
+    selectedGroupKey = currentLesson;
+    let curItems = vItems.filter(it => it.lesson === currentLesson);
+    let currentPct = getGroupMasteryPercent(curItems, selectedSubject);
+
     main.innerHTML = `
-      <div style="text-align:center;padding:10px;">
-        <h2 style="color:var(--col-active-tab);font-size:26px;margin-bottom:5px;">Spirálová výuka</h2>
-        <p style="color:var(--col-text-muted);font-size:15px;margin-bottom:5px;">Aktuálně: <b>${currentLesson}</b> (${currentPct} %)</p>
-        <div class="action-btn green" style="padding:20px;font-size:20px;box-shadow: 0 6px 15px rgba(34,197,94,0.3);margin-top:20px;" onclick="startCampaign()">
+      <div style="text-align:center;padding:15px 10px;">
+        <h2 style="color:var(--col-active-tab);font-size:26px;margin-bottom:12px;">Spirálová výuka</h2>
+        
+        <p style="color:var(--col-text-muted);font-size:16px;margin-bottom:6px;">Aktuální lekce:</p>
+        <p style="color:#fff;font-size:28px;font-weight:bold;margin-bottom:10px;">${currentLesson}</p>
+
+        <div class="bargraph-container" style="max-width:280px;margin:0 auto 20px auto;">
+          <div class="bargraph-header">
+            <span>Postup lekce</span>
+            <span style="color:var(--col-green);">${currentPct} %</span>
+          </div>
+          <div class="bargraph-track" style="height:8px;">
+            <div class="bargraph-fill" style="width:${currentPct}%;"></div>
+          </div>
+        </div>
+
+        <div class="action-btn green" style="padding:18px;font-size:20px;box-shadow: 0 6px 15px rgba(34,197,94,0.3);" onclick="startCampaign()">
            ▶️ SPUSTIT DNEŠNÍ TRÉNINK
         </div>
-        <p style="font-size:13px;color:var(--col-text-muted);margin-top:10px;">Vyzkoušej udržet všech 5 ❤️ srdíček pro zisk zlaťáků!</p>
+        <p style="font-size:13px;color:var(--col-text-muted);margin-top:12px;">Udrž všech 5 ❤️ srdíček pro zisk zlaťáků!</p>
+
         <div style="margin-top:30px;background:var(--col-card);padding:15px;border-radius:10px;border:1px solid var(--col-yellow);">
-           <h3 style="color:var(--col-yellow);font-size:20px;margin-bottom:10px;">🛒 Obchod</h3>
-           <p style="font-size:18px;">Tvoje zlaťáky: <b style="color:var(--col-yellow);">${coins} 💰</b></p>
-           <div class="action-btn" style="background:#2d2605;border-color:var(--col-yellow);color:var(--col-yellow);margin-top:15px;" onclick="buyFreeze()">
+           <h3 style="color:var(--col-yellow);font-size:18px;margin-bottom:8px;">🛒 Obchod</h3>
+           <p style="font-size:16px;">Tvoje zlaťáky: <b style="color:var(--col-yellow);">${coins} 💰</b></p>
+           <div class="action-btn" style="background:#2d2605;border-color:var(--col-yellow);color:var(--col-yellow);margin-top:12px;padding:10px;" onclick="buyFreeze()">
               🧊 Zmrazit sérii (Cena: 20 💰)
            </div>
-           <p style="font-size:12px;color:var(--col-text-muted);margin-top:8px;">Ochrání tě před ztrátou ohně, pokud zítra zapomeneš cvičit.</p>
         </div>
       </div>
     `;
