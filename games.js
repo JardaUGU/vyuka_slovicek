@@ -12,6 +12,7 @@ function formatPromptText(text) {
 // 1. OVLÁDÁNÍ KARET (DALŠÍ / PŘEDCHOZÍ / ZVUK)
 // ==========================================
 let vCardIdx = 0;
+let qActiveList = [];
 
 function vCardNext() {
   const vItems = getVocabItems();
@@ -73,6 +74,8 @@ function initGameState() {
   }
 
   if (selectedGame === "QUIZ" && qItems.length > 0) {
+    // Vezme všechny kvízy, zamíchá je a vybere maximálně 10
+    qActiveList = [...qItems].sort(() => Math.random() - 0.5).slice(0, 10);
     qCurStep = 0;
     qAnswered = false;
     qChosenOpt = null;
@@ -640,26 +643,26 @@ function renderActiveGame() {
     `;
   }
 
-  // KVÍZ
+// KVÍZ
   else if (selectedGame === "QUIZ") {
-    if (qItems.length === 0) {
+    if (qActiveList.length === 0) {
       main.innerHTML = `<div style="text-align:center;padding:30px;"><h2>V této lekci není žádný kvíz.</h2><div class="action-btn" onclick="setScreen('SELECT_GAME')">ZPĚT</div></div>`;
       return;
     }
 
-    if (qCurStep >= qItems.length) {
+    if (qCurStep >= qActiveList.length) {
       main.innerHTML = `
         <div style="text-align:center;padding:30px;">
           <h2 style="color:var(--col-green);margin-bottom:10px;">KVÍZ DOKONČEN! 🎉</h2>
-          <p style="color:#fff;margin-bottom:15px;">Zvládl jsi všech ${qItems.length} otázek!</p>
+          <p style="color:#fff;margin-bottom:15px;">Zvládl jsi všech ${qActiveList.length} otázek!</p>
           <div class="action-btn green" onclick="setScreen('SELECT_GAME')">ZPĚT DO MENU</div>
         </div>
       `;
       return;
     }
 
-    const q = qItems[qCurStep];
-    const pct = Math.round(((qCurStep + 1) / qItems.length) * 100);
+    const q = qActiveList[qCurStep];
+    const pct = Math.round(((qCurStep + 1) / qActiveList.length) * 100);
 
     // Do věty se po kliknutí VŽDY doplní pouze SPRÁVNÝ tvar v zelené barvě
     let promptDisplay = formatPromptText(q.question);
@@ -905,7 +908,18 @@ function startCampaign() {
     if (task.type === 'QUIZ_OUT' || task.type === 'QUIZ_IN') {
        const isOut = task.type === 'QUIZ_OUT';
        const correctAns = isOut ? task.data.question : cleanCzechTranslation(task.data.answer);
-       let pool = allVItems.map(i => isOut ? i.question : cleanCzechTranslation(i.answer)).filter(ans => ans !== correctAns);
+       
+       // 1. Zkusíme vzít falešné odpovědi z aktuální a starších lekcí
+       let localItems = [...currentVItems, ...olderVItems];
+       let pool = [...new Set(localItems.map(i => isOut ? i.question : cleanCzechTranslation(i.answer)))].filter(ans => ans !== correctAns);
+       
+       // 2. Pokud je jich málo, doplníme z celého slovníku, ale hledáme PODOBNOU DÉLKU textu!
+       if (pool.length < 3) {
+           let extra = [...new Set(allVItems.map(i => isOut ? i.question : cleanCzechTranslation(i.answer)))].filter(ans => ans !== correctAns && !pool.includes(ans));
+           extra.sort((a, b) => Math.abs(a.length - correctAns.length) - Math.abs(b.length - correctAns.length));
+           pool.push(...extra.slice(0, 3));
+       }
+       
        pool.sort(() => Math.random() - 0.5);
        task.opts = [correctAns, ...pool.slice(0, 3)].sort(() => Math.random() - 0.5);
        task.correctAns = correctAns;
