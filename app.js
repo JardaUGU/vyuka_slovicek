@@ -544,6 +544,15 @@ function toggleTestingDirection() {
   renderScreen();
 }
 
+function openSequenceMenu() {
+  const sItems = getSeqItems();
+  if (sItems.length === 1) {
+    selectedSeqIndex = 0;
+    startGame('SEQ');
+  } else {
+    setScreen('SELECT_SEQ_ITEM');
+  }
+}
 // --- HLAVNÍ RENDERÉR OBRAZOVEK ---
 function renderScreen() {
   updateFooter(); updateStudyTimerUI(); updateTTSBtnUI();
@@ -750,7 +759,7 @@ function renderScreen() {
       html += `<div class="tile" style="border-color:var(--col-green);" onclick="startGame('QUIZ')"><h2 style="color:var(--col-green);">📝 Kvíz</h2><p>${qItems.length} otázek</p></div>`;
     }
     if (sItems.length > 0) {
-      html += `<div class="tile" style="border-color:var(--col-yellow);" onclick="startGame('SEQ')"><h2 style="color:var(--col-yellow);">⏱️ Řada na čas</h2><p>${sItems.length} úloh</p></div>`;
+      html += `<div class="tile" style="border-color:var(--col-yellow);" onclick="openSequenceMenu()"><h2 style="color:var(--col-yellow);">⏱️ Řada na čas</h2><p>${sItems.length} úloh</p></div>`;
     }
     if (vItems.length === 0 && qItems.length === 0 && sItems.length === 0) {
       html += `<div style="grid-column:span 2;text-align:center;padding:20px;color:var(--col-text-muted);">V této lekci nejsou žádná data ke hraní.</div>`;
@@ -758,6 +767,23 @@ function renderScreen() {
 
     html += `</div>`;
     main.innerHTML = html;
+  }
+
+  // PŘIDÁNA NOVÁ OBRAZOVKA PRO VÝBĚR ŘADY
+  else if (currentScreen === "SELECT_SEQ_ITEM") {
+    bGroup.style.display = "flex"; bGroup.innerText = selectedGroupKey;
+    const sItems = getSeqItems();
+    main.innerHTML = `
+      <h2 style="font-size:18px;margin-bottom:12px;text-align:center;color:var(--col-yellow);">Vyber, co chceš skládat:</h2>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        ${sItems.map((it, idx) => `
+          <div class="tile" style="border-color:var(--col-yellow);padding:15px;" onclick="selectedSeqIndex=${idx}; startGame('SEQ');">
+            <h2 style="color:var(--col-yellow);">${it.question}</h2>
+            <p>${it.answer.split('|').length} položek v řadě</p>
+          </div>
+        `).join('')}
+      </div>
+    `;
   }
 
   // 7. VELIKOST PEXESA
