@@ -115,21 +115,9 @@ function buyShopItem(itemKey, cost) {
   }
 }
 
-// Zmrazení série využívá univerzální nákup
 window.buyFreeze = function() {
   buyShopItem("Zmrazeni", 20);
 };
-
-function syncEconomyToCloud(userName, coins, freezes) {
-  try {
-    const fd = new URLSearchParams();
-    fd.append("action", "save_economy");
-    fd.append("user", userName);
-    fd.append("coins", coins);
-    fd.append("freezes", freezes);
-    fetch(API_URL, { method: "POST", mode: "no-cors", body: fd });
-  } catch(e) {}
-}
 
 // --- ČASOVAČ, STREAK & ZÁPATÍ ---
 function updateFooter() {
@@ -168,17 +156,10 @@ function updateUserStreak(userName, targetMinutes) {
   if (lastCompleted === yestStr) {
     streak += 1;
   } else if (lastCompleted) {
-    let freezes = getUserFreezes(userName);
+    let freezes = getUserItemCount(userName, "Zmrazeni");
     if (freezes > 0) {
-      freezes -= 1;
-      localStorage.setItem(`freeze_${uKey}`, freezes);
-      if (appData && appData.users) {
-        const u = appData.users.find(x => x.name.toLowerCase().trim() === uKey);
-        if (u) u.freezes = freezes;
-      }
-      syncEconomyToCloud(userName, getUserCoins(userName), freezes);
       streak += 1;
-      alert("🧊 Tvoje série byla zachráněna pomocí zmrazení, které jsi koupil v obchodě!");
+      alert("🧊 Tvoje série byla zachráněna pomocí zmrazení!");
     } else {
       streak = 1;
     }
@@ -269,7 +250,7 @@ function sendTimeHeartbeatToGoogle() {
   } catch(e) {}
 }
 
-// --- VÝSLOVNOST (TTS) ---
+// --- VÝSLOVNOST (TTS) S PŘESNÝM SMĚROVÁNÍM NA iOS ---
 let isAutoTTS = localStorage.getItem("auto_tts") !== "false";
 let cachedVoices = [];
 
@@ -324,10 +305,10 @@ function speakWord(text, subjectName) {
         const isTarget = v => (v.lang || '').toLowerCase().replace('_', '-') === targetLang.toLowerCase() ||
                               (v.lang || '').toLowerCase().replace('_', '-').startsWith(langPrefix);
 
-        // 1. Agresivní hledání prémiových hlasů
+        // 1. Prémiové hlasy
         let match = voices.find(v => isTarget(v) && /(enhanced|premium|natural|pro)/i.test(v.name));
 
-        // 2. Tvrdě vyjmenované kvalitní hlasy Applu
+        // 2. Vyjmenované nejlepší hlasy pro iOS
         if (!match) {
             let bestNames = [];
             if (targetLang === 'en-GB') bestNames = ['daniel', 'oliver', 'serena', 'stephanie', 'arthur', 'martha', 'kate'];
@@ -341,18 +322,17 @@ function speakWord(text, subjectName) {
             }
         }
 
-        // 3. Fallback na Siri (zní lépe než Compact)
+        // 3. Hlasy Siri
         if (!match) match = voices.find(v => isTarget(v) && /siri/i.test(v.name));
         
-        // 4. Cokoliv, co NENÍ "compact" (plechový hlas)
+        // 4. Vyřazení compact plechových hlasů
         if (!match) match = voices.find(v => isTarget(v) && !/compact/i.test(v.name));
         
-        // 5. Poslední záchrana
+        // 5. Základní shoda
         if (!match) match = voices.find(isTarget);
 
         if (match) {
           u.voice = match;
-          // KRITICKÝ TRIK PRO iOS: Sladit jazyk požadavku přesně s jazykem hlasu
           u.lang = match.lang; 
         }
       }
@@ -368,27 +348,6 @@ function speakWord(text, subjectName) {
     } else {
       playVoice();
     }
-  }, 40);
-}
-
-    if (voices && voices.length > 0) {
-      const isTarget = v => (v.lang || '').toLowerCase().replace('_', '-') === targetLang.toLowerCase() ||
-                            (v.lang || '').toLowerCase().replace('_', '-').startsWith(langPrefix);
-
-      // 1. Priorita: Stažený hlas vysoké kvality (Enhanced / Premium)
-      let match = voices.find(v => isTarget(v) && /enhanced|premium|natural/i.test(v.name));
-
-      // 2. Priorita: Doporučené britské hlasy (Daniel, Oliver, Serena, Stephanie)
-      if (!match && targetLang === 'en-GB') {
-        match = voices.find(v => isTarget(v) && /daniel|oliver|serena|stephanie|george/i.test(v.name));
-      }
-
-      // 3. Fallback: Jakýkoliv hlas pro daný jazyk
-      if (!match) match = voices.find(isTarget);
-
-      if (match) u.voice = match;
-    }
-    window.speechSynthesis.speak(u);
   }, 40);
 }
 
@@ -448,10 +407,14 @@ async function syncData() {
       if (statusEl) statusEl.innerText = `OK: ${appData.items.length} úloh`;
 
       if (currentUser && appData.users) {
-        const foundU = appData.users.find(u => u.name.toLowerCase() === currentUser.name.toLowerCase());
+        const foundU = appData.users.find(u => u.name.toLowerCase().trim() === currentUser.name.toLowerCase().trim());
         if (foundU) {
           currentUser.targetMinutes = foundU.targetMinutes || 15;
           currentUser.grade = parseInt(foundU.grade) || 2;
+          currentUser.coins = Number(foundU.coins || 0);
+          currentUser.inventory = foundU.inventory || {};
+          currentUser.startLevels = foundU.startLevels || {};
+          
           if (foundU.todayMinutes !== undefined) {
             const cloudSec = Math.round(Number(foundU.todayMinutes) * 60);
             if (cloudSec > todaySecondsStudied) {
@@ -532,7 +495,8 @@ function selectUser(name, grade, targetMinutes) {
     targetMinutes: parseInt(targetMinutes) || 15, 
     stars: 0,
     startLevels: (foundU && foundU.startLevels) ? foundU.startLevels : {},
-    inventory: (foundU && foundU.inventory) ? foundU.inventory : {}
+    inventory: (foundU && foundU.inventory) ? foundU.inventory : {},
+    coins: foundU ? Number(foundU.coins || 0) : 0
   };
   localStorage.setItem("cur_user", JSON.stringify(currentUser));
 
@@ -574,13 +538,6 @@ function chooseGroup(groupName) {
   setScreen("SELECT_GAME");
 }
 
-function toggleTestingDirection() {
-  testingDirection = (testingDirection === "DIR_OUT") ? "DIR_IN" : "DIR_OUT";
-  localStorage.setItem("testing_dir", testingDirection);
-  if (typeof initGameState === "function") initGameState();
-  renderScreen();
-}
-
 function openSequenceMenu() {
   const sItems = getSeqItems();
   if (sItems.length === 1) {
@@ -590,6 +547,14 @@ function openSequenceMenu() {
     setScreen('SELECT_SEQ_ITEM');
   }
 }
+
+function toggleTestingDirection() {
+  testingDirection = (testingDirection === "DIR_OUT") ? "DIR_IN" : "DIR_OUT";
+  localStorage.setItem("testing_dir", testingDirection);
+  if (typeof initGameState === "function") initGameState();
+  renderScreen();
+}
+
 // --- HLAVNÍ RENDERÉR OBRAZOVEK ---
 function renderScreen() {
   updateFooter(); updateStudyTimerUI(); updateTTSBtnUI();
@@ -599,7 +564,7 @@ function renderScreen() {
   const bGroup = document.getElementById("badge-group");
   bUser.innerText = currentUser ? currentUser.name : "Uživatel";
 
-  // 1. VÝBĚR UŽIVATELE (CLOUDOVÝ STREAK A ČAS)
+  // 1. VÝBĚR UŽIVATELE
   if (currentScreen === "SELECT_USER" || !currentUser) {
     bSubj.style.display = "none"; bGroup.style.display = "none";
     const uList = appData.users || [];
@@ -696,7 +661,7 @@ function renderScreen() {
     `;
   }
 
-  // 5. KAMPAŇ HUB (ČISTÝ STAV BEZ ROLETKY - ŘÍZENO TABULKOU)
+  // 5. KAMPAŇ HUB (BEZ ROLETKY, ŘÍZENO TABULKOU)
   else if (currentScreen === "CAMPAIGN_HUB") {
     bSubj.style.display = "flex"; 
     bSubj.innerText = selectedSubject; 
@@ -718,11 +683,11 @@ function renderScreen() {
       }
     }
 
-    // 2. Najdeme první nedokončený level (všechny pod nastaveným startem přeskočíme)
+    // 2. Najdeme první nedokončený level (od nastaveného startu výše)
     let currentLesson = lessons[0] || "Level 1";
     for (let l of lessons) {
       let num = parseInt(l.replace(/\D/g, '')) || 1;
-      if (num < userMinLvl) continue; // Přeskočí nižší levely podle tabulky!
+      if (num < userMinLvl) continue;
 
       let lItems = vItems.filter(it => it.lesson === l);
       let pct = getGroupMasteryPercent(lItems, selectedSubject);
@@ -806,7 +771,7 @@ function renderScreen() {
     main.innerHTML = html;
   }
 
-  // PŘIDÁNA NOVÁ OBRAZOVKA PRO VÝBĚR ŘADY
+  // 7. VÝBĚR ŘADY (MEZIKROK POKUD JE ŘAD VÍCE)
   else if (currentScreen === "SELECT_SEQ_ITEM") {
     bGroup.style.display = "flex"; bGroup.innerText = selectedGroupKey;
     const sItems = getSeqItems();
@@ -823,7 +788,7 @@ function renderScreen() {
     `;
   }
 
-  // 7. VELIKOST PEXESA
+  // 8. VELIKOST PEXESA
   else if (currentScreen === "SELECT_PEXESO_SIZE") {
     bGroup.style.display = "flex"; bGroup.innerText = selectedGroupKey;
     main.innerHTML = `
@@ -837,7 +802,7 @@ function renderScreen() {
     `;
   }
 
-  // 8. AKTIVNÍ HRA
+  // 9. AKTIVNÍ HRA
   else if (currentScreen === "PLAYING") {
     bSubj.style.display = "flex"; bSubj.innerText = selectedSubject;
     bGroup.style.display = "flex"; bGroup.innerText = selectedGroupKey;
