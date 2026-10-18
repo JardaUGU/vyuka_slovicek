@@ -556,7 +556,8 @@ function renderActiveGame() {
 
     if (arcadeState === "GAMEOVER") {
       if (isCampaignMinigame) {
-          let bonusCoins = Math.floor(arcadeScore / 5);
+          // ZDE JE OPRAVA: Děleno 10 místo 5
+          let bonusCoins = Math.floor(arcadeScore / 10); 
           main.innerHTML = `
             <div style="text-align:center;padding:35px;">
               <h2 style="color:var(--col-green);font-size:28px;">TRÉNINK DOKONČEN! 🎉</h2>
@@ -867,19 +868,24 @@ function startCampaign() {
        const isOut = task.type === 'QUIZ_OUT';
        const correctAns = isOut ? task.data.question : cleanCzechTranslation(task.data.answer);
        
+       // Bereme POUZE slova z aktuální a starších lekcí
        let localItems = [...currentVItems, ...olderVItems];
        let pool = [...new Set(localItems.map(i => isOut ? i.question : cleanCzechTranslation(i.answer)))].filter(ans => ans !== correctAns);
        
-       if (pool.length < 3) {
-           let extra = [...new Set(allVItems.map(i => isOut ? i.question : cleanCzechTranslation(i.answer)))].filter(ans => ans !== correctAns && !pool.includes(ans));
-           extra.sort((a, b) => Math.abs(a.length - correctAns.length) - Math.abs(b.length - correctAns.length));
-           pool.push(...extra.slice(0, 3));
+       // Pokud je známých slov málo (např. v Levelu 1), tak je prostě zopakujeme
+       if (pool.length > 0) {
+           while (pool.length < 3) {
+               pool.push(pool[Math.floor(Math.random() * pool.length)]);
+           }
+       } else {
+           pool = ["...", "...", "..."]; // Bezpečnostní pojistka
        }
        
        pool.sort(() => Math.random() - 0.5);
        task.opts = [correctAns, ...pool.slice(0, 3)].sort(() => Math.random() - 0.5);
        task.correctAns = correctAns;
        task.prompt = isOut ? cleanCzechTranslation(task.data.answer) : task.data.question;
+
     } else if (task.type === 'SCRAMBLE') {
        const raw = task.data.question.trim();
        const isWordMode = (raw.split(/\s+/).length >= 3 || raw.length > 15);
