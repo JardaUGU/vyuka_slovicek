@@ -894,6 +894,7 @@ function startCampaign() {
        task.tiles = tokens.map((t, i) => ({ text: t, used: false, id: i })).sort(() => Math.random() - 0.5);
        task.placed = [];
        task.isWordMode = isWordMode;
+       task.hadMistake = false; // <--- OPRAVA: Přidáno sledování bezchybnosti
     } else if (task.type === 'KVIZ') {
        task.opts = task.data.options;
        task.correctAns = task.data.answer;
@@ -940,10 +941,23 @@ function clickCmpScrambleTile(idx) {
 
   if (tile.text === task.tokens[task.placed.length]) {
     sndOk(); tile.used = true; task.placed.push(tile.text);
-    if (task.placed.length === task.tokens.length) { cmpState = 'EVAL'; if (isAutoTTS) speakWord(task.data.question, selectedSubject); }
+    if (task.placed.length === task.tokens.length) { 
+      cmpState = 'EVAL'; 
+      if (isAutoTTS) speakWord(task.data.question, selectedSubject); 
+      
+      // OPRAVA: Pokud dítě složilo větu napoprvé bez chyby, získá trvalé hvězdy!
+      if (!task.hadMistake) {
+        const mIn = getSavedMastery(task.data.question, 'DIR_IN');
+        const mOut = getSavedMastery(task.data.question, 'DIR_OUT');
+        if (mIn < 2) saveWordMasteryToGoogle(task.data.question, mIn + 1, 'DIR_IN');
+        if (mOut < 2) saveWordMasteryToGoogle(task.data.question, mOut + 1, 'DIR_OUT');
+      }
+    }
   } else {
     sndErr(); cmpHearts = Math.max(0, cmpHearts - 1);
-    let newTask = { type: 'SCRAMBLE', data: task.data, tokens: task.tokens, isWordMode: task.isWordMode };
+    task.hadMistake = true; // Zaznamenáme chybu, takže za tento pokus už hvězdu nedostane
+    
+    let newTask = { type: 'SCRAMBLE', data: task.data, tokens: task.tokens, isWordMode: task.isWordMode, hadMistake: false };
     newTask.tiles = task.tokens.map((t, i) => ({ text: t, used: false, id: i })).sort(() => Math.random() - 0.5);
     newTask.placed = []; cmpQueue.push(newTask);
   }
