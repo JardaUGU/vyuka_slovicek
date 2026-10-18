@@ -2,7 +2,13 @@
  * HERNÍ REŽIMY: KARTY, ZKOUŠENÍ, SKLÁDÁNÍ, ARKÁDA, PEXESO, KVÍZ, ŘADA NA ČAS, KAMPAŇ (SPIRÁLA)
  */
 
-// Pomocná funkce pro zvýraznění textu mezi hvězdičkami: *slovo* -> žlutě a podtrženě
+let isCampaignMinigame = false;
+let campaignMinigameCoins = 0;
+let campaignMinigamePool = [];
+let arcadeMode = "";
+let arcadeCurrentOptions = [];
+let qActiveList = [];
+
 function formatPromptText(text) {
   if (!text) return "";
   return text.replace(/\*([^*]+)\*/g, '<b style="color:var(--col-yellow);text-decoration:underline;">$1</b>');
@@ -12,16 +18,13 @@ function formatPromptText(text) {
 // 1. OVLÁDÁNÍ KARET (DALŠÍ / PŘEDCHOZÍ / ZVUK)
 // ==========================================
 let vCardIdx = 0;
-let qActiveList = [];
 
 function vCardNext() {
   const vItems = getVocabItems();
   if (vItems.length === 0) return;
   vCardIdx = (vCardIdx + 1) % vItems.length;
   renderActiveGame();
-  if (isAutoTTS && vItems.length > 0) {
-    speakWord(vItems[vCardIdx].question, selectedSubject);
-  }
+  if (isAutoTTS && vItems.length > 0) speakWord(vItems[vCardIdx].question, selectedSubject);
 }
 
 function vCardPrev() {
@@ -29,26 +32,21 @@ function vCardPrev() {
   if (vItems.length === 0) return;
   vCardIdx = (vCardIdx + vItems.length - 1) % vItems.length;
   renderActiveGame();
-  if (isAutoTTS && vItems.length > 0) {
-    speakWord(vItems[vCardIdx].question, selectedSubject);
-  }
+  if (isAutoTTS && vItems.length > 0) speakWord(vItems[vCardIdx].question, selectedSubject);
 }
 
 function speakCurrentCard() {
   const vItems = getVocabItems();
-  if (vItems[vCardIdx]) {
-    speakWord(vItems[vCardIdx].question, selectedSubject);
-  }
+  if (vItems[vCardIdx]) speakWord(vItems[vCardIdx].question, selectedSubject);
 }
 
 // ==========================================
-// 2. ZKOUŠENÍ Z HLAVY (LEITNER + VÝSLOVNOST + BARGRAF)
+// 2. ZKOUŠENÍ Z HLAVY
 // ==========================================
 let vMastery = {}, vActivePool = 3, vCurrentWord = 0, vLastWord = -1, vQuizRevealed = false;
 let scrambleDeck = [], scramblePlaced = [], scrambleTiles = [], scrambleIsWordMode = false, scrambleHadMistake = false, scrambleDone = false, scrambleSolvedCount = 0;
 let pexesoPairCount = 4, pexesoCards = [], pexesoFlipped = [], pexesoMatched = [], pexesoLocked = false, pexesoAttempts = 0;
 let qCurStep = 0, qAnswered = false, qChosenOpt = null;
-
 let seqTargetIdx = 0, seqSlots = [], seqStartTime = 0, seqTimerInterval = null, seqHintActive = false, seqInactivityTimer = null;
 
 function initGameState() {
@@ -63,27 +61,19 @@ function initGameState() {
       vMastery[i] = m; if (m >= 2) masteredCount++;
     });
     vActivePool = Math.min(vItems.length, Math.max(getAdaptiveWindowSize(currentUser ? currentUser.grade : 2), masteredCount + 3));
-    vLastWord = -1;
-    vCardIdx = 0;
+    vLastWord = -1; vCardIdx = 0;
 
-    if (selectedGame === "CARDS") {
-      if (isAutoTTS) speakWord(vItems[0].question, selectedSubject);
-    }
+    if (selectedGame === "CARDS" && isAutoTTS) speakWord(vItems[0].question, selectedSubject);
     if (selectedGame === "ADAPTIVE") pickNextAdaptiveWord();
     if (selectedGame === "SCRAMBLE") { scrambleDeck = []; scrambleSolvedCount = 0; initScramble(); }
   }
 
   if (selectedGame === "QUIZ" && qItems.length > 0) {
-    // Vezme všechny kvízy, zamíchá je a vybere maximálně 10
     qActiveList = [...qItems].sort(() => Math.random() - 0.5).slice(0, 10);
-    qCurStep = 0;
-    qAnswered = false;
-    qChosenOpt = null;
+    qCurStep = 0; qAnswered = false; qChosenOpt = null;
   }
 
-  if (selectedGame === "SEQ" && sItems.length > 0) {
-    initSequence();
-  }
+  if (selectedGame === "SEQ" && sItems.length > 0) initSequence();
 }
 
 function getMasteryStats() {
@@ -130,17 +120,12 @@ function pickNextAdaptiveWord() {
 function revealAdaptiveQuiz() {
   vQuizRevealed = true;
   renderActiveGame();
-  if (isAutoTTS && vCurrentWord !== -1) {
-    const vItems = getVocabItems();
-    speakWord(vItems[vCurrentWord].question, selectedSubject);
-  }
+  if (isAutoTTS && vCurrentWord !== -1) speakWord(getVocabItems()[vCurrentWord].question, selectedSubject);
 }
 
 function speakAdaptiveCurrent() {
   const vItems = getVocabItems();
-  if (vItems[vCurrentWord]) {
-    speakWord(vItems[vCurrentWord].question, selectedSubject);
-  }
+  if (vItems[vCurrentWord]) speakWord(vItems[vCurrentWord].question, selectedSubject);
 }
 
 function answerAdaptive(known) {
@@ -189,19 +174,16 @@ function clickScrambleTile(idx) {
   if (item.text === target[scramblePlaced.length]) {
     sndOk(); item.used = true; scramblePlaced.push(item.text);
     if (scramblePlaced.length === target.length) {
-      scrambleDone = true;
-      scrambleSolvedCount++;
+      scrambleDone = true; scrambleSolvedCount++;
       if (!scrambleHadMistake) { addReward(1, selectedGroupKey); sndFanfare(); }
       if (isAutoTTS) speakWord(w.question, selectedSubject);
     }
-  } else {
-    sndErr(); scrambleHadMistake = true;
-  }
+  } else { sndErr(); scrambleHadMistake = true; }
   renderActiveGame();
 }
 
 // ==========================================
-// 4. ARKÁDA PADAJÍCÍ SLOVA
+// 4. ARKÁDA PADAJÍCÍ SLOVA (S PODPOROU KAMPANĚ)
 // ==========================================
 let arcadeDeck = [], arcadeCurrent = null, arcadeLives = 3, arcadeScore = 0, arcadeLevel = 1, arcadeY = 0, arcadeX = 50, arcadeSpeed = 0.8, arcadeAnimId = null, arcadeState = "PLAYING";
 
@@ -211,8 +193,11 @@ function stopArcadeLoop() {
 
 function startArcadeGame() {
   stopArcadeLoop();
+  isCampaignMinigame = false;
   const vItems = getVocabItems();
   const mode = getQuickChoiceMode();
+  arcadeMode = "CLASSIC_" + mode;
+  
   arcadeDeck = vItems.filter(it => {
     if (mode === "DER_DIE_DAS") return /^(der|die|das)\s/i.test(it.question);
     if (mode === "A_AN") return /^(a|an)\s/i.test(it.question);
@@ -227,16 +212,43 @@ function startArcadeGame() {
   spawnArcadeWord();
 }
 
+function startCampaignArcade(mode) {
+  stopArcadeLoop();
+  arcadeMode = mode;
+  
+  if (mode === "ARTICLES") {
+      arcadeDeck = campaignMinigamePool.filter(it => /^(der|die|das)\s/i.test(it.question));
+  } else {
+      arcadeDeck = [...campaignMinigamePool];
+  }
+  arcadeDeck.sort(() => Math.random() - 0.5);
+  
+  arcadeLives = 3; arcadeScore = 0; arcadeLevel = 1; arcadeSpeed = 0.8; arcadeState = "PLAYING";
+  selectedGame = "ARCADE";
+  setScreen("PLAYING");
+  spawnArcadeWord();
+}
+
 function spawnArcadeWord() {
   if (arcadeLives <= 0) { arcadeState = "GAMEOVER"; stopArcadeLoop(); renderActiveGame(); return; }
   if (arcadeDeck.length === 0) {
-    const vItems = getVocabItems();
-    arcadeDeck = [...vItems].sort(() => Math.random() - 0.5);
+      if (isCampaignMinigame) {
+          arcadeDeck = [...campaignMinigamePool].sort(() => Math.random() - 0.5);
+          if (arcadeMode === "ARTICLES") arcadeDeck = arcadeDeck.filter(it => /^(der|die|das)\s/i.test(it.question));
+      } else {
+          arcadeDeck = [...getVocabItems()].sort(() => Math.random() - 0.5);
+      }
   }
   arcadeCurrent = arcadeDeck.pop();
   arcadeY = 5;
   arcadeX = Math.floor(Math.random() * 64) + 18;
   arcadeState = "PLAYING";
+
+  if (arcadeMode === "TRANSLATE") {
+      let others = campaignMinigamePool.filter(it => it.question !== arcadeCurrent.question && cleanCzechTranslation(it.answer) !== cleanCzechTranslation(arcadeCurrent.answer)).sort(()=>Math.random()-0.5).slice(0,2);
+      arcadeCurrentOptions = [arcadeCurrent.question, ...others.map(o=>o.question)].sort(()=>Math.random()-0.5);
+  }
+
   renderActiveGame();
   runArcadeLoop();
 }
@@ -262,13 +274,19 @@ function runArcadeLoop() {
 
 function clickArcadeChoice(choice) {
   if (arcadeState !== "PLAYING" || !arcadeCurrent) return;
-  const mode = getQuickChoiceMode();
+  
   let isCorrect = false;
-  if (mode === "DER_DIE_DAS" || mode === "A_AN") isCorrect = arcadeCurrent.question.toLowerCase().startsWith(choice.toLowerCase() + " ");
-  if (mode === "I_Y") isCorrect = arcadeCurrent.answer.trim().toLowerCase() === choice.toLowerCase();
+  if (arcadeMode === "TRANSLATE") {
+      isCorrect = (choice === arcadeCurrent.question);
+  } else if (arcadeMode === "ARTICLES" || arcadeMode.includes("DER_DIE_DAS") || arcadeMode.includes("A_AN")) {
+      isCorrect = arcadeCurrent.question.toLowerCase().startsWith(choice.toLowerCase() + " ");
+  } else if (arcadeMode.includes("I_Y")) {
+      isCorrect = arcadeCurrent.answer.trim().toLowerCase() === choice.toLowerCase();
+  }
 
   if (isCorrect) {
-    arcadeState = "HIT"; stopArcadeLoop(); sndOk(); arcadeScore++; addReward(1, "Padající slova");
+    arcadeState = "HIT"; stopArcadeLoop(); sndOk(); arcadeScore++; 
+    if (!isCampaignMinigame) addReward(1, "Padající slova");
     if (arcadeScore % 7 === 0) { arcadeLevel++; arcadeSpeed += 0.35; sndFanfare(); }
     const el = document.getElementById("arcade-falling-elem");
     if (el) el.classList.add("hit");
@@ -284,7 +302,13 @@ function handleArcadeMiss() {
   if (el) {
     el.classList.add("miss");
     const m = el.querySelector(".falling-main-word");
-    if (m) m.innerText = arcadeCurrent.question;
+    if (m) {
+        if (arcadeMode === "TRANSLATE") {
+            m.innerText = arcadeCurrent.question; // V překladu ukáže správné cizí slovo
+        } else {
+            m.innerText = arcadeCurrent.question;
+        }
+    }
   }
   if (isAutoTTS) speakWord(arcadeCurrent.question, selectedSubject);
   setTimeout(spawnArcadeWord, 1400);
@@ -294,12 +318,24 @@ function handleArcadeMiss() {
 // 5. PEXESO
 // ==========================================
 function startPexesoGame(pairCount) {
+  isCampaignMinigame = false;
   pexesoPairCount = pairCount; selectedGame = "PEXESO";
   const vItems = getVocabItems();
   const count = Math.min(pexesoPairCount, vItems.length);
   const shuffled = [...vItems].sort(() => Math.random() - 0.5).slice(0, count);
+  initPexesoBoard(shuffled);
+}
+
+function startCampaignPexeso() {
+  pexesoPairCount = 6; // Pro kampaň pevně 12 karet
+  selectedGame = "PEXESO";
+  let shuffled = campaignMinigamePool.sort(() => Math.random() - 0.5).slice(0, pexesoPairCount);
+  initPexesoBoard(shuffled);
+}
+
+function initPexesoBoard(words) {
   pexesoCards = [];
-  shuffled.forEach((w, idx) => {
+  words.forEach((w, idx) => {
     pexesoCards.push({ wordIdx: idx, text: w.question, isForeign: true });
     pexesoCards.push({ wordIdx: idx, text: cleanCzechTranslation(w.answer), isForeign: false });
   });
@@ -318,8 +354,9 @@ function clickPexesoCard(idx) {
     const [c1, c2] = [pexesoCards[pexesoFlipped[0]], pexesoCards[pexesoFlipped[1]]];
     if (c1.wordIdx === c2.wordIdx) {
       sndOk(); pexesoMatched.push(c1.wordIdx); pexesoFlipped = [];
-      if (pexesoMatched.length === Math.min(pexesoPairCount, getVocabItems().length)) {
-        sndFanfare(); addReward(2, selectedGroupKey);
+      if (pexesoMatched.length === (pexesoCards.length / 2)) {
+        sndFanfare(); 
+        if (!isCampaignMinigame) addReward(2, selectedGroupKey);
       }
       renderActiveGame();
     } else {
@@ -330,45 +367,20 @@ function clickPexesoCard(idx) {
 }
 
 // ==========================================
-// 6. KVÍZ (ČTENÍ CELÉ VĚTY + SPRÁVNÁ VOLBA)
+// 6. KVÍZ
 // ==========================================
 function clickQuizOpt(optIdx) {
   if (qAnswered) return;
-  const qItems = getQuizItems();
-  const q = qItems[qCurStep];
+  const q = qActiveList[qCurStep];
   const chosen = q.options[optIdx];
-  qAnswered = true;
-  qChosenOpt = chosen;
+  qAnswered = true; qChosenOpt = chosen;
 
-  if (chosen === q.answer) {
-    sndOk();
-    addReward(1, selectedGroupKey);
-  } else {
-    sndErr();
-  }
-
-  // U cizích jazyků přečte celou správně zkompletovanou větu
-  const targetLang = getTargetLang(selectedSubject);
-  if (targetLang !== 'cs-CZ') {
-    let toRead = q.question;
-    if (toRead.includes('___')) {
-      toRead = toRead.replace(/___+/g, q.answer);
-    } else {
-      toRead = toRead + ". " + q.answer;
-    }
-    toRead = toRead.replace(/[*_]/g, '');
-    speakWord(toRead, selectedSubject);
-  }
-
+  if (chosen === q.answer) { sndOk(); addReward(1, selectedGroupKey); } else sndErr();
   renderActiveGame();
 }
 
 function nextQuizStep() {
-  const qItems = getQuizItems();
-  qCurStep++;
-  qAnswered = false;
-  qChosenOpt = null;
-  renderActiveGame();
+  qCurStep++; qAnswered = false; qChosenOpt = null; renderActiveGame();
 }
 
 // ==========================================
@@ -376,10 +388,7 @@ function nextQuizStep() {
 // ==========================================
 function resetInactivityTimer() {
   if (seqInactivityTimer) clearTimeout(seqInactivityTimer);
-  seqInactivityTimer = setTimeout(() => {
-    seqHintActive = true;
-    renderActiveGame();
-  }, 3000);
+  seqInactivityTimer = setTimeout(() => { seqHintActive = true; renderActiveGame(); }, 3000);
 }
 
 function initSequence() {
@@ -387,11 +396,8 @@ function initSequence() {
   if (sItems.length === 0) return;
   const itemsList = sItems[0].answer.split('|').map(s => s.trim()).filter(Boolean);
 
-  seqTargetIdx = 0;
-  seqHintActive = false;
-  seqSlots = [-1, -1, -1, -1];
-  seqSlots[0] = 0;
-  if (itemsList.length > 1) seqSlots[1] = 1;
+  seqTargetIdx = 0; seqHintActive = false; seqSlots = [-1, -1, -1, -1];
+  seqSlots[0] = 0; if (itemsList.length > 1) seqSlots[1] = 1;
   for (let s = 2; s < Math.min(4, itemsList.length); s++) seqSlots[s] = s;
   seqSlots.sort(() => Math.random() - 0.5);
 
@@ -399,11 +405,8 @@ function initSequence() {
   if (seqTimerInterval) clearInterval(seqTimerInterval);
   seqTimerInterval = setInterval(() => {
     const el = document.getElementById("seq-timer");
-    if (el && seqTargetIdx < itemsList.length) {
-      el.innerText = ((Date.now() - seqStartTime) / 1000).toFixed(1) + " s";
-    }
+    if (el && seqTargetIdx < itemsList.length) el.innerText = ((Date.now() - seqStartTime) / 1000).toFixed(1) + " s";
   }, 100);
-
   resetInactivityTimer();
 }
 
@@ -413,15 +416,10 @@ function clickSeqSlot(slot) {
   const btnEl = document.getElementById(`seq-btn-${slot}`);
 
   if (seqSlots[slot] === seqTargetIdx) {
-    sndOk();
-    seqTargetIdx++;
-    seqHintActive = false;
-
+    sndOk(); seqTargetIdx++; seqHintActive = false;
     if (seqTargetIdx >= itemsList.length) {
-      clearInterval(seqTimerInterval);
-      if (seqInactivityTimer) clearTimeout(seqInactivityTimer);
-      sndFanfare();
-      addReward(3, selectedGroupKey);
+      clearInterval(seqTimerInterval); if (seqInactivityTimer) clearTimeout(seqInactivityTimer);
+      sndFanfare(); addReward(3, selectedGroupKey);
     } else {
       const next = seqTargetIdx + 1;
       seqSlots[slot] = next < itemsList.length ? next : -1;
@@ -430,17 +428,12 @@ function clickSeqSlot(slot) {
     renderActiveGame();
   } else {
     sndErr();
-    if (btnEl) {
-      btnEl.classList.add("wrong");
-      setTimeout(() => { if (btnEl) btnEl.classList.remove("wrong"); }, 250);
-    }
-    seqHintActive = true;
-    resetInactivityTimer();
-    renderActiveGame();
+    if (btnEl) { btnEl.classList.add("wrong"); setTimeout(() => { if (btnEl) btnEl.classList.remove("wrong"); }, 250); }
+    seqHintActive = true; resetInactivityTimer(); renderActiveGame();
   }
 }
 
-function startGame(game) { stopArcadeLoop(); selectedGame = game; initGameState(); setScreen("PLAYING"); }
+function startGame(game) { stopArcadeLoop(); selectedGame = game; isCampaignMinigame = false; initGameState(); setScreen("PLAYING"); }
 
 // ==========================================
 // 8. HLAVNÍ RENDERÉR VŠECH HER
@@ -449,7 +442,6 @@ function renderActiveGame() {
   const main = document.getElementById("main-content");
   const isHebrew = (selectedSubject || '').toLowerCase().includes('hebr') || selectedSubject === 'HE';
   const vItems = getVocabItems();
-  const qItems = getQuizItems();
   const sItems = getSeqItems();
 
   // KARTY
@@ -556,20 +548,50 @@ function renderActiveGame() {
 
   // ARKÁDA: PADAJÍCÍ SLOVA
   else if (selectedGame === "ARCADE") {
-    const mode = getQuickChoiceMode();
-    let btns = mode === "DER_DIE_DAS" ? ['DER', 'DIE', 'DAS'] : (mode === "A_AN" ? ['A', 'AN'] : ['I / Í', 'Y / Ý']);
+    let btns = [];
+    if (arcadeMode === "TRANSLATE") btns = arcadeCurrentOptions;
+    else if (arcadeMode.includes("DER_DIE_DAS") || arcadeMode === "ARTICLES") btns = ['DER', 'DIE', 'DAS'];
+    else if (arcadeMode.includes("A_AN")) btns = ['A', 'AN'];
+    else btns = ['I / Í', 'Y / Ý'];
+
     if (arcadeState === "GAMEOVER") {
-      main.innerHTML = `
-        <div style="text-align:center;padding:35px;">
-          <h2 style="color:var(--col-red);font-size:28px;">KONEC HRY! 💔</h2>
-          <p style="font-size:20px;color:#fff;margin:10px 0;">Sestřeleno: <b>${arcadeScore} slov</b> (LVL ${arcadeLevel})</p>
-          <div class="action-btn green" onclick="startArcadeGame()">HRÁT ZNOVU ➔</div>
-          <div class="action-btn" onclick="setScreen('SELECT_GAME')">ZPĚT</div>
-        </div>
-      `;
+      if (isCampaignMinigame) {
+          let bonusCoins = Math.floor(arcadeScore / 5);
+          main.innerHTML = `
+            <div style="text-align:center;padding:35px;">
+              <h2 style="color:var(--col-green);font-size:28px;">TRÉNINK DOKONČEN! 🎉</h2>
+              <p style="font-size:20px;color:#fff;margin:10px 0;">Sestřeleno: <b>${arcadeScore} slov</b> (Bonus: +${bonusCoins} 💰)</p>
+              <p style="font-size:24px;color:var(--col-yellow);margin-bottom:25px;">Celkem získáváš: +${campaignMinigameCoins + bonusCoins} 💰</p>
+              <div class="action-btn green" onclick="finishCampaign(${campaignMinigameCoins + bonusCoins})">PŘIPSAT ZLAŤÁKY A ZPĚT</div>
+            </div>
+          `;
+      } else {
+          main.innerHTML = `
+            <div style="text-align:center;padding:35px;">
+              <h2 style="color:var(--col-red);font-size:28px;">KONEC HRY! 💔</h2>
+              <p style="font-size:20px;color:#fff;margin:10px 0;">Sestřeleno: <b>${arcadeScore} slov</b> (LVL ${arcadeLevel})</p>
+              <div class="action-btn green" onclick="startArcadeGame()">HRÁT ZNOVU ➔</div>
+              <div class="action-btn" onclick="setScreen('SELECT_GAME')">ZPĚT</div>
+            </div>
+          `;
+      }
       return;
     }
-    let disp = arcadeCurrent ? arcadeCurrent.question.replace(/^(der|die|das|a|an)\s+/i, '') : "";
+
+    let disp = "";
+    let subDisp = "";
+    if (arcadeCurrent) {
+        if (arcadeMode === "TRANSLATE") {
+            disp = cleanCzechTranslation(arcadeCurrent.answer);
+        } else if (arcadeMode.includes("DER_DIE_DAS") || arcadeMode === "ARTICLES" || arcadeMode.includes("A_AN")) {
+            disp = arcadeCurrent.question.replace(/^(der|die|das|a|an)\s+/i, '');
+            subDisp = cleanCzechTranslation(arcadeCurrent.answer);
+        } else {
+            disp = arcadeCurrent.question;
+            subDisp = cleanCzechTranslation(arcadeCurrent.answer);
+        }
+    }
+
     main.innerHTML = `
       <div class="arcade-arena">
         <div class="arcade-top-bar">
@@ -581,43 +603,23 @@ function renderActiveGame() {
           ${arcadeCurrent ? `
             <div id="arcade-falling-elem" class="falling-item" style="top:${arcadeY}px; left:${arcadeX}%;">
               <div class="falling-main-word">${disp}</div>
-              <div class="falling-sub-word">${cleanCzechTranslation(arcadeCurrent.answer)}</div>
+              ${subDisp ? `<div class="falling-sub-word">${subDisp}</div>` : ''}
             </div>
           ` : ''}
           <div class="arcade-danger-line"></div>
         </div>
-        <div class="arcade-bottom-bar">
-          ${btns.map(b => `<div class="arcade-btn" onclick="clickArcadeChoice('${b}')">${b}</div>`).join('')}
+        <div class="arcade-bottom-bar" style="${arcadeMode==='TRANSLATE'?'flex-wrap:wrap;justify-content:center;':''}">
+          ${btns.map(b => `<div class="arcade-btn" style="${arcadeMode==='TRANSLATE'?'font-size:16px;min-width:30%;padding:10px 5px;height:auto;margin:2px;':''}" onclick="clickArcadeChoice('${b.replace(/'/g,"\\'")}')">${b}</div>`).join('')}
         </div>
       </div>
-    `;
-  }
-
-  // PROCEDURÁLNÍ MATEMATIKA
-  else if (selectedGame === "PROCEDURAL_MATH") {
-    const isAns = mathChosenAnswer !== null;
-    main.innerHTML = `
-      <div class="bargraph-container">
-        <div class="bargraph-header">
-          <span>Série správně: ${mathStreak} 🔥</span>
-          <span style="color:var(--col-active-tab);">${selectedGroupKey}</span>
-        </div>
-        <div class="bargraph-track"><div class="bargraph-fill" style="width:${Math.min(100, mathStreak * 10)}%;"></div></div>
-      </div>
-      <div class="prompt-box" style="font-size:36px;color:#fff;margin:20px 0;">${mathTask.q}</div>
-      <div class="grid-2">
-        ${mathTask.opts.map(opt => `
-          <div class="opt-btn ${isAns ? (String(opt)===String(mathTask.ans)?'correct':(opt===mathChosenAnswer?'wrong':'')) : ''}" style="height:60px;font-size:26px;font-weight:bold;" onclick="clickMathChoice('${opt}')">${opt}</div>
-        `).join('')}
-      </div>
-      ${isAns ? `<div class="action-btn ${String(mathChosenAnswer)===String(mathTask.ans)?'green':'red'}" onclick="generateMathTask();renderActiveGame();">DALŠÍ PŘÍKLAD ➔</div>` : ''}
     `;
   }
 
   // PEXESO
   else if (selectedGame === "PEXESO") {
-    const isDone = pexesoMatched.length === Math.min(pexesoPairCount, vItems.length);
-    const totalPairs = Math.min(pexesoPairCount, vItems.length);
+    const totalPairs = Math.min(pexesoPairCount, pexesoCards.length / 2);
+    const isDone = pexesoMatched.length === totalPairs;
+    
     main.innerHTML = `
       <div class="bargraph-container">
         <div class="bargraph-header">
@@ -630,8 +632,15 @@ function renderActiveGame() {
         <div class="pexeso-grid" style="grid-template-columns: repeat(4, 1fr);">
           ${pexesoCards.map((c, i) => {
             const m = pexesoMatched.includes(c.wordIdx), f = pexesoFlipped.includes(i);
-            return `<div class="pexeso-card ${m?'matched':(f?'flipped':'hidden')}" onclick="clickPexesoCard(${i})">${m||f?c.text:'❓'}</div>`;
+            return `<div class="pexeso-card ${m?'matched':(f?'flipped':'hidden')}" style="${c.text.length>10?'font-size:12px;':''}" onclick="clickPexesoCard(${i})">${m||f?c.text:'❓'}</div>`;
           }).join('')}
+        </div>
+      ` : (isCampaignMinigame ? `
+        <div style="text-align:center;padding:30px;">
+          <h2 style="color:var(--col-green);">TRÉNINK DOKONČEN! 🎉</h2>
+          <p style="font-size:18px;color:#fff;margin:10px 0;">Pexeso zvládnuto za <b>${pexesoAttempts} pokusů</b>.</p>
+          <p style="font-size:24px;color:var(--col-yellow);margin-bottom:25px;">Celkem získáváš: +${campaignMinigameCoins + (pexesoAttempts <= 12 ? 3 : (pexesoAttempts <= 16 ? 2 : 1))} 💰</p>
+          <div class="action-btn green" onclick="finishCampaign(${campaignMinigameCoins + (pexesoAttempts <= 12 ? 3 : (pexesoAttempts <= 16 ? 2 : 1))})">PŘIPSAT ZLAŤÁKY A ZPĚT</div>
         </div>
       ` : `
         <div style="text-align:center;padding:30px;">
@@ -639,11 +648,11 @@ function renderActiveGame() {
           <div class="action-btn green" onclick="startPexesoGame(pexesoPairCount)">HRÁT ZNOVU</div>
           <div class="action-btn" onclick="setScreen('SELECT_PEXESO_SIZE')">ZMĚNIT VELIKOST</div>
         </div>
-      `}
+      `)}
     `;
   }
 
-// KVÍZ
+  // KVÍZ (Samostatný)
   else if (selectedGame === "QUIZ") {
     if (qActiveList.length === 0) {
       main.innerHTML = `<div style="text-align:center;padding:30px;"><h2>V této lekci není žádný kvíz.</h2><div class="action-btn" onclick="setScreen('SELECT_GAME')">ZPĚT</div></div>`;
@@ -664,7 +673,6 @@ function renderActiveGame() {
     const q = qActiveList[qCurStep];
     const pct = Math.round(((qCurStep + 1) / qActiveList.length) * 100);
 
-    // Do věty se po kliknutí VŽDY doplní pouze SPRÁVNÝ tvar v zelené barvě
     let promptDisplay = formatPromptText(q.question);
     if (qAnswered) {
       const fillHtml = `<span style="color:var(--col-green);font-weight:bold;text-decoration:underline;">${q.answer}</span>`;
@@ -678,7 +686,7 @@ function renderActiveGame() {
     main.innerHTML = `
       <div class="bargraph-container">
         <div class="bargraph-header">
-          <span>Kvíz: Otázka ${qCurStep + 1} z ${qItems.length}</span>
+          <span>Kvíz: Otázka ${qCurStep + 1} z ${qActiveList.length}</span>
           <span style="color:var(--col-active-tab);">${pct} %</span>
         </div>
         <div class="bargraph-track"><div class="bargraph-fill" style="width:${pct}%;"></div></div>
@@ -691,17 +699,10 @@ function renderActiveGame() {
         ${q.options.map((opt, optIdx) => {
           let btnCls = "";
           if (qAnswered) {
-            if (opt === q.answer) {
-              btnCls = "correct";
-            } else if (opt === qChosenOpt) {
-              btnCls = "wrong";
-            }
+            if (opt === q.answer) btnCls = "correct";
+            else if (opt === qChosenOpt) btnCls = "wrong";
           }
-          return `
-            <div class="opt-btn ${btnCls}" onclick="clickQuizOpt(${optIdx})">
-              ${opt}
-            </div>
-          `;
+          return `<div class="opt-btn ${btnCls}" onclick="clickQuizOpt(${optIdx})">${opt}</div>`;
         }).join('')}
       </div>
       ${qAnswered ? `
@@ -710,6 +711,7 @@ function renderActiveGame() {
       ` : ''}
     `;
   }
+
   // ŘADA NA ČAS
   else if (selectedGame === "SEQ") {
     if (sItems.length === 0) return;
@@ -735,31 +737,17 @@ function renderActiveGame() {
         <div class="grid-2">
           ${seqSlots.map((itemIdx, slot) => {
             const isHintSlot = (seqHintActive && itemIdx === seqTargetIdx);
-            return `
-              <div id="seq-btn-${slot}" class="opt-btn ${isHebrew ? 'hebrew' : ''} ${isHintSlot ? 'hint' : ''}" onclick="clickSeqSlot(${slot})">
-                ${itemIdx !== -1 ? itemsList[itemIdx] : ''}
-              </div>
-            `;
+            return `<div id="seq-btn-${slot}" class="opt-btn ${isHebrew ? 'hebrew' : ''} ${isHintSlot ? 'hint' : ''}" onclick="clickSeqSlot(${slot})">${itemIdx !== -1 ? itemsList[itemIdx] : ''}</div>`;
           }).join('')}
         </div>
-      ` : `
-        <div class="action-btn green" onclick="initSequence();renderActiveGame();">DOKONČENO! HRÁT ZNOVU</div>
-      `}
+      ` : `<div class="action-btn green" onclick="initSequence();renderActiveGame();">DOKONČENO! HRÁT ZNOVU</div>`}
     `;
   }
 
   // --- KAMPAŇ (SPIRÁLA) ---
   else if (selectedGame === "CAMPAIGN") {
     if (cmpIdx >= cmpQueue.length) {
-      const coinsEarned = cmpHearts;
-      main.innerHTML = `
-        <div style="text-align:center;padding:30px;">
-          <h2 style="color:var(--col-green);font-size:28px;">TRÉNINK DOKONČEN! 🎉</h2>
-          <p style="font-size:22px;color:#fff;margin:15px 0;">Přežilo: ${"❤️".repeat(cmpHearts)}</p>
-          <p style="font-size:24px;color:var(--col-yellow);margin-bottom:25px;">Získáváš: +${coinsEarned} 💰</p>
-          <div class="action-btn green" onclick="finishCampaign(${coinsEarned})">PŘIPSAT ZLAŤÁKY A ZPĚT</div>
-        </div>
-      `;
+      launchCampaignMinigame(); // Přechod na minihru na konci
       return;
     }
 
@@ -781,7 +769,6 @@ function renderActiveGame() {
       const isEval = cmpState === 'EVAL';
       let promptDisplay = task.prompt;
 
-      // Do věty se po kliknutí VŽDY doplní pouze SPRÁVNÝ tvar v zelené barvě
       if (isEval && task.type === 'KVIZ') {
         const fillHtml = `<span style="color:var(--col-green);font-weight:bold;text-decoration:underline;">${task.correctAns}</span>`;
         if (task.data.question.includes('___')) {
@@ -811,7 +798,7 @@ function renderActiveGame() {
         if (task.data.help) html += `<div style="text-align:center;color:var(--col-yellow);margin:12px 0;font-weight:bold;">[ ${task.data.help} ]</div>`;
         html += `<div class="action-btn green" style="margin-top:15px;" onclick="nextCmpTask()">DALŠÍ ➔</div>`;
       }
-    } 
+    }
     else if (task.type === 'SCRAMBLE') {
       html += `
         <div class="prompt-box">Slož: <b>${cleanCzechTranslation(task.data.answer)}</b></div>
@@ -820,23 +807,18 @@ function renderActiveGame() {
         </div>
       `;
       if (cmpState !== 'EVAL') {
-        html += `
-          <div class="letters-row">
-            ${task.tiles.map((t, i) => `<div class="letter-tile ${task.isWordMode?'word-tile':''} ${isHebrew ? 'hebrew' : ''} ${t.used?'used':''}" onclick="clickCmpScrambleTile(${i})">${t.text}</div>`).join('')}
-          </div>
-        `;
+        html += `<div class="letters-row">${task.tiles.map((t, i) => `<div class="letter-tile ${task.isWordMode?'word-tile':''} ${isHebrew ? 'hebrew' : ''} ${t.used?'used':''}" onclick="clickCmpScrambleTile(${i})">${t.text}</div>`).join('')}</div>`;
       } else {
         if (task.data.help) html += `<div style="text-align:center;color:var(--col-active-tab);font-weight:bold;margin:10px 0;">[ ${task.data.help} ]</div>`;
         html += `<div class="action-btn green" onclick="nextCmpTask()">DALŠÍ ➔</div>`;
       }
     }
-
     main.innerHTML = html;
   }
 }
 
 // ==========================================
-// 9. KAMPAŇ ENGINE (PEDAGOGICKÁ KŘIVKA + TTS + EKONOMIKA)
+// 9. KAMPAŇ ENGINE (PEDAGOGICKÁ KŘIVKA + MINIHRA)
 // ==========================================
 let cmpQueue = [];
 let cmpIdx = 0;
@@ -850,41 +832,40 @@ function startCampaign() {
   let allQItems = getQuizItems();
 
   let lessons = [...new Set(allVItems.map(it => it.lesson))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
-  let currentLesson = lessons[0];
   
-  for (let l of lessons) {
-      let lItems = allVItems.filter(it => it.lesson === l);
-      let pct = getGroupMasteryPercent(lItems, selectedSubject);
-      if (pct < 95) { 
-          currentLesson = l;
-          break;
-      }
+  const subjNorm = selectedSubject.toLowerCase().replace(/[^a-z]/g, "");
+  let userMinLvl = 1;
+  if (currentUser && currentUser.startLevels) {
+    for (let k in currentUser.startLevels) {
+      if (subjNorm.includes(k) || k.includes(subjNorm)) { userMinLvl = Number(currentUser.startLevels[k]) || 1; break; }
+    }
   }
 
-  selectedGroupKey = currentLesson;
+  let autoLesson = lessons[0] || "Level 1";
+  for (let l of lessons) {
+    let num = parseInt(l.replace(/\D/g, '')) || 1;
+    if (num < userMinLvl) continue;
+    let lItems = allVItems.filter(it => it.lesson === l);
+    if (getGroupMasteryPercent(lItems, selectedSubject) < 95) { autoLesson = l; break; }
+  }
 
-  let currentVItems = allVItems.filter(it => it.lesson === currentLesson);
-  let olderVItems = allVItems.filter(it => it.lesson !== currentLesson && it.lesson < currentLesson);
-  let currentQItems = allQItems.filter(it => it.lesson === currentLesson);
+  selectedGroupKey = selectedCampaignLevel || autoLesson;
+  let currentVItems = allVItems.filter(it => it.lesson === selectedGroupKey);
+  let olderVItems = allVItems.filter(it => it.lesson !== selectedGroupKey && (parseInt(it.lesson.replace(/\D/g, ''))||1) < (parseInt(selectedGroupKey.replace(/\D/g, ''))||1));
+  let currentQItems = allQItems.filter(it => it.lesson === selectedGroupKey);
 
-  let qRevision = [];
-  let qNewPassive = [];
-  let qNewActive = [];
-  let qGrammar = [];
-  let qSentences = [];
+  let qRevision = []; let qNewPassive = []; let qNewActive = []; let qGrammar = []; let qSentences = [];
 
   if (olderVItems.length > 0) {
       let shuffledOlder = olderVItems.sort(() => Math.random() - 0.5).slice(0, 5);
       shuffledOlder.forEach(it => {
-          const isSentence = it.question.trim().includes(' ');
-          if (isSentence) qRevision.push({ type: 'SCRAMBLE', data: it });
+          if (it.question.trim().includes(' ')) qRevision.push({ type: 'SCRAMBLE', data: it });
           else qRevision.push({ type: 'QUIZ_IN', data: it });
       });
   }
 
   currentVItems.forEach(it => {
-      const isSentence = it.question.trim().includes(' ') || it.question.trim().includes('-');
-      if (isSentence) {
+      if (it.question.trim().includes(' ') || it.question.trim().includes('-')) {
           qSentences.push({ type: 'SCRAMBLE', data: it });
       } else {
           qNewPassive.push({ type: 'QUIZ_IN', data: it });
@@ -894,14 +875,9 @@ function startCampaign() {
 
   currentQItems.forEach(it => qGrammar.push({ type: 'KVIZ', data: it }));
 
-  qRevision.sort(() => Math.random() - 0.5);
-  qNewPassive.sort(() => Math.random() - 0.5);
-  qNewActive.sort(() => Math.random() - 0.5);
-  qGrammar.sort(() => Math.random() - 0.5);
-  qSentences.sort(() => Math.random() - 0.5);
+  qRevision.sort(() => Math.random() - 0.5); qNewPassive.sort(() => Math.random() - 0.5); qNewActive.sort(() => Math.random() - 0.5); qGrammar.sort(() => Math.random() - 0.5); qSentences.sort(() => Math.random() - 0.5);
 
   q = [...qRevision, ...qNewPassive, ...qNewActive, ...qGrammar, ...qSentences];
-
   if (q.length > 40) q = q.slice(0, 40);
 
   q.forEach(task => {
@@ -909,11 +885,9 @@ function startCampaign() {
        const isOut = task.type === 'QUIZ_OUT';
        const correctAns = isOut ? task.data.question : cleanCzechTranslation(task.data.answer);
        
-       // 1. Zkusíme vzít falešné odpovědi z aktuální a starších lekcí
        let localItems = [...currentVItems, ...olderVItems];
        let pool = [...new Set(localItems.map(i => isOut ? i.question : cleanCzechTranslation(i.answer)))].filter(ans => ans !== correctAns);
        
-       // 2. Pokud je jich málo, doplníme z celého slovníku, ale hledáme PODOBNOU DÉLKU textu!
        if (pool.length < 3) {
            let extra = [...new Set(allVItems.map(i => isOut ? i.question : cleanCzechTranslation(i.answer)))].filter(ans => ans !== correctAns && !pool.includes(ans));
            extra.sort((a, b) => Math.abs(a.length - correctAns.length) - Math.abs(b.length - correctAns.length));
@@ -939,26 +913,15 @@ function startCampaign() {
     }
   });
 
-  cmpQueue = q;
-  cmpIdx = 0;
-  cmpHearts = 5;
-  cmpState = 'PLAYING';
-  cmpChosenOpt = null;
-
-  selectedGame = 'CAMPAIGN';
-  setScreen('PLAYING');
-
-  // OPRAVA 1: Přečte anglické slovo ihned po zobrazení obrazovky (Cizí -> CZ)
-  if (isAutoTTS && cmpQueue[0] && cmpQueue[0].type === 'QUIZ_IN') {
-      speakWord(cmpQueue[0].prompt, selectedSubject);
-  }
+  cmpQueue = q; cmpIdx = 0; cmpHearts = 5; cmpState = 'PLAYING'; cmpChosenOpt = null; isCampaignMinigame = false;
+  selectedGame = 'CAMPAIGN'; setScreen('PLAYING');
+  if (isAutoTTS && cmpQueue[0] && cmpQueue[0].type === 'QUIZ_IN') speakWord(cmpQueue[0].prompt, selectedSubject);
 }
 
 function clickCmpQuizOpt(opt) {
   if (cmpState !== 'PLAYING') return;
   const task = cmpQueue[cmpIdx];
-  cmpChosenOpt = opt;
-  cmpState = 'EVAL';
+  cmpChosenOpt = opt; cmpState = 'EVAL';
 
   if (opt === task.correctAns) {
     sndOk();
@@ -968,19 +931,13 @@ function clickCmpQuizOpt(opt) {
       if (mVal < 2) saveWordMasteryToGoogle(task.data.question, mVal + 1, dir);
     }
   } else {
-    sndErr();
-    cmpHearts = Math.max(0, cmpHearts - 1);
+    sndErr(); cmpHearts = Math.max(0, cmpHearts - 1);
     let newTask = JSON.parse(JSON.stringify(task));
     if (newTask.opts) newTask.opts.sort(() => Math.random() - 0.5);
     cmpQueue.push(newTask);
-    
-    if (task.type === 'QUIZ_OUT' || task.type === 'QUIZ_IN') {
-      const dir = task.type === 'QUIZ_OUT' ? 'DIR_OUT' : 'DIR_IN';
-      saveWordMasteryToGoogle(task.data.question, 0, dir);
-    }
+    if (task.type === 'QUIZ_OUT' || task.type === 'QUIZ_IN') saveWordMasteryToGoogle(task.data.question, 0, task.type === 'QUIZ_OUT' ? 'DIR_OUT' : 'DIR_IN');
   }
 
-  // Po odhalení správné odpovědi čteme pouze ty úkoly, kde předtím angličtina nezazněla (Kvíz nebo překlad CZ->Cizí)
   if (isAutoTTS && task.type !== 'QUIZ_IN') {
     let toRead = task.type === 'KVIZ' ? task.data.question.replace(/___+/g, task.data.answer) : task.data.question;
     speakWord(toRead.replace(/[*_]/g, ''), selectedSubject);
@@ -994,40 +951,53 @@ function clickCmpScrambleTile(idx) {
   const tile = task.tiles[idx];
   if (tile.used) return;
 
-  const expected = task.tokens[task.placed.length];
-  if (tile.text === expected) {
-    sndOk();
-    tile.used = true;
-    task.placed.push(tile.text);
-    if (task.placed.length === task.tokens.length) {
-      cmpState = 'EVAL';
-      if (isAutoTTS) speakWord(task.data.question, selectedSubject);
-    }
+  if (tile.text === task.tokens[task.placed.length]) {
+    sndOk(); tile.used = true; task.placed.push(tile.text);
+    if (task.placed.length === task.tokens.length) { cmpState = 'EVAL'; if (isAutoTTS) speakWord(task.data.question, selectedSubject); }
   } else {
-    sndErr();
-    cmpHearts = Math.max(0, cmpHearts - 1);
+    sndErr(); cmpHearts = Math.max(0, cmpHearts - 1);
     let newTask = { type: 'SCRAMBLE', data: task.data, tokens: task.tokens, isWordMode: task.isWordMode };
     newTask.tiles = task.tokens.map((t, i) => ({ text: t, used: false, id: i })).sort(() => Math.random() - 0.5);
-    newTask.placed = [];
-    cmpQueue.push(newTask);
+    newTask.placed = []; cmpQueue.push(newTask);
   }
   renderActiveGame();
 }
 
 function nextCmpTask() {
-  cmpIdx++;
-  cmpState = 'PLAYING';
-  cmpChosenOpt = null;
-  renderActiveGame();
+  cmpIdx++; cmpState = 'PLAYING'; cmpChosenOpt = null; renderActiveGame();
+  if (cmpIdx < cmpQueue.length && isAutoTTS && cmpQueue[cmpIdx].type === 'QUIZ_IN') speakWord(cmpQueue[cmpIdx].prompt, selectedSubject);
+}
 
-  // OPRAVA 1: Přečte anglické slovo, jakmile se načte další úkol (Cizí -> CZ)
-  if (cmpIdx < cmpQueue.length && isAutoTTS && cmpQueue[cmpIdx].type === 'QUIZ_IN') {
-      speakWord(cmpQueue[cmpIdx].prompt, selectedSubject);
-  }
+function launchCampaignMinigame() {
+    let allVItems = getVocabItems();
+    let singleWords = allVItems.filter(it => it.question.split(' ').length <= 2 && !it.question.includes('.'));
+    
+    let currentSingle = singleWords.filter(it => it.lesson === selectedGroupKey);
+    let olderSingle = singleWords.filter(it => it.lesson !== selectedGroupKey).sort(() => Math.random() - 0.5);
+    campaignMinigamePool = [...currentSingle, ...olderSingle].slice(0, 30);
+
+    isCampaignMinigame = true;
+    campaignMinigameCoins = cmpHearts; // 1 srdce = 1 zlaťák
+
+    if (campaignMinigamePool.length < 6) { finishCampaign(campaignMinigameCoins); return; }
+
+    let r = Math.random();
+    let isGerman = getTargetLang(selectedSubject).startsWith('de');
+    let articlesCount = campaignMinigamePool.filter(it => /^(der|die|das)\s/i.test(it.question)).length;
+
+    if (isGerman && articlesCount >= 8 && r < 0.33) startCampaignArcade("ARTICLES");
+    else if (r < (isGerman && articlesCount >= 8 ? 0.66 : 0.5)) startCampaignArcade("TRANSLATE");
+    else startCampaignPexeso();
 }
 
 function finishCampaign(coins) {
   addCoins(currentUser.name, coins);
   addReward(1, "Trénink: " + selectedGroupKey);
+
+  let allVItems = getVocabItems();
+  let lessons = [...new Set(allVItems.map(it => it.lesson))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
+  let curIdx = lessons.indexOf(selectedGroupKey);
+  if (curIdx !== -1 && curIdx + 1 < lessons.length) selectedCampaignLevel = lessons[curIdx + 1];
+
   setScreen("CAMPAIGN_HUB");
 }
