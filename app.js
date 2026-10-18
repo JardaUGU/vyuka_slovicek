@@ -13,6 +13,7 @@ let selectedSubject = "";
 let selectedGroupKey = "";
 let activeItems = [];
 let selectedGame = "";
+let selectedSeqIndex = 0;
 let testingDirection = localStorage.getItem("testing_dir") || "DIR_OUT";
 
 function forceHardReload() {
@@ -470,7 +471,8 @@ function goBack() {
   if (typeof stopArcadeLoop === "function") stopArcadeLoop();
   sendTimeHeartbeatToGoogle();
   if (currentScreen === "PLAYING" && selectedGame === "PEXESO") setScreen("SELECT_PEXESO_SIZE");
-  else if (currentScreen === "SELECT_PEXESO_SIZE") setScreen("SELECT_GAME");
+  else if (currentScreen === "PLAYING" && selectedGame === "SEQ" && getSeqItems().length > 1) setScreen("SELECT_SEQ_ITEM");
+  else if (currentScreen === "SELECT_PEXESO_SIZE" || currentScreen === "SELECT_SEQ_ITEM") setScreen("SELECT_GAME");
   else if (currentScreen === "PLAYING") {
     if (selectedGame === "CAMPAIGN") setScreen("CAMPAIGN_HUB");
     else if (selectedSubject === "Matematika") setScreen("SELECT_MATH_OP");
