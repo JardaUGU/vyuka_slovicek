@@ -283,6 +283,9 @@ function speakWord(text, subjectName) {
   
   setTimeout(() => {
     let toSpeak = text;
+    // 1. ODSTRANĚNÍ NÁPOVĚD V ZÁVORKÁCH: vymaže např. "(oni)", "(ona)", "(ž. r.)"
+    toSpeak = toSpeak.replace(/\s*\([^)]*\)/gi, '').trim();
+    
     if (/read\s*-\s*read\s*-\s*read/i.test(toSpeak)) toSpeak = "read, red, red";
     else toSpeak = toSpeak.replace(/\//g, ' or ').replace(/\s*-\s*/g, ', ');
 
@@ -379,16 +382,19 @@ function addReward(count = 1, section = "Lekce") {
   } catch(e) {}
 }
 
-// --- SYNCHRONIZACE DAT ---
+// --- BLESKOVÉ NAČTENÍ Z PAMĚTI A PROBUZENÍ SÍTĚ ---
 async function loadData() {
   const cached = localStorage.getItem("app_data");
   if (cached) {
     try {
       appData = JSON.parse(cached);
       if (!appData.items) appData.items = [];
+      // Okamžitě vykreslíme obrazovku z paměti telefonu (0 ms prodleva)
       renderScreen();
     } catch(e) {}
-  } else { renderScreen(); }
+  }
+  
+  // Stahování z cloudu probíhá na pozadí, aniž by blokovalo žáka
   await syncData();
 }
 
@@ -397,9 +403,14 @@ async function syncData() {
   if (statusEl) statusEl.innerText = "Stahuji...";
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000);
-    const res = await fetch(API_URL, { signal: controller.signal });
+    // Pro mobil zkrátíme limit na 10s, aby nevisel zbytečně dlouho
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+    
+    // Přidán časový parametr ?t=..., aby Safari necachovalo starou odpověď
+    const fetchUrl = API_URL + (API_URL.includes('?') ? '&' : '?') + 't=' + Date.now();
+    const res = await fetch(fetchUrl, { signal: controller.signal });
     clearTimeout(timeoutId);
+    
     const json = await res.json();
     if (json && json.items) {
       appData = json;
@@ -426,7 +437,14 @@ async function syncData() {
         }
       }
     }
-  } catch(e) { if (statusEl) statusEl.innerText = "Offline"; }
+  } catch(e) { 
+    if (statusEl) {
+      // Pokud máme data v paměti, napíšeme OK z paměti, ne chybový stav
+      statusEl.innerText = (appData && appData.items && appData.items.length > 0) 
+        ? `OK: ${appData.items.length} úloh` 
+        : "Offline";
+    }
+  }
   renderScreen();
 }
 
