@@ -957,21 +957,41 @@ function nextCmpTask() {
 
 function launchCampaignMinigame() {
     let allVItems = getVocabItems();
+    // Bereme jen jednoslovná nebo dvouslovná hesla (ne celé věty)
     let singleWords = allVItems.filter(it => it.question.split(' ').length <= 2 && !it.question.includes('.'));
     
+    // Zjistíme číslo aktuálního levelu (např. z "Level 1" vytáhneme 1)
+    let currentLvlNum = parseInt(selectedGroupKey.replace(/\D/g, '')) || 1;
+
     let currentSingle = singleWords.filter(it => it.lesson === selectedGroupKey);
-    let olderSingle = singleWords.filter(it => it.lesson !== selectedGroupKey).sort(() => Math.random() - 0.5);
+    
+    // Zásadní oprava: Bereme POUZE slova z lekcí, které mají NIŽŠÍ číslo než aktuální level!
+    let olderSingle = singleWords.filter(it => {
+        let itNum = parseInt(it.lesson.replace(/\D/g, '')) || 1;
+        return it.lesson !== selectedGroupKey && itNum < currentLvlNum;
+    }).sort(() => Math.random() - 0.5);
+
     campaignMinigamePool = [...currentSingle, ...olderSingle].slice(0, 30);
 
     isCampaignMinigame = true;
     campaignMinigameCoins = cmpHearts; // 1 srdce = 1 zlaťák
 
-    if (campaignMinigamePool.length < 6) { finishCampaign(campaignMinigameCoins); return; }
+    // Pojistka pro Level 1 (když je známých slov málo, raději je naklonujeme, než brát z budoucnosti)
+    if (campaignMinigamePool.length > 0 && campaignMinigamePool.length < 10) {
+        let tempPool = [...campaignMinigamePool];
+        while (campaignMinigamePool.length < 20) {
+            campaignMinigamePool.push(tempPool[Math.floor(Math.random() * tempPool.length)]);
+        }
+    } else if (campaignMinigamePool.length === 0) {
+        finishCampaign(campaignMinigameCoins); 
+        return; 
+    }
 
     let r = Math.random();
     let isGerman = getTargetLang(selectedSubject).startsWith('de');
     let articlesCount = campaignMinigamePool.filter(it => /^(der|die|das)\s/i.test(it.question)).length;
 
+    // Výběr minihry (Der/Die/Das, Překlad, nebo Pexeso)
     if (isGerman && articlesCount >= 8 && r < 0.33) startCampaignArcade("ARTICLES");
     else if (r < (isGerman && articlesCount >= 8 ? 0.66 : 0.5)) startCampaignArcade("TRANSLATE");
     else startCampaignPexeso();
