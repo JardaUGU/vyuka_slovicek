@@ -305,7 +305,6 @@ function speakWord(text, subjectName) {
     if (/read\s*-\s*read\s*-\s*read/i.test(toSpeak)) toSpeak = "read, red, red";
     else toSpeak = toSpeak.replace(/\//g, ' or ').replace(/\s*-\s*/g, ', ');
 
-    // OPRAVA PRO SAMOTNÉ "I": prohlížeče ho jinak čtou jako "capital I"
     if (/^\s*I\s*[.!?]?\s*$/i.test(toSpeak)) {
       toSpeak = "eye";
     }
@@ -314,25 +313,63 @@ function speakWord(text, subjectName) {
     const targetLang = getTargetLang(subjectName);
     const langPrefix = targetLang.split('-')[0];
 
-    u.lang = targetLang; u.rate = 0.88;
+    u.lang = targetLang; 
+    u.rate = 0.88;
 
     if (cachedVoices.length === 0) updateVoices();
     let voices = cachedVoices.length ? cachedVoices : window.speechSynthesis.getVoices();
 
+    const playVoice = () => {
+      if (voices && voices.length > 0) {
+        const isTarget = v => (v.lang || '').toLowerCase().replace('_', '-') === targetLang.toLowerCase() ||
+                              (v.lang || '').toLowerCase().replace('_', '-').startsWith(langPrefix);
+
+        // 1. Agresivní hledání prémiových hlasů
+        let match = voices.find(v => isTarget(v) && /(enhanced|premium|natural|pro)/i.test(v.name));
+
+        // 2. Tvrdě vyjmenované kvalitní hlasy Applu
+        if (!match) {
+            let bestNames = [];
+            if (targetLang === 'en-GB') bestNames = ['daniel', 'oliver', 'serena', 'stephanie', 'arthur', 'martha', 'kate'];
+            else if (targetLang === 'de-DE') bestNames = ['anna', 'petra', 'markus', 'yannick', 'helena', 'martin'];
+            else if (targetLang === 'cs-CZ') bestNames = ['iveta', 'zuzana'];
+            else if (targetLang === 'en-US') bestNames = ['samantha', 'alex', 'karen', 'ava', 'tom'];
+
+            for (let name of bestNames) {
+                match = voices.find(v => isTarget(v) && v.name.toLowerCase().includes(name));
+                if (match) break;
+            }
+        }
+
+        // 3. Fallback na Siri (zní lépe než Compact)
+        if (!match) match = voices.find(v => isTarget(v) && /siri/i.test(v.name));
+        
+        // 4. Cokoliv, co NENÍ "compact" (plechový hlas)
+        if (!match) match = voices.find(v => isTarget(v) && !/compact/i.test(v.name));
+        
+        // 5. Poslední záchrana
+        if (!match) match = voices.find(isTarget);
+
+        if (match) {
+          u.voice = match;
+          // KRITICKÝ TRIK PRO iOS: Sladit jazyk požadavku přesně s jazykem hlasu
+          u.lang = match.lang; 
+        }
+      }
+      window.speechSynthesis.speak(u);
+    };
+
     if ((!voices || voices.length === 0) && 'speechSynthesis' in window) {
       setTimeout(() => {
         updateVoices();
-        const v2 = cachedVoices.length ? cachedVoices : window.speechSynthesis.getVoices();
-        if (v2 && v2.length > 0) {
-          let m2 = v2.find(v => (v.lang || '').toLowerCase().replace('_', '-').startsWith(langPrefix));
-          if (!m2 && langPrefix === 'de') m2 = v2.find(v => /anna|petra|markus/i.test(v.name));
-          if (!m2 && langPrefix === 'en') m2 = v2.find(v => /samantha|daniel|karen|alex/i.test(v.name));
-          if (m2) u.voice = m2;
-        }
-        window.speechSynthesis.speak(u);
+        voices = cachedVoices.length ? cachedVoices : window.speechSynthesis.getVoices();
+        playVoice();
       }, 50);
-      return;
+    } else {
+      playVoice();
     }
+  }, 40);
+}
 
     if (voices && voices.length > 0) {
       const isTarget = v => (v.lang || '').toLowerCase().replace('_', '-') === targetLang.toLowerCase() ||
