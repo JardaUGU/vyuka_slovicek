@@ -394,7 +394,7 @@ function resetInactivityTimer() {
 function initSequence() {
   const sItems = getSeqItems();
   if (sItems.length === 0) return;
-  const itemsList = sItems[0].answer.split('|').map(s => s.trim()).filter(Boolean);
+  const itemsList = sItems[selectedSeqIndex].answer.split('|').map(s => s.trim()).filter(Boolean);
 
   seqTargetIdx = 0; seqHintActive = false; seqSlots = [-1, -1, -1, -1];
   seqSlots[0] = 0; if (itemsList.length > 1) seqSlots[1] = 1;
@@ -412,7 +412,7 @@ function initSequence() {
 
 function clickSeqSlot(slot) {
   const sItems = getSeqItems();
-  const itemsList = sItems[0].answer.split('|').map(s => s.trim()).filter(Boolean);
+  const itemsList = sItems[selectedSeqIndex].answer.split('|').map(s => s.trim()).filter(Boolean);
   const btnEl = document.getElementById(`seq-btn-${slot}`);
 
   if (seqSlots[slot] === seqTargetIdx) {
@@ -715,7 +715,7 @@ function renderActiveGame() {
   // ŘADA NA ČAS
   else if (selectedGame === "SEQ") {
     if (sItems.length === 0) return;
-    const seqConfig = sItems[0];
+    const seqConfig = sItems[selectedSeqIndex];
     const itemsList = seqConfig.answer.split('|').map(s => s.trim()).filter(Boolean);
     const isFinished = seqTargetIdx >= itemsList.length;
     const targetWord = itemsList[seqTargetIdx];
@@ -818,7 +818,7 @@ function renderActiveGame() {
 }
 
 // ==========================================
-// 9. KAMPAŇ ENGINE (PEDAGOGICKÁ KŘIVKA + MINIHRA)
+// 9. KAMPAŇ ENGINE (OPRAVENO)
 // ==========================================
 let cmpQueue = [];
 let cmpIdx = 0;
@@ -831,25 +831,7 @@ function startCampaign() {
   let allVItems = getVocabItems();
   let allQItems = getQuizItems();
 
-  let lessons = [...new Set(allVItems.map(it => it.lesson))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
-  
-  const subjNorm = selectedSubject.toLowerCase().replace(/[^a-z]/g, "");
-  let userMinLvl = 1;
-  if (currentUser && currentUser.startLevels) {
-    for (let k in currentUser.startLevels) {
-      if (subjNorm.includes(k) || k.includes(subjNorm)) { userMinLvl = Number(currentUser.startLevels[k]) || 1; break; }
-    }
-  }
-
-  let autoLesson = lessons[0] || "Level 1";
-  for (let l of lessons) {
-    let num = parseInt(l.replace(/\D/g, '')) || 1;
-    if (num < userMinLvl) continue;
-    let lItems = allVItems.filter(it => it.lesson === l);
-    if (getGroupMasteryPercent(lItems, selectedSubject) < 95) { autoLesson = l; break; }
-  }
-
-  selectedGroupKey = selectedCampaignLevel || autoLesson;
+  // Proměnná selectedGroupKey (aktuální level) je již 100% správně vypočítána a nastavena z app.js
   let currentVItems = allVItems.filter(it => it.lesson === selectedGroupKey);
   let olderVItems = allVItems.filter(it => it.lesson !== selectedGroupKey && (parseInt(it.lesson.replace(/\D/g, ''))||1) < (parseInt(selectedGroupKey.replace(/\D/g, ''))||1));
   let currentQItems = allQItems.filter(it => it.lesson === selectedGroupKey);
@@ -917,7 +899,6 @@ function startCampaign() {
   selectedGame = 'CAMPAIGN'; setScreen('PLAYING');
   if (isAutoTTS && cmpQueue[0] && cmpQueue[0].type === 'QUIZ_IN') speakWord(cmpQueue[0].prompt, selectedSubject);
 }
-
 function clickCmpQuizOpt(opt) {
   if (cmpState !== 'PLAYING') return;
   const task = cmpQueue[cmpIdx];
@@ -993,11 +974,7 @@ function launchCampaignMinigame() {
 function finishCampaign(coins) {
   addCoins(currentUser.name, coins);
   addReward(1, "Trénink: " + selectedGroupKey);
-
-  let allVItems = getVocabItems();
-  let lessons = [...new Set(allVItems.map(it => it.lesson))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
-  let curIdx = lessons.indexOf(selectedGroupKey);
-  if (curIdx !== -1 && curIdx + 1 < lessons.length) selectedCampaignLevel = lessons[curIdx + 1];
-
+  
+  // Návrat do hubu – hub si sám načte a posune další level
   setScreen("CAMPAIGN_HUB");
 }
