@@ -487,6 +487,7 @@ function getGroupMasteryPercent(groupItems, subjName) {
 // --- NAVIGACE ---
 function goBack() {
   if (typeof stopArcadeLoop === "function") stopArcadeLoop();
+  if (typeof stopSnakeLoop === "function") stopSnakeLoop();
   sendTimeHeartbeatToGoogle();
   if (currentScreen === "PLAYING" && selectedGame === "PEXESO") setScreen("SELECT_PEXESO_SIZE");
   else if (currentScreen === "PLAYING" && selectedGame === "SEQ" && getSeqItems().length > 1) setScreen("SELECT_SEQ_ITEM");
@@ -766,6 +767,9 @@ function renderScreen() {
         </div>
         <div class="tile" onclick="startGame('SCRAMBLE')"><h2>3. Skládání</h2><p>Pravopis</p></div>
         <div class="tile" onclick="setScreen('SELECT_PEXESO_SIZE')"><h2>🃏 Pexeso</h2><p>Hledání dvojic</p></div>
+        <div class="tile" style="border-color:#10b981;background:#062319;" onclick="startSnakeGame()">
+          <h2 style="color:#10b981;">🐍 Had</h2><p>Pravopis na čas</p>
+        </div>
       `;
     }
     if (quickMode) {
