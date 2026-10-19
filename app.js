@@ -183,6 +183,7 @@ function registerUserAction() {
 }
 window.addEventListener('click', registerUserAction, true);
 window.addEventListener('touchstart', registerUserAction, true);
+window.addEventListener('keydown', registerUserAction, true);
 
 setInterval(() => {
   if (currentScreen === "PLAYING" && currentUser) {
