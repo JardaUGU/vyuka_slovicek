@@ -849,10 +849,13 @@ function startCampaign() {
 
   currentVItems.forEach(it => {
       if (it.question.trim().includes(' ') || it.question.trim().includes('-')) {
+          // Dlouhé věty a fráze -> skládání celých slov
           qSentences.push({ type: 'SCRAMBLE', data: it });
       } else {
+          // Samostatná slova -> 1. poznat, 2. vybrat, 3. poskládat PO PÍSMENECH!
           qNewPassive.push({ type: 'QUIZ_IN', data: it });
           qNewActive.push({ type: 'QUIZ_OUT', data: it });
+          qSentences.push({ type: 'SCRAMBLE', data: it }); // Písmenkování!
       }
   });
 
