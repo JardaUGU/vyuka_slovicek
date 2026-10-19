@@ -652,7 +652,7 @@ function renderActiveGame() {
           <div class="snake-stats">
             <span>${"❤️".repeat(snakeLives)}</span>
             <span style="color:var(--col-yellow);">LVL ${snakeLevel}</span>
-            <span style="color:var(--col-active-tab);">Slov: ${snakeScore}</span>
+            <span style="color:var(--col-active-tab);">Slov: ${snakeScore} | 🐍 Délka: ${snakeBody.length}</span>
           </div>
           ${snakeCurrentWord ? `
             <div class="snake-prompt-cz">${snakeCurrentWord.czech}</div>
@@ -1277,40 +1277,33 @@ function handleSnakeWordComplete() {
 
   if (snakeScore % 3 === 0) {
     snakeLevel++;
-    snakeSpeed = Math.max(120, snakeSpeed - 15);
+    snakeSpeed = Math.max(100, snakeSpeed - 15); // Postupné zrychlování
   }
 
+  // POJISTKA: Pokud had sežral poslední písmeno těsně u zdi, otočíme ho bezpečně do volného prostoru
+  const nextX = snakeBody[0].x + snakeDir.x;
+  const nextY = snakeBody[0].y + snakeDir.y;
+  if (nextX < 0 || nextX >= snakeGridSize || nextY < 0 || nextY >= snakeGridSize) {
+    const turn1 = { x: -snakeDir.y, y: snakeDir.x };
+    const turn2 = { x: snakeDir.y, y: -snakeDir.x };
+    const try1X = snakeBody[0].x + turn1.x;
+    const try1Y = snakeBody[0].y + turn1.y;
+    if (try1X >= 0 && try1X < snakeGridSize && try1Y >= 0 && try1Y < snakeGridSize) {
+      snakeDir = turn1; snakeNextDir = turn1;
+    } else {
+      snakeDir = turn2; snakeNextDir = turn2;
+    }
+  }
+
+  // Po krátké pauze načteme nové slovo, ale HAD ZŮSTÁVÁ DLOUHÝ a pokračuje tam, kde byl!
   setTimeout(() => {
     setupNextSnakeWord();
-    resetSnakePosition();
+    // resetSnakePosition() BYL ODSTRANĚN – had pokračuje v jízdě dál a roste!
     runSnakeLoop();
     renderActiveGame();
-  }, 1200);
+  }, 1000);
 
   renderActiveGame();
-}
-
-function handleSnakeDeath(reason) {
-  snakeState = "HIT";
-  stopSnakeLoop();
-  sndErr();
-  snakeLives--;
-  snakeStatusMsg = reason;
-
-  if (snakeLives <= 0) {
-    snakeState = "GAMEOVER";
-    renderActiveGame();
-  } else {
-    // Oprava: po nárazu restartujeme hledání aktuálního slova od začátku
-    setTimeout(() => {
-      resetSnakePosition();
-      snakeCurrentIdx = 0; // Vrátíme slovo na první písmeno
-      spawnSnakeFood();
-      runSnakeLoop();
-      renderActiveGame();
-    }, 1400);
-    renderActiveGame();
-  }
 }
 
 function drawSnake() {
