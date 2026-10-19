@@ -667,7 +667,7 @@ function renderActiveGame() {
           ${snakeState === "HIT" ? `<div style="color:var(--col-red);font-weight:bold;margin-top:6px;font-size:14px;">${snakeStatusMsg}</div>` : ''}
         </div>
 
-        <div class="snake-canvas-wrap" ontouchstart="handleSnakeTouchStart(event)" ontouchend="handleSnakeTouchEnd(event)">
+        <div class="snake-canvas-wrap" ontouchstart="handleSnakeTouchStart(event)" ontouchmove="handleSnakeTouchMove(event)" ontouchend="handleSnakeTouchEnd(event)">
           <canvas id="snake-canvas" width="340" height="340"></canvas>
         </div>
 
@@ -1396,21 +1396,36 @@ window.addEventListener("keydown", (e) => {
   }
 });
 
-// Potažení prstem po displeji (Swipe pro mobil)
-let snakeTouchStartX = 0, snakeTouchStartY = 0;
+// --- DOKONALÉ DOTYKOVÉ OVLÁDÁNÍ (SWIPE) PRO MOBIL ---
+let snakeTouchStartX = 0;
+let snakeTouchStartY = 0;
+
 function handleSnakeTouchStart(e) {
+  if (e.cancelable) e.preventDefault(); // Zablokuje začátek posunu stránky
+  if (typeof registerUserAction === "function") registerUserAction();
   if (e.touches && e.touches[0]) {
     snakeTouchStartX = e.touches[0].clientX;
     snakeTouchStartY = e.touches[0].clientY;
   }
 }
+
+function handleSnakeTouchMove(e) {
+  if (e.cancelable) e.preventDefault(); // Zablokuje scrollování během tahu prstem
+}
+
 function handleSnakeTouchEnd(e) {
+  if (e.cancelable) e.preventDefault();
   if (!e.changedTouches || !e.changedTouches[0]) return;
+  
   const dx = e.changedTouches[0].clientX - snakeTouchStartX;
   const dy = e.changedTouches[0].clientY - snakeTouchStartY;
-  if (Math.abs(dx) > Math.abs(dy)) {
-    if (Math.abs(dx) > 20) setSnakeDirection(dx > 0 ? 1 : -1, 0);
-  } else {
-    if (Math.abs(dy) > 20) setSnakeDirection(0, dy > 0 ? 1 : -1);
+  
+  // Reaguje už na lehký švih prstem (15 px)
+  if (Math.abs(dx) > 15 || Math.abs(dy) > 15) {
+    if (Math.abs(dx) > Math.abs(dy)) {
+      setSnakeDirection(dx > 0 ? 1 : -1, 0); // Vodorovně: doprava nebo doleva
+    } else {
+      setSnakeDirection(0, dy > 0 ? 1 : -1); // Svisle: dolů nebo nahoru
+    }
   }
 }
