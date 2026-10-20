@@ -183,6 +183,7 @@ function registerUserAction() {
 }
 window.addEventListener('click', registerUserAction, true);
 window.addEventListener('touchstart', registerUserAction, true);
+window.addEventListener('keydown', registerUserAction, true);
 
 setInterval(() => {
   if (currentScreen === "PLAYING" && currentUser) {
@@ -288,6 +289,10 @@ function speakWord(text, subjectName) {
     
     if (/read\s*-\s*read\s*-\s*read/i.test(toSpeak)) toSpeak = "read, red, red";
     else toSpeak = toSpeak.replace(/\//g, ' or ').replace(/\s*-\s*/g, ', ');
+    
+    // Čtení Božího jména v hebrejštině (Jahve / Tetragrammaton -> Adonaj)
+    toSpeak = toSpeak.replace(/יהוה/g, 'אֲדֹנָי');
+    toSpeak = toSpeak.replace(/\b(Jahve|Jahveh|Yahweh|Yahwe|Jehova|JHVH|YHWH)\b/gi, 'Adonaj');
 
     if (/^\s*I\s*[.!?]?\s*$/i.test(toSpeak)) {
       toSpeak = "eye";
@@ -487,6 +492,7 @@ function getGroupMasteryPercent(groupItems, subjName) {
 // --- NAVIGACE ---
 function goBack() {
   if (typeof stopArcadeLoop === "function") stopArcadeLoop();
+  if (typeof stopSnakeLoop === "function") stopSnakeLoop();
   sendTimeHeartbeatToGoogle();
   if (currentScreen === "PLAYING" && selectedGame === "PEXESO") setScreen("SELECT_PEXESO_SIZE");
   else if (currentScreen === "PLAYING" && selectedGame === "SEQ" && getSeqItems().length > 1) setScreen("SELECT_SEQ_ITEM");
@@ -766,6 +772,9 @@ function renderScreen() {
         </div>
         <div class="tile" onclick="startGame('SCRAMBLE')"><h2>3. Skládání</h2><p>Pravopis</p></div>
         <div class="tile" onclick="setScreen('SELECT_PEXESO_SIZE')"><h2>🃏 Pexeso</h2><p>Hledání dvojic</p></div>
+        <div class="tile" style="border-color:#10b981;background:#062319;" onclick="startSnakeGame()">
+          <h2 style="color:#10b981;">🐍 Had</h2><p>Pravopis na čas</p>
+        </div>
       `;
     }
     if (quickMode) {
