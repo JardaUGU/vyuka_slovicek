@@ -119,19 +119,41 @@ window.buyFreeze = function() {
   buyShopItem("Zmrazeni", 20);
 };
 
-// --- ČASOVAČ, STREAK & ZÁPATÍ ---
+// --- ČASOVAČ, STREAK A HLÍDÁNÍ PŮLNOCI ---
+function getTodayDateStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+let activeDateStr = getTodayDateStr();
+
+// Automaticky vynuluje čas při přechodu na nový den
+function checkDateRollover() {
+  const today = getTodayDateStr();
+  if (today !== activeDateStr) {
+    activeDateStr = today;
+    todaySecondsStudied = 0;
+    lastCloudSyncSec = 0;
+    if (currentUser) {
+      localStorage.setItem(getStudyTimeKey(currentUser.name), 0);
+    }
+    updateStudyTimerUI();
+    renderScreen();
+  }
+}
+
 function updateFooter() {
   const fUser = document.getElementById("footer-user");
   if (fUser) fUser.innerText = currentUser ? `Žák: ${currentUser.name}` : "Žák: --";
 }
 
 function getStudyTimeKey(userName) {
-  const d = new Date();
-  return `study_sec_${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}_${(userName || 'user').toLowerCase().trim()}`;
+  return `study_sec_${getTodayDateStr()}_${(userName || 'user').toLowerCase().trim()}`;
 }
 
 function loadUserStudyTime(userName) {
   if (!userName) return 0;
+  checkDateRollover();
   return Number(localStorage.getItem(getStudyTimeKey(userName)) || 0);
 }
 
@@ -143,15 +165,14 @@ function getUserStreak(userName) {
 function updateUserStreak(userName, targetMinutes) {
   if (!userName) return;
   const uKey = userName.toLowerCase().trim();
-  const d = new Date();
-  const todayStr = `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+  const todayStr = getTodayDateStr();
   const lastCompleted = localStorage.getItem(`streak_last_date_${uKey}`);
   
   if (lastCompleted === todayStr) return;
 
   let streak = Number(localStorage.getItem(`streak_${uKey}`) || 0);
   const yest = new Date(Date.now() - 86400000);
-  const yestStr = `${yest.getFullYear()}-${yest.getMonth() + 1}-${yest.getDate()}`;
+  const yestStr = `${yest.getFullYear()}-${String(yest.getMonth() + 1).padStart(2,'0')}-${String(yest.getDate()).padStart(2,'0')}`;
 
   if (lastCompleted === yestStr) {
     streak += 1;
@@ -177,6 +198,7 @@ let isTimerPaused = false;
 let lastCloudSyncSec = 0;
 
 function registerUserAction() {
+  checkDateRollover(); // Kontrola nového dne při každém dotyku
   lastUserActivityTime = Date.now();
   if (isTimerPaused) { isTimerPaused = false; updateStudyTimerUI(); }
   if (cachedVoices.length === 0) updateVoices();
@@ -186,6 +208,8 @@ window.addEventListener('touchstart', registerUserAction, true);
 window.addEventListener('keydown', registerUserAction, true);
 
 setInterval(() => {
+  checkDateRollover(); // Kontrola nového dne každou vteřinu
+
   if (currentScreen === "PLAYING" && currentUser) {
     const idleTime = Date.now() - lastUserActivityTime;
     if (idleTime < 15000) {
@@ -433,10 +457,11 @@ async function syncData() {
           
           if (foundU.todayMinutes !== undefined) {
             const cloudSec = Math.round(Number(foundU.todayMinutes) * 60);
-            if (cloudSec > todaySecondsStudied) {
-              todaySecondsStudied = cloudSec;
-              localStorage.setItem(getStudyTimeKey(currentUser.name), todaySecondsStudied);
-            }
+            const localSec = loadUserStudyTime(currentUser.name);
+            // Nastaví čas podle reálného stavu dneška
+            todaySecondsStudied = Math.max(localSec, cloudSec);
+            localStorage.setItem(getStudyTimeKey(currentUser.name), todaySecondsStudied);
+          }
           }
           localStorage.setItem("cur_user", JSON.stringify(currentUser));
         }
@@ -512,6 +537,7 @@ function goBack() {
 function setScreen(scr) { currentScreen = scr; registerUserAction(); renderScreen(); }
 
 function selectUser(name, grade, targetMinutes) {
+  checkDateRollover();
   const foundU = (appData.users || []).find(u => u.name.toLowerCase().trim() === name.toLowerCase().trim());
   currentUser = { 
     name, 
