@@ -217,9 +217,18 @@ function startScrambleFromAdaptiveBatch() {
 // ==========================================
 function initScramble() {
   const vItems = getVocabItems();
-  if (!scrambleDeck || scrambleDeck.length === 0) {
-    scrambleDeck = vItems.map((_, i) => i).sort(() => Math.random() - 0.5);
+  
+  // POKUD BYL DOKONČEN BLOK 15 SLOV: Skládáme POUZE tato slova!
+  if (isAdaptiveBatchMode && adaptiveBatchIndices && adaptiveBatchIndices.length > 0) {
+    if (!scrambleDeck || scrambleDeck.length === 0) {
+      scrambleDeck = [...adaptiveBatchIndices].sort(() => Math.random() - 0.5);
+    }
+  } else {
+    if (!scrambleDeck || scrambleDeck.length === 0) {
+      scrambleDeck = vItems.map((_, i) => i).sort(() => Math.random() - 0.5);
+    }
   }
+
   vCurrentWord = scrambleDeck.pop();
   const w = vItems[vCurrentWord];
   scramblePlaced = []; scrambleHadMistake = false; scrambleDone = false;
@@ -542,25 +551,28 @@ function startSnakeGame() {
   setTimeout(attachSnakeTouchHandlers, 50);
 }
 
-function buySnakeShieldInGame() {
+function buySnakeShieldInGame(e) {
+  if (e) { e.preventDefault(); e.stopPropagation(); }
   if (snakeLives > 1 && snakeShieldLetters <= 0) {
     snakeLives--;
     snakeShieldLetters = 20;
     sndFanfare();
+    snakeStatusMsg = "🛡️ Štít aktivován! (20 písmen)";
     snakeState = "PLAYING";
     renderActiveGame();
     runSnakeLoop();
-    setTimeout(attachSnakeTouchHandlers, 20);
   } else if (snakeLives <= 1) {
     alert("Nemůžeš obětovat své poslední srdíčko! ❤️");
+    resumeSnakeWithoutShield(e);
   }
 }
 
-function resumeSnakeWithoutShield() {
+function resumeSnakeWithoutShield(e) {
+  if (e) { e.preventDefault(); e.stopPropagation(); }
   snakeState = "PLAYING";
+  snakeStatusMsg = "";
   renderActiveGame();
   runSnakeLoop();
-  setTimeout(attachSnakeTouchHandlers, 20);
 }
 
 function setupNextSnakeWord() {
@@ -1144,12 +1156,49 @@ function launchCampaignMinigame() {
     let r = Math.random();
     let isGerman = getTargetLang(selectedSubject).startsWith('de');
     let articlesCount = campaignMinigamePool.filter(it => /^(der|die|das)\s/i.test(it.question)).length;
+    let hasArticles = isGerman && articlesCount >= 8;
 
-    if (isGerman && articlesCount >= 8 && r < 0.33) startCampaignArcade("ARTICLES");
-    else if (r < (isGerman && articlesCount >= 8 ? 0.66 : 0.5)) startCampaignArcade("TRANSLATE");
-    else startCampaignPexeso();
+    // ROVNOMĚRNÝ VÝBĚR MINIHREK (ARKÁDA / PEXESO / HAD)
+    if (hasArticles) {
+        if (r < 0.25) startCampaignArcade("ARTICLES");
+        else if (r < 0.50) startCampaignArcade("TRANSLATE");
+        else if (r < 0.75) startCampaignPexeso();
+        else startCampaignSnake(); // 🐍 HAD PRO NĚMČINU
+    } else {
+        if (r < 0.33) startCampaignArcade("TRANSLATE");
+        else if (r < 0.66) startCampaignPexeso();
+        else startCampaignSnake(); // 🐍 HAD PRO ANGLIČTINU / ŠPANĚLŠTINU
+    }
 }
+function startCampaignSnake() {
+  stopArcadeLoop();
+  stopSnakeLoop();
+  isCampaignMinigame = true;
 
+  // Vybereme jednoslovná hesla z poolu kampaně
+  snakeDeck = campaignMinigamePool.filter(it => {
+    let clean = it.question.replace(/^(der|die|das|ein|eine|el|la|un|una)\s+/i, '').trim();
+    return clean.split(/\s+/).length === 1 && clean.length >= 2 && clean.length <= 10 && !clean.includes('.');
+  }).sort(() => Math.random() - 0.5);
+
+  if (snakeDeck.length === 0) {
+    startCampaignPexeso(); // Záloha, pokud by náhodou v lekci nebylo žádné slovo vhodné pro hada
+    return;
+  }
+
+  snakeLives = 3;
+  snakeScore = 0;
+  snakeLevel = 1;
+  snakeSpeed = 220;
+  snakeShieldLetters = 0;
+  selectedGame = "SNAKE";
+  setScreen("PLAYING");
+
+  setupNextSnakeWord();
+  resetSnakePosition();
+  runSnakeLoop();
+  setTimeout(attachSnakeTouchHandlers, 50);
+}
 function finishCampaign(coins) {
   addCoins(currentUser.name, coins);
   addReward(1, "Trénink: " + selectedGroupKey);
@@ -1488,24 +1537,36 @@ function renderActiveGame() {
     `;
   }
 
-  // HRA HAD (SNAKE S PAUZOU PO VYPRŠENÍ ŠTÍTU A PEVNOU VÝŠKOU)
+// HRA HAD (SNAKE NA PLNÝ DISPLEJ + FUNKČNÍ DIALOG)
   else if (selectedGame === "SNAKE") {
     if (snakeState === "GAMEOVER") {
-      main.innerHTML = `
-        <div style="text-align:center;padding:35px;">
-          <h2 style="color:var(--col-red);font-size:28px;">KONEC HRY! 💔</h2>
-          <p style="font-size:20px;color:#fff;margin:12px 0;">Správně složeno: <b>${snakeScore} slov</b></p>
-          <div class="action-btn green" onclick="startSnakeGame()">HRÁT ZNOVU ➔</div>
-          <div class="action-btn" onclick="setScreen('SELECT_GAME')">ZPĚT</div>
-        </div>
-      `;
+      if (isCampaignMinigame) {
+        let bonusCoins = Math.floor(snakeScore / 2); // 1 zlaťák za každá 2 slova poskládaná hadem
+        main.innerHTML = `
+          <div style="text-align:center;padding:35px;">
+            <h2 style="color:var(--col-green);font-size:28px;">TRÉNINK DOKONČEN! 🎉</h2>
+            <p style="font-size:20px;color:#fff;margin:10px 0;">Had poskládal: <b>${snakeScore} slov</b> (Bonus: +${bonusCoins} 💰)</p>
+            <p style="font-size:24px;color:var(--col-yellow);margin-bottom:25px;">Celkem získáváš: +${campaignMinigameCoins + bonusCoins} 💰</p>
+            <div class="action-btn green" onclick="finishCampaign(${campaignMinigameCoins + bonusCoins})">PŘIPSAT ZLAŤÁKY A ZPĚT</div>
+          </div>
+        `;
+      } else {
+        main.innerHTML = `
+          <div style="text-align:center;padding:35px;">
+            <h2 style="color:var(--col-red);font-size:28px;">KONEC HRY! 💔</h2>
+            <p style="font-size:20px;color:#fff;margin:12px 0;">Správně složeno: <b>${snakeScore} slov</b></p>
+            <div class="action-btn green" onclick="startSnakeGame()">HRÁT ZNOVU ➔</div>
+            <div class="action-btn" onclick="setScreen('SELECT_GAME')">ZPĚT</div>
+          </div>
+        `;
+      }
       return;
     }
 
     const canBuyShield = snakeLives > 1 && snakeShieldLetters <= 0;
 
     main.innerHTML = `
-      <div class="snake-container" style="touch-action:none!important;">
+      <div class="snake-container">
         <div class="snake-header-box">
           <div class="snake-stats">
             <span>${"❤️".repeat(snakeLives)}</span>
@@ -1513,7 +1574,8 @@ function renderActiveGame() {
             ${snakeShieldLetters > 0 ? `
               <span class="snake-shield-btn active">🛡️ Štít: ještě ${snakeShieldLetters} p.</span>
             ` : `
-              <button class="snake-shield-btn" style="${!canBuyShield?'opacity:0.4;cursor:default;':''}" onclick="buySnakeShieldInGame()">
+              <button class="snake-shield-btn" style="${!canBuyShield?'opacity:0.4;cursor:default;':''}" 
+                      ontouchstart="buySnakeShieldInGame(event)" onclick="buySnakeShieldInGame(event)">
                 🛡️ Koupit štít (-1 ❤️ / 20 p.)
               </button>
             `}
@@ -1532,26 +1594,27 @@ function renderActiveGame() {
             </div>
           ` : ''}
 
-          <!-- PEVNÁ VÝŠKA PRO ZPRÁVU – ZABRÁNÍ POSKAKOVÁNÍ PLOCHY -->
           <div class="snake-status-bar" style="color:${snakeState==='PAUSED_SHIELD'?'var(--col-yellow)':'var(--col-red)'};">
             ${snakeState === "HIT" || snakeState === "PAUSED_SHIELD" ? snakeStatusMsg : ''}
           </div>
         </div>
 
-        <div class="snake-canvas-wrap" style="touch-action:none!important;">
-          <canvas id="snake-canvas" width="340" height="340" style="touch-action:none!important;"></canvas>
+        <div class="snake-canvas-wrap">
+          <canvas id="snake-canvas" width="340" height="340"></canvas>
 
-          <!-- MODÁLNÍ DIALOG PŘI VYPRŠENÍ ŠTÍTU -->
+          <!-- NEBLOKOVANÝ MODÁLNÍ DIALOG PŘI VYPRŠENÍ ŠTÍTU -->
           ${snakeState === "SHIELD_EXPIRED_PAUSE" ? `
-            <div style="position:absolute;inset:0;background:rgba(8,16,30,0.85);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;text-align:center;z-index:20;">
-              <h3 style="color:var(--col-yellow);font-size:22px;margin-bottom:8px;">🛡️ ŠTÍT VYPRŠEL!</h3>
-              <p style="font-size:14px;color:#fff;margin-bottom:15px;">Dál už tě zdi ani tělo neochrání.</p>
+            <div style="position:absolute;inset:0;background:rgba(8,16,30,0.9);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;text-align:center;z-index:100;pointer-events:auto;">
+              <h3 style="color:var(--col-yellow);font-size:24px;margin-bottom:8px;">🛡️ ŠTÍT VYPRŠEL!</h3>
+              <p style="font-size:15px;color:#fff;margin-bottom:18px;">Dál už tě zdi ani tvůj ocas neochrání.</p>
               ${canBuyShield ? `
-                <div class="action-btn" style="background:#4338ca;border-color:#818cf8;width:100%;margin-bottom:8px;padding:10px;font-size:15px;" onclick="buySnakeShieldInGame()">
+                <div class="action-btn" style="background:#4338ca;border-color:#818cf8;width:100%;max-width:280px;margin-bottom:10px;padding:12px;font-size:16px;" 
+                     ontouchstart="buySnakeShieldInGame(event)" onclick="buySnakeShieldInGame(event)">
                   Koupit další štít (-1 ❤️ / 20 p.)
                 </div>
               ` : ''}
-              <div class="action-btn green" style="width:100%;padding:10px;font-size:15px;" onclick="resumeSnakeWithoutShield()">
+              <div class="action-btn green" style="width:100%;max-width:280px;padding:12px;font-size:16px;" 
+                   ontouchstart="resumeSnakeWithoutShield(event)" onclick="resumeSnakeWithoutShield(event)">
                 Pokračovat bez štítu ▶️
               </div>
             </div>
