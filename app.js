@@ -16,6 +16,16 @@ let selectedGame = "";
 let selectedSeqIndex = 0;
 let testingDirection = localStorage.getItem("testing_dir") || "DIR_OUT";
 
+// Časomíra – bezpečně inicializovaná
+let todaySecondsStudied = 0;
+let lastUserActivityTime = Date.now();
+let isTimerPaused = false;
+let lastCloudSyncSec = 0;
+
+let isAutoTTS = localStorage.getItem("auto_tts") !== "false";
+let cachedVoices = [];
+
+// --- POMOCNÉ FUNKCE ---
 function forceHardReload() {
   window.location.href = window.location.origin + window.location.pathname + '?reload=' + Date.now();
 }
@@ -127,7 +137,6 @@ function getTodayDateStr() {
 
 let activeDateStr = getTodayDateStr();
 
-// Automaticky vynuluje čas při přechodu na nový den
 function checkDateRollover() {
   const today = getTodayDateStr();
   if (today !== activeDateStr) {
@@ -135,10 +144,10 @@ function checkDateRollover() {
     todaySecondsStudied = 0;
     lastCloudSyncSec = 0;
     if (currentUser) {
-      localStorage.setItem(getStudyTimeKey(currentUser.name), 0);
+      localStorage.setItem(getStudyTimeKey(currentUser.name), "0");
     }
     updateStudyTimerUI();
-    renderScreen();
+    if (typeof renderScreen === "function") renderScreen();
   }
 }
 
@@ -153,7 +162,6 @@ function getStudyTimeKey(userName) {
 
 function loadUserStudyTime(userName) {
   if (!userName) return 0;
-  checkDateRollover();
   return Number(localStorage.getItem(getStudyTimeKey(userName)) || 0);
 }
 
@@ -192,13 +200,8 @@ function updateUserStreak(userName, targetMinutes) {
   localStorage.setItem(`streak_last_date_${uKey}`, todayStr);
 }
 
-let todaySecondsStudied = currentUser ? loadUserStudyTime(currentUser.name) : 0;
-let lastUserActivityTime = Date.now();
-let isTimerPaused = false;
-let lastCloudSyncSec = 0;
-
 function registerUserAction() {
-  checkDateRollover(); // Kontrola nového dne při každém dotyku
+  checkDateRollover();
   lastUserActivityTime = Date.now();
   if (isTimerPaused) { isTimerPaused = false; updateStudyTimerUI(); }
   if (cachedVoices.length === 0) updateVoices();
@@ -208,13 +211,13 @@ window.addEventListener('touchstart', registerUserAction, true);
 window.addEventListener('keydown', registerUserAction, true);
 
 setInterval(() => {
-  checkDateRollover(); // Kontrola nového dne každou vteřinu
+  checkDateRollover();
 
   if (currentScreen === "PLAYING" && currentUser) {
     const idleTime = Date.now() - lastUserActivityTime;
     if (idleTime < 15000) {
       todaySecondsStudied++;
-      localStorage.setItem(getStudyTimeKey(currentUser.name), todaySecondsStudied);
+      localStorage.setItem(getStudyTimeKey(currentUser.name), String(todaySecondsStudied));
       isTimerPaused = false;
 
       const targetSec = (currentUser.targetMinutes || 15) * 60;
@@ -275,10 +278,7 @@ function sendTimeHeartbeatToGoogle() {
   } catch(e) {}
 }
 
-// --- VÝSLOVNOST (TTS) S PŘESNÝM SMĚROVÁNÍM NA iOS ---
-let isAutoTTS = localStorage.getItem("auto_tts") !== "false";
-let cachedVoices = [];
-
+// --- VÝSLOVNOST (TTS) S PODPOROU JAHVE -> ADONAJ A iOS HLASŮ ---
 function updateVoices() {
   if ('speechSynthesis' in window) {
     const v = window.speechSynthesis.getVoices();
@@ -299,6 +299,7 @@ function getTargetLang(subjectName) {
   if (s.includes('angli') || s === 'en' || s.includes('inteligentn')) return 'en-GB';
   if (s.includes('nemc') || s === 'de') return 'de-DE';
   if (s.includes('hebr') || s === 'he') return 'he-IL';
+  if (s.includes('spanel') || s === 'es') return 'es-ES';
   return 'cs-CZ';
 }
 
@@ -308,15 +309,16 @@ function speakWord(text, subjectName) {
   
   setTimeout(() => {
     let toSpeak = text;
-    // 1. ODSTRANĚNÍ NÁPOVĚD V ZÁVORKÁCH: vymaže např. "(oni)", "(ona)", "(ž. r.)"
+
+    // 1. Odstranění závorek (oni, ona se nečte)
     toSpeak = toSpeak.replace(/\s*\([^)]*\)/gi, '').trim();
-    
-    if (/read\s*-\s*read\s*-\s*read/i.test(toSpeak)) toSpeak = "read, red, red";
-    else toSpeak = toSpeak.replace(/\//g, ' or ').replace(/\s*-\s*/g, ', ');
-    
-    // Čtení Božího jména v hebrejštině (Jahve / Tetragrammaton -> Adonaj)
+
+    // 2. Čtení Božího jména v hebrejštině (Jahve / Tetragrammaton -> Adonaj)
     toSpeak = toSpeak.replace(/יהוה/g, 'אֲדֹנָי');
     toSpeak = toSpeak.replace(/\b(Jahve|Jahveh|Yahweh|Yahwe|Jehova|JHVH|YHWH)\b/gi, 'Adonaj');
+
+    if (/read\s*-\s*read\s*-\s*read/i.test(toSpeak)) toSpeak = "read, red, red";
+    else toSpeak = toSpeak.replace(/\//g, ' or ').replace(/\s*-\s*/g, ', ');
 
     if (/^\s*I\s*[.!?]?\s*$/i.test(toSpeak)) {
       toSpeak = "eye";
@@ -337,15 +339,14 @@ function speakWord(text, subjectName) {
         const isTarget = v => (v.lang || '').toLowerCase().replace('_', '-') === targetLang.toLowerCase() ||
                               (v.lang || '').toLowerCase().replace('_', '-').startsWith(langPrefix);
 
-        // 1. Prémiové hlasy
         let match = voices.find(v => isTarget(v) && /(enhanced|premium|natural|pro)/i.test(v.name));
 
-        // 2. Vyjmenované nejlepší hlasy pro iOS
         if (!match) {
             let bestNames = [];
             if (targetLang === 'en-GB') bestNames = ['daniel', 'oliver', 'serena', 'stephanie', 'arthur', 'martha', 'kate'];
             else if (targetLang === 'de-DE') bestNames = ['anna', 'petra', 'markus', 'yannick', 'helena', 'martin'];
             else if (targetLang === 'cs-CZ') bestNames = ['iveta', 'zuzana'];
+            else if (targetLang === 'es-ES') bestNames = ['jorge', 'monica', 'carmen', 'diego'];
             else if (targetLang === 'en-US') bestNames = ['samantha', 'alex', 'karen', 'ava', 'tom'];
 
             for (let name of bestNames) {
@@ -354,13 +355,8 @@ function speakWord(text, subjectName) {
             }
         }
 
-        // 3. Hlasy Siri
         if (!match) match = voices.find(v => isTarget(v) && /siri/i.test(v.name));
-        
-        // 4. Vyřazení compact plechových hlasů
         if (!match) match = voices.find(v => isTarget(v) && !/compact/i.test(v.name));
-        
-        // 5. Základní shoda
         if (!match) match = voices.find(isTarget);
 
         if (match) {
@@ -411,19 +407,22 @@ function addReward(count = 1, section = "Lekce") {
   } catch(e) {}
 }
 
-// --- BLESKOVÉ NAČTENÍ Z PAMĚTI A PROBUZENÍ SÍTĚ ---
+// --- SYNCHRONIZACE DAT ---
 async function loadData() {
+  checkDateRollover();
+  if (currentUser) {
+    todaySecondsStudied = loadUserStudyTime(currentUser.name);
+  }
   const cached = localStorage.getItem("app_data");
   if (cached) {
     try {
       appData = JSON.parse(cached);
       if (!appData.items) appData.items = [];
-      // Okamžitě vykreslíme obrazovku z paměti telefonu (0 ms prodleva)
       renderScreen();
     } catch(e) {}
+  } else { 
+    renderScreen(); 
   }
-  
-  // Stahování z cloudu probíhá na pozadí, aniž by blokovalo žáka
   await syncData();
 }
 
@@ -432,14 +431,10 @@ async function syncData() {
   if (statusEl) statusEl.innerText = "Stahuji...";
   try {
     const controller = new AbortController();
-    // Pro mobil zkrátíme limit na 10s, aby nevisel zbytečně dlouho
     const timeoutId = setTimeout(() => controller.abort(), 10000);
-    
-    // Přidán časový parametr ?t=..., aby Safari necachovalo starou odpověď
     const fetchUrl = API_URL + (API_URL.includes('?') ? '&' : '?') + 't=' + Date.now();
     const res = await fetch(fetchUrl, { signal: controller.signal });
     clearTimeout(timeoutId);
-    
     const json = await res.json();
     if (json && json.items) {
       appData = json;
@@ -458,10 +453,8 @@ async function syncData() {
           if (foundU.todayMinutes !== undefined) {
             const cloudSec = Math.round(Number(foundU.todayMinutes) * 60);
             const localSec = loadUserStudyTime(currentUser.name);
-            // Nastaví čas podle reálného stavu dneška
             todaySecondsStudied = Math.max(localSec, cloudSec);
-            localStorage.setItem(getStudyTimeKey(currentUser.name), todaySecondsStudied);
-          }
+            localStorage.setItem(getStudyTimeKey(currentUser.name), String(todaySecondsStudied));
           }
           localStorage.setItem("cur_user", JSON.stringify(currentUser));
         }
@@ -469,7 +462,6 @@ async function syncData() {
     }
   } catch(e) { 
     if (statusEl) {
-      // Pokud máme data v paměti, napíšeme OK z paměti, ne chybový stav
       statusEl.innerText = (appData && appData.items && appData.items.length > 0) 
         ? `OK: ${appData.items.length} úloh` 
         : "Offline";
@@ -553,7 +545,7 @@ function selectUser(name, grade, targetMinutes) {
   let localSec = loadUserStudyTime(currentUser.name);
   let cloudSec = foundU ? Math.round(Number(foundU.todayMinutes || 0) * 60) : 0;
   todaySecondsStudied = Math.max(localSec, cloudSec);
-  localStorage.setItem(getStudyTimeKey(currentUser.name), todaySecondsStudied);
+  localStorage.setItem(getStudyTimeKey(currentUser.name), String(todaySecondsStudied));
 
   isTimerPaused = false;
   updateStudyTimerUI();
@@ -721,7 +713,6 @@ function renderScreen() {
     const vItems = getVocabItems();
     let lessons = [...new Set(vItems.map(it => it.lesson))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
 
-    // 1. Zjistíme minimální level z Google Tabulky pro daný předmět
     const subjNorm = selectedSubject.toLowerCase().replace(/[^a-z]/g, "");
     let userMinLvl = 1;
     if (currentUser && currentUser.startLevels) {
@@ -733,7 +724,6 @@ function renderScreen() {
       }
     }
 
-    // 2. Najdeme první nedokončený level (od nastaveného startu výše)
     let currentLesson = lessons[0] || "Level 1";
     for (let l of lessons) {
       let num = parseInt(l.replace(/\D/g, '')) || 1;
@@ -824,7 +814,7 @@ function renderScreen() {
     main.innerHTML = html;
   }
 
-  // 7. VÝBĚR ŘADY (MEZIKROK POKUD JE ŘAD VÍCE)
+  // 7. VÝBĚR ŘADY (MEZIKROK)
   else if (currentScreen === "SELECT_SEQ_ITEM") {
     bGroup.style.display = "flex"; bGroup.innerText = selectedGroupKey;
     const sItems = getSeqItems();
