@@ -1,8 +1,26 @@
 /**
- * HERNÍ REŽIMY: KARTY, ZKOUŠENÍ, SKLÁDÁNÍ, ARKÁDA, PEXESO, KVÍZ, ŘADA NA ČAS, KAMPAŇ (SPIRÁLA)
+ * HERNÍ REŽIMY: KARTY, ZKOUŠENÍ, SKLÁDÁNÍ, ARKÁDA, PEXESO, KVÍZ, ŘADA NA ČAS, HAD, KAMPAŇ
  */
+
+// --- GLOBÁLNÍ STAVOVÉ PROMĚNNÉ HER ---
+let vCardIdx = 0;
+let vMastery = {}, vActivePool = 3, vCurrentWord = 0, vLastWord = -1, vQuizRevealed = false;
+let scrambleDeck = [], scramblePlaced = [], scrambleTiles = [], scrambleIsWordMode = false, scrambleHadMistake = false, scrambleDone = false, scrambleSolvedCount = 0;
+let pexesoPairCount = 4, pexesoCards = [], pexesoFlipped = [], pexesoMatched = [], pexesoLocked = false, pexesoAttempts = 0;
+let qCurStep = 0, qAnswered = false, qChosenOpt = null, qActiveList = [];
+let seqTargetIdx = 0, seqSlots = [], seqStartTime = 0, seqTimerInterval = null, seqHintActive = false, seqInactivityTimer = null;
+
+// Arkáda a Minihry
+let isCampaignMinigame = false;
+let campaignMinigameCoins = 0;
+let campaignMinigamePool = [];
+let arcadeMode = "";
+let arcadeCurrentOptions = [];
+let arcadeDeck = [], arcadeCurrent = null, arcadeLives = 3, arcadeScore = 0, arcadeLevel = 1, arcadeY = 0, arcadeX = 50, arcadeSpeed = 0.8, arcadeAnimId = null, arcadeState = "PLAYING";
+
+// Had (Snake)
 let snakeInterval = null;
-let snakeGridSize = 17; // 17x17 políček (při 340px má každé políčko 20px)
+let snakeGridSize = 17;
 let snakeCellSize = 20;
 let snakeBody = [];
 let snakeDir = { x: 1, y: 0 };
@@ -10,7 +28,7 @@ let snakeNextDir = { x: 1, y: 0 };
 let snakeLives = 3;
 let snakeScore = 0;
 let snakeLevel = 1;
-let snakeSpeed = 170;
+let snakeSpeed = 220;
 let snakeDeck = [];
 let snakeCurrentWord = null;
 let snakeTargetLetters = [];
@@ -18,13 +36,15 @@ let snakeCurrentIdx = 0;
 let snakeFoods = [];
 let snakeState = "PLAYING";
 let snakeStatusMsg = "";
+let snakeShieldLetters = 0;
+let snakeTouchStartX = 0, snakeTouchStartY = 0;
 
-let isCampaignMinigame = false;
-let campaignMinigameCoins = 0;
-let campaignMinigamePool = [];
-let arcadeMode = "";
-let arcadeCurrentOptions = [];
-let qActiveList = [];
+// Kampaň (Spirála)
+let cmpQueue = [];
+let cmpIdx = 0;
+let cmpHearts = 5;
+let cmpState = 'PLAYING';
+let cmpChosenOpt = null;
 
 function formatPromptText(text) {
   if (!text) return "";
@@ -32,10 +52,8 @@ function formatPromptText(text) {
 }
 
 // ==========================================
-// 1. OVLÁDÁNÍ KARET (DALŠÍ / PŘEDCHOZÍ / ZVUK)
+// 1. KARTY (FLASHCARDS)
 // ==========================================
-let vCardIdx = 0;
-
 function vCardNext() {
   const vItems = getVocabItems();
   if (vItems.length === 0) return;
@@ -58,14 +76,8 @@ function speakCurrentCard() {
 }
 
 // ==========================================
-// 2. ZKOUŠENÍ Z HLAVY
+// 2. ZKOUŠENÍ Z HLAVY (LEITNER ADAPTIVE)
 // ==========================================
-let vMastery = {}, vActivePool = 3, vCurrentWord = 0, vLastWord = -1, vQuizRevealed = false;
-let scrambleDeck = [], scramblePlaced = [], scrambleTiles = [], scrambleIsWordMode = false, scrambleHadMistake = false, scrambleDone = false, scrambleSolvedCount = 0;
-let pexesoPairCount = 4, pexesoCards = [], pexesoFlipped = [], pexesoMatched = [], pexesoLocked = false, pexesoAttempts = 0;
-let qCurStep = 0, qAnswered = false, qChosenOpt = null;
-let seqTargetIdx = 0, seqSlots = [], seqStartTime = 0, seqTimerInterval = null, seqHintActive = false, seqInactivityTimer = null;
-
 function initGameState() {
   const vItems = getVocabItems();
   const qItems = getQuizItems();
@@ -162,7 +174,7 @@ function answerAdaptive(known) {
 }
 
 // ==========================================
-// 3. SKLÁDÁNÍ SLOV A FRÁZÍ
+// 3. SKLÁDÁNÍ SLOV A FRÁZÍ (SCRAMBLE)
 // ==========================================
 function initScramble() {
   const vItems = getVocabItems();
@@ -200,10 +212,8 @@ function clickScrambleTile(idx) {
 }
 
 // ==========================================
-// 4. ARKÁDA PADAJÍCÍ SLOVA (S PODPOROU KAMPANĚ)
+// 4. ARKÁDA PADAJÍCÍ SLOVA
 // ==========================================
-let arcadeDeck = [], arcadeCurrent = null, arcadeLives = 3, arcadeScore = 0, arcadeLevel = 1, arcadeY = 0, arcadeX = 50, arcadeSpeed = 0.8, arcadeAnimId = null, arcadeState = "PLAYING";
-
 function stopArcadeLoop() {
   if (arcadeAnimId) { cancelAnimationFrame(arcadeAnimId); arcadeAnimId = null; }
 }
@@ -319,13 +329,7 @@ function handleArcadeMiss() {
   if (el) {
     el.classList.add("miss");
     const m = el.querySelector(".falling-main-word");
-    if (m) {
-        if (arcadeMode === "TRANSLATE") {
-            m.innerText = arcadeCurrent.question; // V překladu ukáže správné cizí slovo
-        } else {
-            m.innerText = arcadeCurrent.question;
-        }
-    }
+    if (m) m.innerText = arcadeCurrent.question;
   }
   if (isAutoTTS) speakWord(arcadeCurrent.question, selectedSubject);
   setTimeout(spawnArcadeWord, 1400);
@@ -344,7 +348,7 @@ function startPexesoGame(pairCount) {
 }
 
 function startCampaignPexeso() {
-  pexesoPairCount = 6; // Pro kampaň pevně 12 karet
+  pexesoPairCount = 6;
   selectedGame = "PEXESO";
   let shuffled = campaignMinigamePool.sort(() => Math.random() - 0.5).slice(0, pexesoPairCount);
   initPexesoBoard(shuffled);
@@ -384,7 +388,7 @@ function clickPexesoCard(idx) {
 }
 
 // ==========================================
-// 6. KVÍZ
+// 6. KVÍZ (SAMOSTATNÝ)
 // ==========================================
 function clickQuizOpt(optIdx) {
   if (qAnswered) return;
@@ -411,7 +415,8 @@ function resetInactivityTimer() {
 function initSequence() {
   const sItems = getSeqItems();
   if (sItems.length === 0) return;
-  const itemsList = sItems[selectedSeqIndex].answer.split('|').map(s => s.trim()).filter(Boolean);
+  const seqConfig = sItems[selectedSeqIndex] || sItems[0];
+  const itemsList = seqConfig.answer.split('|').map(s => s.trim()).filter(Boolean);
 
   seqTargetIdx = 0; seqHintActive = false; seqSlots = [-1, -1, -1, -1];
   seqSlots[0] = 0; if (itemsList.length > 1) seqSlots[1] = 1;
@@ -429,7 +434,8 @@ function initSequence() {
 
 function clickSeqSlot(slot) {
   const sItems = getSeqItems();
-  const itemsList = sItems[selectedSeqIndex].answer.split('|').map(s => s.trim()).filter(Boolean);
+  const seqConfig = sItems[selectedSeqIndex] || sItems[0];
+  const itemsList = seqConfig.answer.split('|').map(s => s.trim()).filter(Boolean);
   const btnEl = document.getElementById(`seq-btn-${slot}`);
 
   if (seqSlots[slot] === seqTargetIdx) {
@@ -450,10 +456,629 @@ function clickSeqSlot(slot) {
   }
 }
 
-function startGame(game) { stopArcadeLoop(); selectedGame = game; isCampaignMinigame = false; initGameState(); setScreen("PLAYING"); }
+function startGame(game) { 
+  stopArcadeLoop(); 
+  stopSnakeLoop();
+  selectedGame = game; 
+  isCampaignMinigame = false; 
+  initGameState(); 
+  setScreen("PLAYING"); 
+}
 
 // ==========================================
-// 8. HLAVNÍ RENDERÉR VŠECH HER
+// 8. HRA HAD (SNAKE SPELLING ENGINE)
+// ==========================================
+function stopSnakeLoop() {
+  if (snakeInterval) { clearInterval(snakeInterval); snakeInterval = null; }
+}
+
+function startSnakeGame() {
+  stopArcadeLoop();
+  stopSnakeLoop();
+  
+  const vItems = getVocabItems();
+  snakeDeck = vItems.filter(it => {
+    let clean = it.question.replace(/^(der|die|das|ein|eine|el|la|un|una)\s+/i, '').trim();
+    return clean.split(/\s+/).length === 1 && clean.length >= 2 && clean.length <= 10 && !clean.includes('.');
+  }).sort(() => Math.random() - 0.5);
+
+  if (snakeDeck.length === 0) {
+    alert("V této lekci nejsou žádná vhodná jednoslovná slovíčka pro hada.");
+    return;
+  }
+
+  snakeLives = 3;
+  snakeScore = 0;
+  snakeLevel = 1;
+  snakeSpeed = 220;
+  snakeShieldLetters = 0;
+  selectedGame = "SNAKE";
+  setScreen("PLAYING");
+
+  setupNextSnakeWord();
+  resetSnakePosition();
+  runSnakeLoop();
+  setTimeout(attachSnakeTouchHandlers, 50);
+}
+
+function buySnakeShieldInGame() {
+  if (snakeLives > 1 && snakeShieldLetters <= 0) {
+    snakeLives--;
+    snakeShieldLetters = 20;
+    sndFanfare();
+    renderActiveGame();
+    setTimeout(attachSnakeTouchHandlers, 20);
+  } else if (snakeLives <= 1) {
+    alert("Nemůžeš obětovat své poslední srdíčko! ❤️");
+  }
+}
+
+function setupNextSnakeWord() {
+  if (snakeDeck.length === 0) {
+    const vItems = getVocabItems();
+    snakeDeck = vItems.filter(it => {
+      let clean = it.question.replace(/^(der|die|das|ein|eine|el|la|un|una)\s+/i, '').trim();
+      return clean.split(/\s+/).length === 1 && clean.length >= 2 && clean.length <= 10;
+    }).sort(() => Math.random() - 0.5);
+  }
+
+  const rawItem = snakeDeck.pop();
+  let cleanForeign = rawItem.question.replace(/^(der|die|das|ein|eine|el|la|un|una)\s+/i, '').trim().toUpperCase();
+
+  snakeCurrentWord = {
+    raw: rawItem,
+    czech: cleanCzechTranslation(rawItem.answer),
+    foreign: rawItem.question,
+    cleanForeign: cleanForeign
+  };
+
+  snakeTargetLetters = getGraphemes(cleanForeign);
+  snakeCurrentIdx = 0;
+  spawnSnakeFood();
+}
+
+function resetSnakePosition() {
+  snakeBody = [
+    { x: 5, y: 8 },
+    { x: 4, y: 8 },
+    { x: 3, y: 8 }
+  ];
+  snakeDir = { x: 1, y: 0 };
+  snakeNextDir = { x: 1, y: 0 };
+}
+
+function spawnSnakeFood() {
+  snakeFoods = [];
+  const occupied = new Set();
+  snakeBody.forEach(seg => occupied.add(`${seg.x},${seg.y}`));
+
+  for (let i = snakeCurrentIdx; i < snakeTargetLetters.length; i++) {
+    const ch = snakeTargetLetters[i];
+    let pos = getRandomFreeGridPos(occupied);
+    if (pos) {
+      occupied.add(`${pos.x},${pos.y}`);
+      snakeFoods.push({ x: pos.x, y: pos.y, char: ch, isTarget: (i === snakeCurrentIdx) });
+    }
+  }
+
+  if (snakeLevel >= 2) {
+    const distractorsCount = Math.min(3, snakeLevel - 1);
+    const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    for (let d = 0; d < distractorsCount; d++) {
+      let randChar = alphabet[Math.floor(Math.random() * alphabet.length)];
+      let pos = getRandomFreeGridPos(occupied);
+      if (pos) {
+        occupied.add(`${pos.x},${pos.y}`);
+        snakeFoods.push({ x: pos.x, y: pos.y, char: randChar, isTarget: false });
+      }
+    }
+  }
+}
+
+function getRandomFreeGridPos(occupied) {
+  let tries = 0;
+  while (tries < 150) {
+    let x = Math.floor(Math.random() * (snakeGridSize - 2)) + 1;
+    let y = Math.floor(Math.random() * (snakeGridSize - 2)) + 1;
+    let key = `${x},${y}`;
+    if (!occupied.has(key)) return { x, y };
+    tries++;
+  }
+  return null;
+}
+
+function runSnakeLoop() {
+  stopSnakeLoop();
+  snakeState = "PLAYING";
+  snakeInterval = setInterval(() => {
+    if (currentScreen !== "PLAYING" || selectedGame !== "SNAKE" || isTimerPaused) return;
+    updateSnake();
+    drawSnake();
+  }, snakeSpeed);
+}
+
+function setSnakeDirection(dx, dy) {
+  if (typeof registerUserAction === "function") registerUserAction();
+  if (snakeDir.x + dx === 0 && snakeDir.y + dy === 0) return;
+  snakeNextDir = { x: dx, y: dy };
+}
+
+function updateSnake() {
+  if (snakeState !== "PLAYING") return;
+  snakeDir = { ...snakeNextDir };
+
+  let nextX = snakeBody[0].x + snakeDir.x;
+  let nextY = snakeBody[0].y + snakeDir.y;
+
+  if (snakeShieldLetters > 0) {
+    if (nextX < 0) nextX = snakeGridSize - 1;
+    else if (nextX >= snakeGridSize) nextX = 0;
+    if (nextY < 0) nextY = snakeGridSize - 1;
+    else if (nextY >= snakeGridSize) nextY = 0;
+  } else {
+    if (nextX < 0 || nextX >= snakeGridSize || nextY < 0 || nextY >= snakeGridSize) {
+      handleSnakeDeath("Náraz do zdi! 💥");
+      return;
+    }
+  }
+
+  const head = { x: nextX, y: nextY };
+
+  if (snakeShieldLetters <= 0) {
+    for (let i = 0; i < snakeBody.length - 1; i++) {
+      if (snakeBody[i].x === head.x && snakeBody[i].y === head.y) {
+        handleSnakeDeath("Kousnutí se do ocasu! 💥");
+        return;
+      }
+    }
+  }
+
+  const foodIdx = snakeFoods.findIndex(f => f.x === head.x && f.y === head.y);
+  if (foodIdx !== -1) {
+    const eaten = snakeFoods[foodIdx];
+    const targetChar = snakeTargetLetters[snakeCurrentIdx];
+
+    if (eaten.char === targetChar) {
+      sndOk();
+      snakeFoods.splice(foodIdx, 1);
+      snakeCurrentIdx++;
+      snakeBody.unshift(head);
+
+      if (snakeShieldLetters > 0) {
+        snakeShieldLetters--;
+        if (snakeShieldLetters === 0) renderActiveGame();
+      }
+
+      if (snakeCurrentIdx >= snakeTargetLetters.length) {
+        handleSnakeWordComplete();
+        return;
+      } else {
+        snakeFoods.forEach(f => {
+          f.isTarget = (f.char === snakeTargetLetters[snakeCurrentIdx]);
+        });
+      }
+    } else {
+      if (snakeShieldLetters > 0) {
+        sndErr();
+        snakeStatusMsg = `🛡️ Štít tě ochránil! Špatné písmeno [ ${eaten.char} ]. Hledej [ ${targetChar} ]`;
+        snakeState = "PAUSED_SHIELD";
+        stopSnakeLoop();
+        renderActiveGame();
+        setTimeout(() => {
+          snakeState = "PLAYING";
+          runSnakeLoop();
+          renderActiveGame();
+        }, 1200);
+        return;
+      } else {
+        handleSnakeDeath(`Špatné písmeno [ ${eaten.char} ]! Hledáš [ ${targetChar} ]`);
+        return;
+      }
+    }
+  } else {
+    snakeBody.unshift(head);
+    snakeBody.pop();
+  }
+}
+
+function handleSnakeWordComplete() {
+  snakeState = "WORD_DONE";
+  stopSnakeLoop();
+  sndFanfare();
+  snakeScore++;
+  addReward(1, "Had");
+
+  if (isAutoTTS && snakeCurrentWord) speakWord(snakeCurrentWord.foreign, selectedSubject);
+
+  if (snakeScore % 3 === 0) {
+    snakeLevel++;
+    snakeSpeed = Math.max(100, snakeSpeed - 15);
+  }
+
+  if (snakeShieldLetters <= 0) {
+    const nextX = snakeBody[0].x + snakeDir.x;
+    const nextY = snakeBody[0].y + snakeDir.y;
+    if (nextX < 0 || nextX >= snakeGridSize || nextY < 0 || nextY >= snakeGridSize) {
+      const turn1 = { x: -snakeDir.y, y: snakeDir.x };
+      const turn2 = { x: snakeDir.y, y: -snakeDir.x };
+      const t1X = snakeBody[0].x + turn1.x, t1Y = snakeBody[0].y + turn1.y;
+      if (t1X >= 0 && t1X < snakeGridSize && t1Y >= 0 && t1Y < snakeGridSize) {
+        snakeDir = turn1; snakeNextDir = turn1;
+      } else {
+        snakeDir = turn2; snakeNextDir = turn2;
+      }
+    }
+  }
+
+  setTimeout(() => {
+    setupNextSnakeWord();
+    runSnakeLoop();
+    renderActiveGame();
+    setTimeout(attachSnakeTouchHandlers, 20);
+  }, 1000);
+
+  renderActiveGame();
+}
+
+function handleSnakeDeath(reason) {
+  snakeState = "HIT";
+  stopSnakeLoop();
+  sndErr();
+  snakeLives--;
+  snakeStatusMsg = reason;
+
+  if (snakeLives <= 0) {
+    snakeState = "GAMEOVER";
+    renderActiveGame();
+  } else {
+    setTimeout(() => {
+      resetSnakePosition();
+      snakeCurrentIdx = 0;
+      spawnSnakeFood();
+      runSnakeLoop();
+      renderActiveGame();
+      setTimeout(attachSnakeTouchHandlers, 20);
+    }, 1400);
+    renderActiveGame();
+  }
+}
+
+function drawSnake() {
+  const canvas = document.getElementById("snake-canvas");
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
+
+  ctx.fillStyle = "#08101e";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.04)";
+  ctx.lineWidth = 1;
+  for (let x = 0; x <= canvas.width; x += snakeCellSize) {
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+  }
+  for (let y = 0; y <= canvas.height; y += snakeCellSize) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+  }
+
+  snakeFoods.forEach(f => {
+    let px = f.x * snakeCellSize;
+    let py = f.y * snakeCellSize;
+
+    ctx.save();
+    if (f.isTarget) {
+      ctx.fillStyle = "rgba(250, 204, 21, 0.25)";
+      ctx.strokeStyle = "#facc15";
+      ctx.lineWidth = 2;
+    } else {
+      ctx.fillStyle = "rgba(0, 188, 212, 0.15)";
+      ctx.strokeStyle = "#00bcd4";
+      ctx.lineWidth = 1;
+    }
+    ctx.beginPath();
+    ctx.roundRect(px + 2, py + 2, snakeCellSize - 4, snakeCellSize - 4, 4);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = f.isTarget ? "#facc15" : "#ffffff";
+    ctx.font = "bold 13px Roboto, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(f.char, px + (snakeCellSize / 2), py + (snakeCellSize / 2) + 1);
+    ctx.restore();
+  });
+
+  snakeBody.forEach((seg, idx) => {
+    let px = seg.x * snakeCellSize;
+    let py = seg.y * snakeCellSize;
+
+    ctx.save();
+    if (idx === 0) {
+      ctx.fillStyle = snakeShieldLetters > 0 ? "#38bdf8" : "#22c55e";
+      ctx.beginPath();
+      ctx.roundRect(px + 1, py + 1, snakeCellSize - 2, snakeCellSize - 2, 6);
+      ctx.fill();
+
+      ctx.fillStyle = "#000000";
+      if (snakeDir.x === 1) {
+        ctx.fillRect(px + 13, py + 4, 3, 3); ctx.fillRect(px + 13, py + 13, 3, 3);
+      } else if (snakeDir.x === -1) {
+        ctx.fillRect(px + 4, py + 4, 3, 3); ctx.fillRect(px + 4, py + 13, 3, 3);
+      } else if (snakeDir.y === 1) {
+        ctx.fillRect(px + 4, py + 13, 3, 3); ctx.fillRect(px + 13, py + 13, 3, 3);
+      } else {
+        ctx.fillRect(px + 4, py + 4, 3, 3); ctx.fillRect(px + 13, py + 4, 3, 3);
+      }
+    } else {
+      if (snakeShieldLetters > 0) {
+        ctx.fillStyle = idx % 2 === 0 ? "#0284c7" : "#0369a1";
+      } else {
+        ctx.fillStyle = idx % 2 === 0 ? "#16a34a" : "#15803d";
+      }
+      ctx.beginPath();
+      ctx.roundRect(px + 2, py + 2, snakeCellSize - 4, snakeCellSize - 4, 4);
+      ctx.fill();
+    }
+    ctx.restore();
+  });
+}
+
+window.addEventListener("keydown", (e) => {
+  if (currentScreen === "PLAYING" && selectedGame === "SNAKE") {
+    if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space"].includes(e.code)) {
+      e.preventDefault();
+    }
+    if (e.code === "ArrowUp" || e.key === "w" || e.key === "W") setSnakeDirection(0, -1);
+    else if (e.code === "ArrowDown" || e.key === "s" || e.key === "S") setSnakeDirection(0, 1);
+    else if (e.code === "ArrowLeft" || e.key === "a" || e.key === "A") setSnakeDirection(-1, 0);
+    else if (e.code === "ArrowRight" || e.key === "d" || e.key === "D") setSnakeDirection(1, 0);
+  }
+});
+
+function attachSnakeTouchHandlers() {
+  const wrap = document.querySelector(".snake-canvas-wrap");
+  const canvas = document.getElementById("snake-canvas");
+  if (!wrap || !canvas) return;
+
+  const preventDefaultTouch = (e) => {
+    if (e.cancelable) e.preventDefault();
+  };
+
+  wrap.addEventListener("touchstart", (e) => {
+    preventDefaultTouch(e);
+    if (typeof registerUserAction === "function") registerUserAction();
+    if (e.touches && e.touches[0]) {
+      snakeTouchStartX = e.touches[0].clientX;
+      snakeTouchStartY = e.touches[0].clientY;
+    }
+  }, { passive: false });
+
+  wrap.addEventListener("touchmove", preventDefaultTouch, { passive: false });
+
+  wrap.addEventListener("touchend", (e) => {
+    preventDefaultTouch(e);
+    if (!e.changedTouches || !e.changedTouches[0]) return;
+    const dx = e.changedTouches[0].clientX - snakeTouchStartX;
+    const dy = e.changedTouches[0].clientY - snakeTouchStartY;
+    
+    if (Math.abs(dx) > 15 || Math.abs(dy) > 15) {
+      if (Math.abs(dx) > Math.abs(dy)) {
+        setSnakeDirection(dx > 0 ? 1 : -1, 0);
+      } else {
+        setSnakeDirection(0, dy > 0 ? 1 : -1);
+      }
+    }
+  }, { passive: false });
+}
+
+// ==========================================
+// 9. KAMPAŇ ENGINE (SPIRÁLA)
+// ==========================================
+function startCampaign() {
+  let q = [];
+  let allVItems = getVocabItems();
+  let allQItems = getQuizItems();
+
+  let currentVItems = allVItems.filter(it => it.lesson === selectedGroupKey);
+  let olderVItems = allVItems.filter(it => it.lesson !== selectedGroupKey && (parseInt(it.lesson.replace(/\D/g, ''))||1) < (parseInt(selectedGroupKey.replace(/\D/g, ''))||1));
+  let currentQItems = allQItems.filter(it => it.lesson === selectedGroupKey);
+
+  let qRevision = []; let qNewPassive = []; let qNewActive = []; let qGrammar = []; let qSentences = [];
+
+  if (olderVItems.length > 0) {
+      let shuffledOlder = olderVItems.sort(() => Math.random() - 0.5).slice(0, 5);
+      shuffledOlder.forEach(it => {
+          if (it.question.trim().includes(' ')) qRevision.push({ type: 'SCRAMBLE', data: it });
+          else qRevision.push({ type: 'QUIZ_IN', data: it });
+      });
+  }
+
+  currentVItems.forEach(it => {
+      if (it.question.trim().includes(' ') || it.question.trim().includes('-')) {
+          qSentences.push({ type: 'SCRAMBLE', data: it });
+      } else {
+          qNewPassive.push({ type: 'QUIZ_IN', data: it });
+          qNewActive.push({ type: 'QUIZ_OUT', data: it });
+          qSentences.push({ type: 'SCRAMBLE', data: it }); // Písmenkování
+      }
+  });
+
+  currentQItems.forEach(it => qGrammar.push({ type: 'KVIZ', data: it }));
+
+  qRevision.sort(() => Math.random() - 0.5); 
+  qNewPassive.sort(() => Math.random() - 0.5); 
+  qNewActive.sort(() => Math.random() - 0.5); 
+  qGrammar.sort(() => Math.random() - 0.5); 
+  qSentences.sort(() => Math.random() - 0.5);
+
+  q = [...qRevision, ...qNewPassive, ...qNewActive, ...qGrammar, ...qSentences];
+  if (q.length > 40) q = q.slice(0, 40);
+
+  q.forEach(task => {
+    if (task.type === 'QUIZ_OUT' || task.type === 'QUIZ_IN') {
+       const isOut = task.type === 'QUIZ_OUT';
+       const correctAns = isOut ? task.data.question : cleanCzechTranslation(task.data.answer);
+       
+       let localItems = [...currentVItems, ...olderVItems];
+       let pool = [...new Set(localItems.map(i => isOut ? i.question : cleanCzechTranslation(i.answer)))].filter(ans => ans !== correctAns);
+       
+       if (pool.length > 0) {
+           while (pool.length < 3) {
+               pool.push(pool[Math.floor(Math.random() * pool.length)]);
+           }
+       } else {
+           pool = ["...", "...", "..."];
+       }
+       
+       pool.sort(() => Math.random() - 0.5);
+       task.opts = [correctAns, ...pool.slice(0, 3)].sort(() => Math.random() - 0.5);
+       task.correctAns = correctAns;
+       task.prompt = isOut ? cleanCzechTranslation(task.data.answer) : task.data.question;
+
+    } else if (task.type === 'SCRAMBLE') {
+       const raw = task.data.question.trim();
+       const isWordMode = (raw.split(/\s+/).length >= 3 || raw.length > 15);
+       const tokens = isWordMode ? (raw.includes('-') ? raw.split('-').map(s=>s.trim()) : raw.split(/\s+/)) : getGraphemes(raw);
+       task.tokens = tokens;
+       task.tiles = tokens.map((t, i) => ({ text: t, used: false, id: i })).sort(() => Math.random() - 0.5);
+       task.placed = [];
+       task.isWordMode = isWordMode;
+       task.hadMistake = false;
+    } else if (task.type === 'KVIZ') {
+       task.opts = task.data.options;
+       task.correctAns = task.data.answer;
+       task.prompt = formatPromptText(task.data.question);
+    }
+  });
+
+  cmpQueue = q; 
+  cmpIdx = 0; 
+  cmpHearts = 5; 
+  cmpState = 'PLAYING'; 
+  cmpChosenOpt = null; 
+  isCampaignMinigame = false;
+
+  selectedGame = 'CAMPAIGN'; 
+  setScreen('PLAYING');
+  if (isAutoTTS && cmpQueue[0] && cmpQueue[0].type === 'QUIZ_IN') speakWord(cmpQueue[0].prompt, selectedSubject);
+}
+
+function clickCmpQuizOpt(opt) {
+  if (cmpState !== 'PLAYING') return;
+  const task = cmpQueue[cmpIdx];
+  cmpChosenOpt = opt; 
+  cmpState = 'EVAL';
+
+  if (opt === task.correctAns) {
+    sndOk();
+    if (task.type === 'QUIZ_OUT' || task.type === 'QUIZ_IN') {
+      const dir = task.type === 'QUIZ_OUT' ? 'DIR_OUT' : 'DIR_IN';
+      const mVal = getSavedMastery(task.data.question, dir);
+      if (mVal < 2) saveWordMasteryToGoogle(task.data.question, mVal + 1, dir);
+    }
+  } else {
+    sndErr(); 
+    cmpHearts = Math.max(0, cmpHearts - 1);
+    let newTask = JSON.parse(JSON.stringify(task));
+    if (newTask.opts) newTask.opts.sort(() => Math.random() - 0.5);
+    cmpQueue.push(newTask);
+    if (task.type === 'QUIZ_OUT' || task.type === 'QUIZ_IN') {
+      saveWordMasteryToGoogle(task.data.question, 0, task.type === 'QUIZ_OUT' ? 'DIR_OUT' : 'DIR_IN');
+    }
+  }
+
+  if (isAutoTTS && task.type !== 'QUIZ_IN') {
+    let toRead = task.type === 'KVIZ' ? task.data.question.replace(/___+/g, task.data.answer) : task.data.question;
+    speakWord(toRead.replace(/[*_]/g, ''), selectedSubject);
+  }
+  renderActiveGame();
+}
+
+function clickCmpScrambleTile(idx) {
+  if (cmpState !== 'PLAYING') return;
+  const task = cmpQueue[cmpIdx];
+  const tile = task.tiles[idx];
+  if (tile.used) return;
+
+  if (tile.text === task.tokens[task.placed.length]) {
+    sndOk(); 
+    tile.used = true; 
+    task.placed.push(tile.text);
+    if (task.placed.length === task.tokens.length) { 
+      cmpState = 'EVAL'; 
+      if (isAutoTTS) speakWord(task.data.question, selectedSubject); 
+      
+      // Přičtení hvězd při bezchybném složení
+      if (!task.hadMistake) {
+        const mIn = getSavedMastery(task.data.question, 'DIR_IN');
+        const mOut = getSavedMastery(task.data.question, 'DIR_OUT');
+        if (mIn < 2) saveWordMasteryToGoogle(task.data.question, mIn + 1, 'DIR_IN');
+        if (mOut < 2) saveWordMasteryToGoogle(task.data.question, mOut + 1, 'DIR_OUT');
+      }
+    }
+  } else {
+    sndErr(); 
+    cmpHearts = Math.max(0, cmpHearts - 1);
+    task.hadMistake = true;
+    
+    let newTask = { type: 'SCRAMBLE', data: task.data, tokens: task.tokens, isWordMode: task.isWordMode, hadMistake: false };
+    newTask.tiles = task.tokens.map((t, i) => ({ text: t, used: false, id: i })).sort(() => Math.random() - 0.5);
+    newTask.placed = []; 
+    cmpQueue.push(newTask);
+  }
+  renderActiveGame();
+}
+
+function nextCmpTask() {
+  cmpIdx++; 
+  cmpState = 'PLAYING'; 
+  cmpChosenOpt = null; 
+  renderActiveGame();
+  if (cmpIdx < cmpQueue.length && isAutoTTS && cmpQueue[cmpIdx].type === 'QUIZ_IN') speakWord(cmpQueue[cmpIdx].prompt, selectedSubject);
+}
+
+function launchCampaignMinigame() {
+    let allVItems = getVocabItems();
+    let singleWords = allVItems.filter(it => it.question.split(' ').length <= 2 && !it.question.includes('.'));
+    
+    let currentLvlNum = parseInt(selectedGroupKey.replace(/\D/g, '')) || 1;
+    let currentSingle = singleWords.filter(it => it.lesson === selectedGroupKey);
+    
+    let olderSingle = singleWords.filter(it => {
+        let itNum = parseInt(it.lesson.replace(/\D/g, '')) || 1;
+        return it.lesson !== selectedGroupKey && itNum < currentLvlNum;
+    }).sort(() => Math.random() - 0.5);
+
+    campaignMinigamePool = [...currentSingle, ...olderSingle].slice(0, 30);
+    isCampaignMinigame = true;
+    campaignMinigameCoins = cmpHearts;
+
+    if (campaignMinigamePool.length > 0 && campaignMinigamePool.length < 10) {
+        let tempPool = [...campaignMinigamePool];
+        while (campaignMinigamePool.length < 20) {
+            campaignMinigamePool.push(tempPool[Math.floor(Math.random() * tempPool.length)]);
+        }
+    } else if (campaignMinigamePool.length === 0) {
+        finishCampaign(campaignMinigameCoins); 
+        return; 
+    }
+
+    let r = Math.random();
+    let isGerman = getTargetLang(selectedSubject).startsWith('de');
+    let articlesCount = campaignMinigamePool.filter(it => /^(der|die|das)\s/i.test(it.question)).length;
+
+    if (isGerman && articlesCount >= 8 && r < 0.33) startCampaignArcade("ARTICLES");
+    else if (r < (isGerman && articlesCount >= 8 ? 0.66 : 0.5)) startCampaignArcade("TRANSLATE");
+    else startCampaignPexeso();
+}
+
+function finishCampaign(coins) {
+  addCoins(currentUser.name, coins);
+  addReward(1, "Trénink: " + selectedGroupKey);
+  setScreen("CAMPAIGN_HUB");
+}
+
+// ==========================================
+// 10. HLAVNÍ RENDERÉR VŠECH AKTIVNÍCH HER
 // ==========================================
 function renderActiveGame() {
   const main = document.getElementById("main-content");
@@ -485,7 +1110,7 @@ function renderActiveGame() {
     `;
   }
 
-  // ZKOUŠENÍ Z HLAVY
+  // ZKOUŠENÍ Z HLAVY (ADAPTIVE)
   else if (selectedGame === "ADAPTIVE") {
     const stats = getMasteryStats();
     const pct = Math.round((stats.current / stats.total) * 100);
@@ -534,7 +1159,7 @@ function renderActiveGame() {
     `;
   }
 
-  // SKLÁDÁNÍ
+  // SKLÁDÁNÍ (SCRAMBLE)
   else if (selectedGame === "SCRAMBLE") {
     const w = vItems[vCurrentWord];
     const pct = Math.min(100, Math.round((scrambleSolvedCount / vItems.length) * 100));
@@ -573,8 +1198,7 @@ function renderActiveGame() {
 
     if (arcadeState === "GAMEOVER") {
       if (isCampaignMinigame) {
-          // ZDE JE OPRAVA: Děleno 10 místo 5
-          let bonusCoins = Math.floor(arcadeScore / 10); 
+          let bonusCoins = Math.floor(arcadeScore / 10);
           main.innerHTML = `
             <div style="text-align:center;padding:35px;">
               <h2 style="color:var(--col-green);font-size:28px;">TRÉNINK DOKONČEN! 🎉</h2>
@@ -632,7 +1256,157 @@ function renderActiveGame() {
       </div>
     `;
   }
-   // HRA HAD (SNAKE)
+
+  // PEXESO
+  else if (selectedGame === "PEXESO") {
+    const totalPairs = Math.min(pexesoPairCount, pexesoCards.length / 2);
+    const isDone = pexesoMatched.length === totalPairs;
+    
+    main.innerHTML = `
+      <div class="bargraph-container">
+        <div class="bargraph-header">
+          <span>Pexeso: ${pexesoMatched.length} / ${totalPairs} dvojic</span>
+          <span style="color:var(--col-yellow);">Pokusy: ${pexesoAttempts}</span>
+        </div>
+        <div class="bargraph-track"><div class="bargraph-fill" style="width:${(pexesoMatched.length / totalPairs) * 100}%;"></div></div>
+      </div>
+      ${!isDone ? `
+        <div class="pexeso-grid" style="grid-template-columns: repeat(4, 1fr);">
+          ${pexesoCards.map((c, i) => {
+            const m = pexesoMatched.includes(c.wordIdx), f = pexesoFlipped.includes(i);
+            return `<div class="pexeso-card ${m?'matched':(f?'flipped':'hidden')}" style="${(m||f) && c.text.length>10?'font-size:12px;':''}" onclick="clickPexesoCard(${i})">${m||f?c.text:'❓'}</div>`;
+          }).join('')}
+        </div>
+      ` : (isCampaignMinigame ? `
+        <div style="text-align:center;padding:30px;">
+          <h2 style="color:var(--col-green);">TRÉNINK DOKONČEN! 🎉</h2>
+          <p style="font-size:18px;color:#fff;margin:10px 0;">Pexeso zvládnuto za <b>${pexesoAttempts} pokusů</b>.</p>
+          <p style="font-size:24px;color:var(--col-yellow);margin-bottom:25px;">Celkem získáváš: +${campaignMinigameCoins + (pexesoAttempts <= 12 ? 3 : (pexesoAttempts <= 16 ? 2 : 1))} 💰</p>
+          <div class="action-btn green" onclick="finishCampaign(${campaignMinigameCoins + (pexesoAttempts <= 12 ? 3 : (pexesoAttempts <= 16 ? 2 : 1))})">PŘIPSAT ZLAŤÁKY A ZPĚT</div>
+        </div>
+      ` : `
+        <div style="text-align:center;padding:30px;">
+          <h2 style="color:var(--col-green);">HOTOVO ZA ${pexesoAttempts} POKUSŮ! 🎉</h2>
+          <div class="action-btn green" onclick="startPexesoGame(pexesoPairCount)">HRÁT ZNOVU</div>
+          <div class="action-btn" onclick="setScreen('SELECT_PEXESO_SIZE')">ZMĚNIT VELIKOST</div>
+        </div>
+      `)}
+    `;
+  }
+
+  // KVÍZ (SAMOSTATNÝ)
+  else if (selectedGame === "QUIZ") {
+    if (qActiveList.length === 0) {
+      main.innerHTML = `<div style="text-align:center;padding:30px;"><h2>V této lekci není žádný kvíz.</h2><div class="action-btn" onclick="setScreen('SELECT_GAME')">ZPĚT</div></div>`;
+      return;
+    }
+
+    if (qCurStep >= qActiveList.length) {
+      main.innerHTML = `
+        <div style="text-align:center;padding:30px;">
+          <h2 style="color:var(--col-green);margin-bottom:10px;">KVÍZ DOKONČEN! 🎉</h2>
+          <p style="color:#fff;margin-bottom:15px;">Zvládl jsi všech ${qActiveList.length} otázek!</p>
+          <div class="action-btn green" onclick="setScreen('SELECT_GAME')">ZPĚT DO MENU</div>
+        </div>
+      `;
+      return;
+    }
+
+    const q = qActiveList[qCurStep];
+    const pct = Math.round(((qCurStep + 1) / qActiveList.length) * 100);
+
+    let promptDisplay = formatPromptText(q.question);
+    if (qAnswered) {
+      const fillHtml = `<span style="color:var(--col-green);font-weight:bold;text-decoration:underline;">${q.answer}</span>`;
+      if (q.question.includes('___')) {
+        promptDisplay = formatPromptText(q.question.replace(/___+/g, fillHtml));
+      } else {
+        promptDisplay = formatPromptText(q.question) + " " + fillHtml;
+      }
+    }
+
+    main.innerHTML = `
+      <div class="bargraph-container">
+        <div class="bargraph-header">
+          <span>Kvíz: Otázka ${qCurStep + 1} z ${qActiveList.length}</span>
+          <span style="color:var(--col-active-tab);">${pct} %</span>
+        </div>
+        <div class="bargraph-track"><div class="bargraph-fill" style="width:${pct}%;"></div></div>
+      </div>
+      <div class="prompt-box" style="font-size:22px;color:#fff;margin:15px 0;">
+        ${promptDisplay}
+        ${(qAnswered && getTargetLang(selectedSubject) !== 'cs-CZ') ? `<span class="audio-btn" onclick="speakWord('${(q.question.includes('___') ? q.question.replace(/___+/g, q.answer) : q.question + ' ' + q.answer).replace(/[*_]/g, '')}', '${selectedSubject}')">🔊</span>` : ''}
+      </div>
+      <div class="grid-2">
+        ${q.options.map((opt, optIdx) => {
+          let btnCls = "";
+          if (qAnswered) {
+            if (opt === q.answer) btnCls = "correct";
+            else if (opt === qChosenOpt) btnCls = "wrong";
+          }
+          return `<div class="opt-btn ${btnCls}" onclick="clickQuizOpt(${optIdx})">${opt}</div>`;
+        }).join('')}
+      </div>
+      ${qAnswered ? `
+        ${q.help ? `<div style="text-align:center;color:var(--col-yellow);margin:10px 0;font-size:16px;font-weight:bold;">[ ${q.help} ]</div>` : ''}
+        <div class="action-btn green" style="margin-top:12px;" onclick="nextQuizStep()">DALŠÍ OTÁZKA ➔</div>
+      ` : ''}
+    `;
+  }
+
+  // PROCEDURÁLNÍ MATEMATIKA
+  else if (selectedGame === "PROCEDURAL_MATH") {
+    const isAns = (typeof mathChosenAnswer !== "undefined" && mathChosenAnswer !== null);
+    main.innerHTML = `
+      <div class="bargraph-container">
+        <div class="bargraph-header">
+          <span>Série správně: ${typeof mathStreak !== "undefined" ? mathStreak : 0} 🔥</span>
+          <span style="color:var(--col-active-tab);">${selectedGroupKey}</span>
+        </div>
+        <div class="bargraph-track"><div class="bargraph-fill" style="width:${Math.min(100, (typeof mathStreak !== "undefined" ? mathStreak : 0) * 10)}%;"></div></div>
+      </div>
+      <div class="prompt-box" style="font-size:36px;color:#fff;margin:20px 0;">${typeof mathTask !== "undefined" ? mathTask.q : ""}</div>
+      <div class="grid-2">
+        ${(typeof mathTask !== "undefined" && mathTask.opts ? mathTask.opts : []).map(opt => `
+          <div class="opt-btn ${isAns ? (String(opt)===String(mathTask.ans)?'correct':(opt===mathChosenAnswer?'wrong':'')) : ''}" style="height:60px;font-size:26px;font-weight:bold;" onclick="clickMathChoice('${opt}')">${opt}</div>
+        `).join('')}
+      </div>
+      ${isAns ? `<div class="action-btn ${String(mathChosenAnswer)===String(mathTask.ans)?'green':'red'}" onclick="generateMathTask();renderActiveGame();">DALŠÍ PŘÍKLAD ➔</div>` : ''}
+    `;
+  }
+
+  // ŘADA NA ČAS
+  else if (selectedGame === "SEQ") {
+    if (sItems.length === 0) return;
+    const seqConfig = sItems[selectedSeqIndex] || sItems[0];
+    const itemsList = seqConfig.answer.split('|').map(s => s.trim()).filter(Boolean);
+    const isFinished = seqTargetIdx >= itemsList.length;
+    const targetWord = itemsList[seqTargetIdx];
+    const pct = Math.round((seqTargetIdx / itemsList.length) * 100);
+
+    main.innerHTML = `
+      <div class="bargraph-container">
+        <div class="bargraph-header">
+          <span>Položka ${Math.min(seqTargetIdx + 1, itemsList.length)} z ${itemsList.length} ${seqHintActive ? '<b style="color:var(--col-yellow);">[NÁPOVĚDA]</b>' : ''}</span>
+          <span id="seq-timer" style="color:var(--col-yellow);font-weight:bold;">0.0 s</span>
+        </div>
+        <div class="bargraph-track"><div class="bargraph-fill" style="width:${pct}%;"></div></div>
+      </div>
+      <div class="prompt-box ${isHebrew ? 'hebrew-text' : ''}" style="margin:8px 0;min-height:56px;color:#fff;font-size:22px;">
+        ${itemsList.slice(0, seqTargetIdx).join(' ')} 
+        <span style="color:var(--col-yellow);">${seqHintActive ? `[ ${targetWord}! ]` : '[ ??? ]'}</span>
+      </div>
+      ${!isFinished ? `
+        <div class="grid-2">
+          ${seqSlots.map((itemIdx, slot) => {
+            const isHintSlot = (seqHintActive && itemIdx === seqTargetIdx);
+            return `<div id="seq-btn-${slot}" class="opt-btn ${isHebrew ? 'hebrew' : ''} ${isHintSlot ? 'hint' : ''}" onclick="clickSeqSlot(${slot})">${itemIdx !== -1 ? itemsList[itemIdx] : ''}</div>`;
+          }).join('')}
+        </div>
+      ` : `<div class="action-btn green" onclick="initSequence();renderActiveGame();">DOKONČENO! HRÁT ZNOVU</div>`}
+    `;
+  }
+
   // HRA HAD (SNAKE S TLAČÍTKEM NA ŠTÍT)
   else if (selectedGame === "SNAKE") {
     if (snakeState === "GAMEOVER") {
@@ -698,139 +1472,10 @@ function renderActiveGame() {
     setTimeout(attachSnakeTouchHandlers, 50);
   }
 
-  // PEXESO
-  else if (selectedGame === "PEXESO") {
-    const totalPairs = Math.min(pexesoPairCount, pexesoCards.length / 2);
-    const isDone = pexesoMatched.length === totalPairs;
-    
-    main.innerHTML = `
-      <div class="bargraph-container">
-        <div class="bargraph-header">
-          <span>Pexeso: ${pexesoMatched.length} / ${totalPairs} dvojic</span>
-          <span style="color:var(--col-yellow);">Pokusy: ${pexesoAttempts}</span>
-        </div>
-        <div class="bargraph-track"><div class="bargraph-fill" style="width:${(pexesoMatched.length / totalPairs) * 100}%;"></div></div>
-      </div>
-      ${!isDone ? `
-        <div class="pexeso-grid" style="grid-template-columns: repeat(4, 1fr);">
-          ${pexesoCards.map((c, i) => {
-            const m = pexesoMatched.includes(c.wordIdx), f = pexesoFlipped.includes(i);
-            return `<div class="pexeso-card ${m?'matched':(f?'flipped':'hidden')}" style="${c.text.length>10?'font-size:12px;':''}" onclick="clickPexesoCard(${i})">${m||f?c.text:'❓'}</div>`;
-          }).join('')}
-        </div>
-      ` : (isCampaignMinigame ? `
-        <div style="text-align:center;padding:30px;">
-          <h2 style="color:var(--col-green);">TRÉNINK DOKONČEN! 🎉</h2>
-          <p style="font-size:18px;color:#fff;margin:10px 0;">Pexeso zvládnuto za <b>${pexesoAttempts} pokusů</b>.</p>
-          <p style="font-size:24px;color:var(--col-yellow);margin-bottom:25px;">Celkem získáváš: +${campaignMinigameCoins + (pexesoAttempts <= 12 ? 3 : (pexesoAttempts <= 16 ? 2 : 1))} 💰</p>
-          <div class="action-btn green" onclick="finishCampaign(${campaignMinigameCoins + (pexesoAttempts <= 12 ? 3 : (pexesoAttempts <= 16 ? 2 : 1))})">PŘIPSAT ZLAŤÁKY A ZPĚT</div>
-        </div>
-      ` : `
-        <div style="text-align:center;padding:30px;">
-          <h2 style="color:var(--col-green);">HOTOVO ZA ${pexesoAttempts} POKUSŮ! 🎉</h2>
-          <div class="action-btn green" onclick="startPexesoGame(pexesoPairCount)">HRÁT ZNOVU</div>
-          <div class="action-btn" onclick="setScreen('SELECT_PEXESO_SIZE')">ZMĚNIT VELIKOST</div>
-        </div>
-      `)}
-    `;
-  }
-
-  // KVÍZ (Samostatný)
-  else if (selectedGame === "QUIZ") {
-    if (qActiveList.length === 0) {
-      main.innerHTML = `<div style="text-align:center;padding:30px;"><h2>V této lekci není žádný kvíz.</h2><div class="action-btn" onclick="setScreen('SELECT_GAME')">ZPĚT</div></div>`;
-      return;
-    }
-
-    if (qCurStep >= qActiveList.length) {
-      main.innerHTML = `
-        <div style="text-align:center;padding:30px;">
-          <h2 style="color:var(--col-green);margin-bottom:10px;">KVÍZ DOKONČEN! 🎉</h2>
-          <p style="color:#fff;margin-bottom:15px;">Zvládl jsi všech ${qActiveList.length} otázek!</p>
-          <div class="action-btn green" onclick="setScreen('SELECT_GAME')">ZPĚT DO MENU</div>
-        </div>
-      `;
-      return;
-    }
-
-    const q = qActiveList[qCurStep];
-    const pct = Math.round(((qCurStep + 1) / qActiveList.length) * 100);
-
-    let promptDisplay = formatPromptText(q.question);
-    if (qAnswered) {
-      const fillHtml = `<span style="color:var(--col-green);font-weight:bold;text-decoration:underline;">${q.answer}</span>`;
-      if (q.question.includes('___')) {
-        promptDisplay = formatPromptText(q.question.replace(/___+/g, fillHtml));
-      } else {
-        promptDisplay = formatPromptText(q.question) + " " + fillHtml;
-      }
-    }
-
-    main.innerHTML = `
-      <div class="bargraph-container">
-        <div class="bargraph-header">
-          <span>Kvíz: Otázka ${qCurStep + 1} z ${qActiveList.length}</span>
-          <span style="color:var(--col-active-tab);">${pct} %</span>
-        </div>
-        <div class="bargraph-track"><div class="bargraph-fill" style="width:${pct}%;"></div></div>
-      </div>
-      <div class="prompt-box" style="font-size:22px;color:#fff;margin:15px 0;">
-        ${promptDisplay}
-        ${(qAnswered && getTargetLang(selectedSubject) !== 'cs-CZ') ? `<span class="audio-btn" onclick="speakWord('${(q.question.includes('___') ? q.question.replace(/___+/g, q.answer) : q.question + ' ' + q.answer).replace(/[*_]/g, '')}', '${selectedSubject}')">🔊</span>` : ''}
-      </div>
-      <div class="grid-2">
-        ${q.options.map((opt, optIdx) => {
-          let btnCls = "";
-          if (qAnswered) {
-            if (opt === q.answer) btnCls = "correct";
-            else if (opt === qChosenOpt) btnCls = "wrong";
-          }
-          return `<div class="opt-btn ${btnCls}" onclick="clickQuizOpt(${optIdx})">${opt}</div>`;
-        }).join('')}
-      </div>
-      ${qAnswered ? `
-        ${q.help ? `<div style="text-align:center;color:var(--col-yellow);margin:10px 0;font-size:16px;font-weight:bold;">[ ${q.help} ]</div>` : ''}
-        <div class="action-btn green" style="margin-top:12px;" onclick="nextQuizStep()">DALŠÍ OTÁZKA ➔</div>
-      ` : ''}
-    `;
-  }
-
-  // ŘADA NA ČAS
-  else if (selectedGame === "SEQ") {
-    if (sItems.length === 0) return;
-    const seqConfig = sItems[selectedSeqIndex];
-    const itemsList = seqConfig.answer.split('|').map(s => s.trim()).filter(Boolean);
-    const isFinished = seqTargetIdx >= itemsList.length;
-    const targetWord = itemsList[seqTargetIdx];
-    const pct = Math.round((seqTargetIdx / itemsList.length) * 100);
-
-    main.innerHTML = `
-      <div class="bargraph-container">
-        <div class="bargraph-header">
-          <span>Položka ${Math.min(seqTargetIdx + 1, itemsList.length)} z ${itemsList.length} ${seqHintActive ? '<b style="color:var(--col-yellow);">[NÁPOVĚDA]</b>' : ''}</span>
-          <span id="seq-timer" style="color:var(--col-yellow);font-weight:bold;">0.0 s</span>
-        </div>
-        <div class="bargraph-track"><div class="bargraph-fill" style="width:${pct}%;"></div></div>
-      </div>
-      <div class="prompt-box ${isHebrew ? 'hebrew-text' : ''}" style="margin:8px 0;min-height:56px;color:#fff;font-size:22px;">
-        ${itemsList.slice(0, seqTargetIdx).join(' ')} 
-        <span style="color:var(--col-yellow);">${seqHintActive ? `[ ${targetWord}! ]` : '[ ??? ]'}</span>
-      </div>
-      ${!isFinished ? `
-        <div class="grid-2">
-          ${seqSlots.map((itemIdx, slot) => {
-            const isHintSlot = (seqHintActive && itemIdx === seqTargetIdx);
-            return `<div id="seq-btn-${slot}" class="opt-btn ${isHebrew ? 'hebrew' : ''} ${isHintSlot ? 'hint' : ''}" onclick="clickSeqSlot(${slot})">${itemIdx !== -1 ? itemsList[itemIdx] : ''}</div>`;
-          }).join('')}
-        </div>
-      ` : `<div class="action-btn green" onclick="initSequence();renderActiveGame();">DOKONČENO! HRÁT ZNOVU</div>`}
-    `;
-  }
-
-  // --- KAMPAŇ (SPIRÁLA) ---
+  // KAMPAŇ (SPIRÁLA)
   else if (selectedGame === "CAMPAIGN") {
     if (cmpIdx >= cmpQueue.length) {
-      launchCampaignMinigame(); // Přechod na minihru na konci
+      launchCampaignMinigame();
       return;
     }
 
@@ -898,652 +1543,4 @@ function renderActiveGame() {
     }
     main.innerHTML = html;
   }
-}
-
-// ==========================================
-// 9. KAMPAŇ ENGINE (OPRAVENO)
-// ==========================================
-let cmpQueue = [];
-let cmpIdx = 0;
-let cmpHearts = 5;
-let cmpState = 'PLAYING'; 
-let cmpChosenOpt = null;
-
-function startCampaign() {
-  let q = [];
-  let allVItems = getVocabItems();
-  let allQItems = getQuizItems();
-
-  // Proměnná selectedGroupKey (aktuální level) je již 100% správně vypočítána a nastavena z app.js
-  let currentVItems = allVItems.filter(it => it.lesson === selectedGroupKey);
-  let olderVItems = allVItems.filter(it => it.lesson !== selectedGroupKey && (parseInt(it.lesson.replace(/\D/g, ''))||1) < (parseInt(selectedGroupKey.replace(/\D/g, ''))||1));
-  let currentQItems = allQItems.filter(it => it.lesson === selectedGroupKey);
-
-  let qRevision = []; let qNewPassive = []; let qNewActive = []; let qGrammar = []; let qSentences = [];
-
-  if (olderVItems.length > 0) {
-      let shuffledOlder = olderVItems.sort(() => Math.random() - 0.5).slice(0, 5);
-      shuffledOlder.forEach(it => {
-          if (it.question.trim().includes(' ')) qRevision.push({ type: 'SCRAMBLE', data: it });
-          else qRevision.push({ type: 'QUIZ_IN', data: it });
-      });
-  }
-
-  currentVItems.forEach(it => {
-      if (it.question.trim().includes(' ') || it.question.trim().includes('-')) {
-          // Dlouhé věty a fráze -> skládání celých slov
-          qSentences.push({ type: 'SCRAMBLE', data: it });
-      } else {
-          // Samostatná slova -> 1. poznat, 2. vybrat, 3. poskládat PO PÍSMENECH!
-          qNewPassive.push({ type: 'QUIZ_IN', data: it });
-          qNewActive.push({ type: 'QUIZ_OUT', data: it });
-          qSentences.push({ type: 'SCRAMBLE', data: it }); // Písmenkování!
-      }
-  });
-
-  currentQItems.forEach(it => qGrammar.push({ type: 'KVIZ', data: it }));
-
-  qRevision.sort(() => Math.random() - 0.5); qNewPassive.sort(() => Math.random() - 0.5); qNewActive.sort(() => Math.random() - 0.5); qGrammar.sort(() => Math.random() - 0.5); qSentences.sort(() => Math.random() - 0.5);
-
-  q = [...qRevision, ...qNewPassive, ...qNewActive, ...qGrammar, ...qSentences];
-  if (q.length > 40) q = q.slice(0, 40);
-
-  q.forEach(task => {
-    if (task.type === 'QUIZ_OUT' || task.type === 'QUIZ_IN') {
-       const isOut = task.type === 'QUIZ_OUT';
-       const correctAns = isOut ? task.data.question : cleanCzechTranslation(task.data.answer);
-       
-       // Bereme POUZE slova z aktuální a starších lekcí
-       let localItems = [...currentVItems, ...olderVItems];
-       let pool = [...new Set(localItems.map(i => isOut ? i.question : cleanCzechTranslation(i.answer)))].filter(ans => ans !== correctAns);
-       
-       // Pokud je známých slov málo (např. v Levelu 1), tak je prostě zopakujeme
-       if (pool.length > 0) {
-           while (pool.length < 3) {
-               pool.push(pool[Math.floor(Math.random() * pool.length)]);
-           }
-       } else {
-           pool = ["...", "...", "..."]; // Bezpečnostní pojistka
-       }
-       
-       pool.sort(() => Math.random() - 0.5);
-       task.opts = [correctAns, ...pool.slice(0, 3)].sort(() => Math.random() - 0.5);
-       task.correctAns = correctAns;
-       task.prompt = isOut ? cleanCzechTranslation(task.data.answer) : task.data.question;
-
-    } else if (task.type === 'SCRAMBLE') {
-       const raw = task.data.question.trim();
-       const isWordMode = (raw.split(/\s+/).length >= 3 || raw.length > 15);
-       const tokens = isWordMode ? (raw.includes('-') ? raw.split('-').map(s=>s.trim()) : raw.split(/\s+/)) : getGraphemes(raw);
-       task.tokens = tokens;
-       task.tiles = tokens.map((t, i) => ({ text: t, used: false, id: i })).sort(() => Math.random() - 0.5);
-       task.placed = [];
-       task.isWordMode = isWordMode;
-       task.hadMistake = false; // <--- OPRAVA: Přidáno sledování bezchybnosti
-    } else if (task.type === 'KVIZ') {
-       task.opts = task.data.options;
-       task.correctAns = task.data.answer;
-       task.prompt = formatPromptText(task.data.question);
-    }
-  });
-
-  cmpQueue = q; cmpIdx = 0; cmpHearts = 5; cmpState = 'PLAYING'; cmpChosenOpt = null; isCampaignMinigame = false;
-  selectedGame = 'CAMPAIGN'; setScreen('PLAYING');
-  if (isAutoTTS && cmpQueue[0] && cmpQueue[0].type === 'QUIZ_IN') speakWord(cmpQueue[0].prompt, selectedSubject);
-}
-function clickCmpQuizOpt(opt) {
-  if (cmpState !== 'PLAYING') return;
-  const task = cmpQueue[cmpIdx];
-  cmpChosenOpt = opt; cmpState = 'EVAL';
-
-  if (opt === task.correctAns) {
-    sndOk();
-    if (task.type === 'QUIZ_OUT' || task.type === 'QUIZ_IN') {
-      const dir = task.type === 'QUIZ_OUT' ? 'DIR_OUT' : 'DIR_IN';
-      const mVal = getSavedMastery(task.data.question, dir);
-      if (mVal < 2) saveWordMasteryToGoogle(task.data.question, mVal + 1, dir);
-    }
-  } else {
-    sndErr(); cmpHearts = Math.max(0, cmpHearts - 1);
-    let newTask = JSON.parse(JSON.stringify(task));
-    if (newTask.opts) newTask.opts.sort(() => Math.random() - 0.5);
-    cmpQueue.push(newTask);
-    if (task.type === 'QUIZ_OUT' || task.type === 'QUIZ_IN') saveWordMasteryToGoogle(task.data.question, 0, task.type === 'QUIZ_OUT' ? 'DIR_OUT' : 'DIR_IN');
-  }
-
-  if (isAutoTTS && task.type !== 'QUIZ_IN') {
-    let toRead = task.type === 'KVIZ' ? task.data.question.replace(/___+/g, task.data.answer) : task.data.question;
-    speakWord(toRead.replace(/[*_]/g, ''), selectedSubject);
-  }
-  renderActiveGame();
-}
-
-function clickCmpScrambleTile(idx) {
-  if (cmpState !== 'PLAYING') return;
-  const task = cmpQueue[cmpIdx];
-  const tile = task.tiles[idx];
-  if (tile.used) return;
-
-  if (tile.text === task.tokens[task.placed.length]) {
-    sndOk(); tile.used = true; task.placed.push(tile.text);
-    if (task.placed.length === task.tokens.length) { 
-      cmpState = 'EVAL'; 
-      if (isAutoTTS) speakWord(task.data.question, selectedSubject); 
-      
-      // OPRAVA: Pokud dítě složilo větu napoprvé bez chyby, získá trvalé hvězdy!
-      if (!task.hadMistake) {
-        const mIn = getSavedMastery(task.data.question, 'DIR_IN');
-        const mOut = getSavedMastery(task.data.question, 'DIR_OUT');
-        if (mIn < 2) saveWordMasteryToGoogle(task.data.question, mIn + 1, 'DIR_IN');
-        if (mOut < 2) saveWordMasteryToGoogle(task.data.question, mOut + 1, 'DIR_OUT');
-      }
-    }
-  } else {
-    sndErr(); cmpHearts = Math.max(0, cmpHearts - 1);
-    task.hadMistake = true; // Zaznamenáme chybu, takže za tento pokus už hvězdu nedostane
-    
-    let newTask = { type: 'SCRAMBLE', data: task.data, tokens: task.tokens, isWordMode: task.isWordMode, hadMistake: false };
-    newTask.tiles = task.tokens.map((t, i) => ({ text: t, used: false, id: i })).sort(() => Math.random() - 0.5);
-    newTask.placed = []; cmpQueue.push(newTask);
-  }
-  renderActiveGame();
-}
-
-function nextCmpTask() {
-  cmpIdx++; cmpState = 'PLAYING'; cmpChosenOpt = null; renderActiveGame();
-  if (cmpIdx < cmpQueue.length && isAutoTTS && cmpQueue[cmpIdx].type === 'QUIZ_IN') speakWord(cmpQueue[cmpIdx].prompt, selectedSubject);
-}
-
-function launchCampaignMinigame() {
-    let allVItems = getVocabItems();
-    // Bereme jen jednoslovná nebo dvouslovná hesla (ne celé věty)
-    let singleWords = allVItems.filter(it => it.question.split(' ').length <= 2 && !it.question.includes('.'));
-    
-    // Zjistíme číslo aktuálního levelu (např. z "Level 1" vytáhneme 1)
-    let currentLvlNum = parseInt(selectedGroupKey.replace(/\D/g, '')) || 1;
-
-    let currentSingle = singleWords.filter(it => it.lesson === selectedGroupKey);
-    
-    // Zásadní oprava: Bereme POUZE slova z lekcí, které mají NIŽŠÍ číslo než aktuální level!
-    let olderSingle = singleWords.filter(it => {
-        let itNum = parseInt(it.lesson.replace(/\D/g, '')) || 1;
-        return it.lesson !== selectedGroupKey && itNum < currentLvlNum;
-    }).sort(() => Math.random() - 0.5);
-
-    campaignMinigamePool = [...currentSingle, ...olderSingle].slice(0, 30);
-
-    isCampaignMinigame = true;
-    campaignMinigameCoins = cmpHearts; // 1 srdce = 1 zlaťák
-
-    // Pojistka pro Level 1 (když je známých slov málo, raději je naklonujeme, než brát z budoucnosti)
-    if (campaignMinigamePool.length > 0 && campaignMinigamePool.length < 10) {
-        let tempPool = [...campaignMinigamePool];
-        while (campaignMinigamePool.length < 20) {
-            campaignMinigamePool.push(tempPool[Math.floor(Math.random() * tempPool.length)]);
-        }
-    } else if (campaignMinigamePool.length === 0) {
-        finishCampaign(campaignMinigameCoins); 
-        return; 
-    }
-
-    let r = Math.random();
-    let isGerman = getTargetLang(selectedSubject).startsWith('de');
-    let articlesCount = campaignMinigamePool.filter(it => /^(der|die|das)\s/i.test(it.question)).length;
-
-    // Výběr minihry (Der/Die/Das, Překlad, nebo Pexeso)
-    if (isGerman && articlesCount >= 8 && r < 0.33) startCampaignArcade("ARTICLES");
-    else if (r < (isGerman && articlesCount >= 8 ? 0.66 : 0.5)) startCampaignArcade("TRANSLATE");
-    else startCampaignPexeso();
-}
-
-function finishCampaign(coins) {
-  addCoins(currentUser.name, coins);
-  addReward(1, "Trénink: " + selectedGroupKey);
-  
-  // Návrat do hubu – hub si sám načte a posune další level
-  setScreen("CAMPAIGN_HUB");
-}
-// ==========================================
-// 10. HRA HAD (NESMRTELNOST ZA SRDÍČKO + BEZPEČNÝ SWIPE)
-// ==========================================
-let snakeInterval = null;
-let snakeGridSize = 17;
-let snakeCellSize = 20;
-let snakeBody = [];
-let snakeDir = { x: 1, y: 0 };
-let snakeNextDir = { x: 1, y: 0 };
-let snakeLives = 3;
-let snakeScore = 0;
-let snakeLevel = 1;
-let snakeSpeed = 220;
-let snakeDeck = [];
-let snakeCurrentWord = null;
-let snakeTargetLetters = [];
-let snakeCurrentIdx = 0;
-let snakeFoods = [];
-let snakeState = "PLAYING";
-let snakeStatusMsg = "";
-let snakeShieldLetters = 0; // Počítadlo nesmrtelnosti na písmena
-
-function stopSnakeLoop() {
-  if (snakeInterval) { clearInterval(snakeInterval); snakeInterval = null; }
-}
-
-function startSnakeGame() {
-  stopArcadeLoop();
-  stopSnakeLoop();
-  
-  const vItems = getVocabItems();
-  snakeDeck = vItems.filter(it => {
-    let clean = it.question.replace(/^(der|die|das|ein|eine|el|la|un|una)\s+/i, '').trim();
-    return clean.split(/\s+/).length === 1 && clean.length >= 2 && clean.length <= 9 && !clean.includes('.');
-  }).sort(() => Math.random() - 0.5);
-
-  if (snakeDeck.length === 0) {
-    alert("V této lekci nejsou žádná vhodná jednoslovná slovíčka pro hada.");
-    return;
-  }
-
-  snakeLives = 3;
-  snakeScore = 0;
-  snakeLevel = 1;
-  snakeSpeed = 220;
-  snakeShieldLetters = 0;
-  selectedGame = "SNAKE";
-  setScreen("PLAYING");
-
-  setupNextSnakeWord();
-  resetSnakePosition();
-  runSnakeLoop();
-  setTimeout(attachSnakeTouchHandlers, 50);
-}
-
-// Nákup nesmrtelnosti přímo ve hře za 1 srdíčko
-function buySnakeShieldInGame() {
-  if (snakeLives > 1 && snakeShieldLetters <= 0) {
-    snakeLives--;
-    snakeShieldLetters = 20; // 20 písmen nesmrtelnosti
-    sndFanfare();
-    renderActiveGame();
-    setTimeout(attachSnakeTouchHandlers, 20);
-  } else if (snakeLives <= 1) {
-    alert("Nemůžeš obětovat své poslední srdíčko! ❤️");
-  }
-}
-
-function setupNextSnakeWord() {
-  if (snakeDeck.length === 0) {
-    const vItems = getVocabItems();
-    snakeDeck = vItems.filter(it => {
-      let clean = it.question.replace(/^(der|die|das|ein|eine|el|la|un|una)\s+/i, '').trim();
-      return clean.split(/\s+/).length === 1 && clean.length >= 2 && clean.length <= 9;
-    }).sort(() => Math.random() - 0.5);
-  }
-
-  const rawItem = snakeDeck.pop();
-  let cleanForeign = rawItem.question.replace(/^(der|die|das|ein|eine|el|la|un|una)\s+/i, '').trim().toUpperCase();
-
-  snakeCurrentWord = {
-    raw: rawItem,
-    czech: cleanCzechTranslation(rawItem.answer),
-    foreign: rawItem.question,
-    cleanForeign: cleanForeign
-  };
-
-  snakeTargetLetters = getGraphemes(cleanForeign);
-  snakeCurrentIdx = 0;
-  spawnSnakeFood();
-}
-
-function resetSnakePosition() {
-  snakeBody = [
-    { x: 5, y: 8 },
-    { x: 4, y: 8 },
-    { x: 3, y: 8 }
-  ];
-  snakeDir = { x: 1, y: 0 };
-  snakeNextDir = { x: 1, y: 0 };
-}
-
-function spawnSnakeFood() {
-  snakeFoods = [];
-  const occupied = new Set();
-  snakeBody.forEach(seg => occupied.add(`${seg.x},${seg.y}`));
-
-  // Písmena aktuálního slova
-  for (let i = snakeCurrentIdx; i < snakeTargetLetters.length; i++) {
-    const ch = snakeTargetLetters[i];
-    let pos = getRandomFreeGridPos(occupied);
-    if (pos) {
-      occupied.add(`${pos.x},${pos.y}`);
-      snakeFoods.push({ x: pos.x, y: pos.y, char: ch, isTarget: (i === snakeCurrentIdx) });
-    }
-  }
-
-  // Falešná písmena (překážky od 2. levelu)
-  if (snakeLevel >= 2) {
-    const distractorsCount = Math.min(3, snakeLevel - 1);
-    const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-    for (let d = 0; d < distractorsCount; d++) {
-      let randChar = alphabet[Math.floor(Math.random() * alphabet.length)];
-      let pos = getRandomFreeGridPos(occupied);
-      if (pos) {
-        occupied.add(`${pos.x},${pos.y}`);
-        snakeFoods.push({ x: pos.x, y: pos.y, char: randChar, isTarget: false });
-      }
-    }
-  }
-}
-
-function getRandomFreeGridPos(occupied) {
-  let tries = 0;
-  while (tries < 150) {
-    let x = Math.floor(Math.random() * (snakeGridSize - 2)) + 1;
-    let y = Math.floor(Math.random() * (snakeGridSize - 2)) + 1;
-    let key = `${x},${y}`;
-    if (!occupied.has(key)) return { x, y };
-    tries++;
-  }
-  return null;
-}
-
-function runSnakeLoop() {
-  stopSnakeLoop();
-  snakeState = "PLAYING";
-  snakeInterval = setInterval(() => {
-    if (currentScreen !== "PLAYING" || selectedGame !== "SNAKE" || isTimerPaused) return;
-    updateSnake();
-    drawSnake();
-  }, snakeSpeed);
-}
-
-function setSnakeDirection(dx, dy) {
-  if (typeof registerUserAction === "function") registerUserAction();
-  if (snakeDir.x + dx === 0 && snakeDir.y + dy === 0) return; // Zákaz otočky o 180°
-  snakeNextDir = { x: dx, y: dy };
-}
-
-function updateSnake() {
-  if (snakeState !== "PLAYING") return;
-  snakeDir = { ...snakeNextDir };
-
-  let nextX = snakeBody[0].x + snakeDir.x;
-  let nextY = snakeBody[0].y + snakeDir.y;
-
-  // --- OŠETŘENÍ ZDÍ (PŘI ŠTÍTU PROJEDE ZDÍ NA DRUHOU STRANU) ---
-  if (snakeShieldLetters > 0) {
-    if (nextX < 0) nextX = snakeGridSize - 1;
-    else if (nextX >= snakeGridSize) nextX = 0;
-    if (nextY < 0) nextY = snakeGridSize - 1;
-    else if (nextY >= snakeGridSize) nextY = 0;
-  } else {
-    // Bez štítu: náraz do zdi = smrt
-    if (nextX < 0 || nextX >= snakeGridSize || nextY < 0 || nextY >= snakeGridSize) {
-      handleSnakeDeath("Náraz do zdi! 💥");
-      return;
-    }
-  }
-
-  const head = { x: nextX, y: nextY };
-
-  // --- OŠETŘENÍ KOUSNUTÍ SE DO TĚLA ---
-  if (snakeShieldLetters <= 0) {
-    for (let i = 0; i < snakeBody.length - 1; i++) {
-      if (snakeBody[i].x === head.x && snakeBody[i].y === head.y) {
-        handleSnakeDeath("Kousnutí se do ocasu! 💥");
-        return;
-      }
-    }
-  }
-
-  // --- KONTROLA PÍSMENE ---
-  const foodIdx = snakeFoods.findIndex(f => f.x === head.x && f.y === head.y);
-  if (foodIdx !== -1) {
-    const eaten = snakeFoods[foodIdx];
-    const targetChar = snakeTargetLetters[snakeCurrentIdx];
-
-    if (eaten.char === targetChar) {
-      // SPRÁVNÉ PÍSMENO
-      sndOk();
-      snakeFoods.splice(foodIdx, 1);
-      snakeCurrentIdx++;
-      snakeBody.unshift(head); // Roste délka
-
-      if (snakeShieldLetters > 0) {
-        snakeShieldLetters--; // Odečet písmene ze štítu
-        if (snakeShieldLetters === 0) renderActiveGame(); // Překreslí tlačítko štítu
-      }
-
-      if (snakeCurrentIdx >= snakeTargetLetters.length) {
-        handleSnakeWordComplete();
-        return;
-      } else {
-        snakeFoods.forEach(f => {
-          f.isTarget = (f.char === snakeTargetLetters[snakeCurrentIdx]);
-        });
-      }
-    } else {
-      // ŠPATNÉ PÍSMENO
-      if (snakeShieldLetters > 0) {
-        // PŘI ŠTÍTU NEZEMŘE: Had se jen na vteřinu zastaví a upozorní hráče
-        sndErr();
-        snakeStatusMsg = `🛡️ Štít tě ochránil! Špatné písmeno [ ${eaten.char} ]. Hledej [ ${targetChar} ]`;
-        snakeState = "PAUSED_SHIELD";
-        stopSnakeLoop();
-        renderActiveGame();
-        setTimeout(() => {
-          snakeState = "PLAYING";
-          runSnakeLoop();
-          renderActiveGame();
-        }, 1200);
-        return;
-      } else {
-        // Bez štítu: ztráta života
-        handleSnakeDeath(`Špatné písmeno [ ${eaten.char} ]! Hledáš [ ${targetChar} ]`);
-        return;
-      }
-    }
-  } else {
-    // Běžný krok
-    snakeBody.unshift(head);
-    snakeBody.pop();
-  }
-}
-
-function handleSnakeWordComplete() {
-  snakeState = "WORD_DONE";
-  stopSnakeLoop();
-  sndFanfare();
-  snakeScore++;
-  addReward(1, "Had");
-
-  if (isAutoTTS && snakeCurrentWord) speakWord(snakeCurrentWord.foreign, selectedSubject);
-
-  if (snakeScore % 3 === 0) {
-    snakeLevel++;
-    snakeSpeed = Math.max(100, snakeSpeed - 15);
-  }
-
-  // Bezpečné otočení od zdi do volného prostoru
-  if (snakeShieldLetters <= 0) {
-    const nextX = snakeBody[0].x + snakeDir.x;
-    const nextY = snakeBody[0].y + snakeDir.y;
-    if (nextX < 0 || nextX >= snakeGridSize || nextY < 0 || nextY >= snakeGridSize) {
-      const turn1 = { x: -snakeDir.y, y: snakeDir.x };
-      const turn2 = { x: snakeDir.y, y: -snakeDir.x };
-      const t1X = snakeBody[0].x + turn1.x, t1Y = snakeBody[0].y + turn1.y;
-      if (t1X >= 0 && t1X < snakeGridSize && t1Y >= 0 && t1Y < snakeGridSize) {
-        snakeDir = turn1; snakeNextDir = turn1;
-      } else {
-        snakeDir = turn2; snakeNextDir = turn2;
-      }
-    }
-  }
-
-  setTimeout(() => {
-    setupNextSnakeWord();
-    runSnakeLoop();
-    renderActiveGame();
-    setTimeout(attachSnakeTouchHandlers, 20);
-  }, 1000);
-
-  renderActiveGame();
-}
-
-function handleSnakeDeath(reason) {
-  snakeState = "HIT";
-  stopSnakeLoop();
-  sndErr();
-  snakeLives--;
-  snakeStatusMsg = reason;
-
-  if (snakeLives <= 0) {
-    snakeState = "GAMEOVER";
-    renderActiveGame();
-  } else {
-    setTimeout(() => {
-      resetSnakePosition();
-      snakeCurrentIdx = 0;
-      spawnSnakeFood();
-      runSnakeLoop();
-      renderActiveGame();
-      setTimeout(attachSnakeTouchHandlers, 20);
-    }, 1400);
-    renderActiveGame();
-  }
-}
-
-function drawSnake() {
-  const canvas = document.getElementById("snake-canvas");
-  if (!canvas) return;
-  const ctx = canvas.getContext("2d");
-
-  ctx.fillStyle = "#08101e";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  // Mřížka
-  ctx.strokeStyle = "rgba(255, 255, 255, 0.04)";
-  ctx.lineWidth = 1;
-  for (let x = 0; x <= canvas.width; x += snakeCellSize) {
-    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
-  }
-  for (let y = 0; y <= canvas.height; y += snakeCellSize) {
-    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
-  }
-
-  // Kreslení písmen
-  snakeFoods.forEach(f => {
-    let px = f.x * snakeCellSize;
-    let py = f.y * snakeCellSize;
-
-    ctx.save();
-    if (f.isTarget) {
-      ctx.fillStyle = "rgba(250, 204, 21, 0.25)";
-      ctx.strokeStyle = "#facc15";
-      ctx.lineWidth = 2;
-    } else {
-      ctx.fillStyle = "rgba(0, 188, 212, 0.15)";
-      ctx.strokeStyle = "#00bcd4";
-      ctx.lineWidth = 1;
-    }
-    ctx.beginPath();
-    ctx.roundRect(px + 2, py + 2, snakeCellSize - 4, snakeCellSize - 4, 4);
-    ctx.fill();
-    ctx.stroke();
-
-    ctx.fillStyle = f.isTarget ? "#facc15" : "#ffffff";
-    ctx.font = "bold 13px Roboto, sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(f.char, px + (snakeCellSize / 2), py + (snakeCellSize / 2) + 1);
-    ctx.restore();
-  });
-
-  // Kreslení hada (při štítu svítí azurově)
-  snakeBody.forEach((seg, idx) => {
-    let px = seg.x * snakeCellSize;
-    let py = seg.y * snakeCellSize;
-
-    ctx.save();
-    if (idx === 0) {
-      ctx.fillStyle = snakeShieldLetters > 0 ? "#38bdf8" : "#22c55e";
-      ctx.beginPath();
-      ctx.roundRect(px + 1, py + 1, snakeCellSize - 2, snakeCellSize - 2, 6);
-      ctx.fill();
-
-      // Oči
-      ctx.fillStyle = "#000000";
-      if (snakeDir.x === 1) {
-        ctx.fillRect(px + 13, py + 4, 3, 3); ctx.fillRect(px + 13, py + 13, 3, 3);
-      } else if (snakeDir.x === -1) {
-        ctx.fillRect(px + 4, py + 4, 3, 3); ctx.fillRect(px + 4, py + 13, 3, 3);
-      } else if (snakeDir.y === 1) {
-        ctx.fillRect(px + 4, py + 13, 3, 3); ctx.fillRect(px + 13, py + 13, 3, 3);
-      } else {
-        ctx.fillRect(px + 4, py + 4, 3, 3); ctx.fillRect(px + 13, py + 4, 3, 3);
-      }
-    } else {
-      if (snakeShieldLetters > 0) {
-        ctx.fillStyle = idx % 2 === 0 ? "#0284c7" : "#0369a1";
-      } else {
-        ctx.fillStyle = idx % 2 === 0 ? "#16a34a" : "#15803d";
-      }
-      ctx.beginPath();
-      ctx.roundRect(px + 2, py + 2, snakeCellSize - 4, snakeCellSize - 4, 4);
-      ctx.fill();
-    }
-    ctx.restore();
-  });
-}
-
-// Ovládání klávesnicí (PC)
-window.addEventListener("keydown", (e) => {
-  if (currentScreen === "PLAYING" && selectedGame === "SNAKE") {
-    if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space"].includes(e.code)) {
-      e.preventDefault();
-    }
-    if (e.code === "ArrowUp" || e.key === "w" || e.key === "W") setSnakeDirection(0, -1);
-    else if (e.code === "ArrowDown" || e.key === "s" || e.key === "S") setSnakeDirection(0, 1);
-    else if (e.code === "ArrowLeft" || e.key === "a" || e.key === "A") setSnakeDirection(-1, 0);
-    else if (e.code === "ArrowRight" || e.key === "d" || e.key === "D") setSnakeDirection(1, 0);
-  }
-});
-
-// ZCELA NEHYBNÝ SWIPE NA DISPLEJI (ŽÁDNÝ POSUN STRÁNKY)
-let snakeTouchStartX = 0, snakeTouchStartY = 0;
-
-function attachSnakeTouchHandlers() {
-  const wrap = document.querySelector(".snake-canvas-wrap");
-  const canvas = document.getElementById("snake-canvas");
-  if (!wrap || !canvas) return;
-
-  const preventDefaultTouch = (e) => {
-    if (e.cancelable) e.preventDefault();
-  };
-
-  wrap.addEventListener("touchstart", (e) => {
-    preventDefaultTouch(e);
-    if (typeof registerUserAction === "function") registerUserAction();
-    if (e.touches && e.touches[0]) {
-      snakeTouchStartX = e.touches[0].clientX;
-      snakeTouchStartY = e.touches[0].clientY;
-    }
-  }, { passive: false });
-
-  wrap.addEventListener("touchmove", preventDefaultTouch, { passive: false });
-
-  wrap.addEventListener("touchend", (e) => {
-    preventDefaultTouch(e);
-    if (!e.changedTouches || !e.changedTouches[0]) return;
-    const dx = e.changedTouches[0].clientX - snakeTouchStartX;
-    const dy = e.changedTouches[0].clientY - snakeTouchStartY;
-    
-    if (Math.abs(dx) > 15 || Math.abs(dy) > 15) {
-      if (Math.abs(dx) > Math.abs(dy)) {
-        setSnakeDirection(dx > 0 ? 1 : -1, 0);
-      } else {
-        setSnakeDirection(0, dy > 0 ? 1 : -1);
-      }
-    }
-  }, { passive: false });
 }
