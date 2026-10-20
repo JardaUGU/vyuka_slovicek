@@ -289,6 +289,10 @@ function speakWord(text, subjectName) {
     
     if (/read\s*-\s*read\s*-\s*read/i.test(toSpeak)) toSpeak = "read, red, red";
     else toSpeak = toSpeak.replace(/\//g, ' or ').replace(/\s*-\s*/g, ', ');
+    
+    // Čtení Božího jména v hebrejštině (Jahve / Tetragrammaton -> Adonaj)
+    toSpeak = toSpeak.replace(/יהוה/g, 'אֲדֹנָי');
+    toSpeak = toSpeak.replace(/\b(Jahve|Jahveh|Yahweh|Yahwe|Jehova|JHVH|YHWH)\b/gi, 'Adonaj');
 
     if (/^\s*I\s*[.!?]?\s*$/i.test(toSpeak)) {
       toSpeak = "eye";
