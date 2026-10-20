@@ -81,7 +81,7 @@ footer { height: 32px; background-color: var(--col-card); border-top: 1px solid 
 .arcade-btn { flex: 1; height: 62px; background: var(--col-card); border: 2px solid var(--col-active-tab); border-radius: 10px; color: #fff; font-size: 24px; font-weight: bold; display: flex; align-items: center; justify-content: center; cursor: pointer; }
 .arcade-btn:active { transform: scale(0.94); background: var(--col-active-tab); }
 
-/* --- HRA HAD: ZÁKAZ SCROLLU A DOTYKOVÉ OVLÁDÁNÍ --- */
+/* --- HRA HAD: ZÁKAZ SCROLLU A OVLÁDÁNÍ --- */
 .snake-container { 
   display: flex; 
   flex-direction: column; 
@@ -91,7 +91,8 @@ footer { height: 32px; background-color: var(--col-card); border-top: 1px solid 
   margin: 0 auto; 
   user-select: none; 
   -webkit-user-select: none;
-  touch-action: none; /* ZABRÁNÍ POSOUVÁNÍ STRÁNKY PŘI HŘE */
+  touch-action: none !important;
+  overscroll-behavior: none !important;
 }
 
 .snake-header-box { 
@@ -104,17 +105,21 @@ footer { height: 32px; background-color: var(--col-card); border-top: 1px solid 
   text-align: center; 
 }
 
-.snake-stats { display: flex; justify-content: space-between; font-weight: bold; font-size: 13px; margin-bottom: 4px; }
+.snake-stats { display: flex; justify-content: space-between; align-items: center; font-weight: bold; font-size: 13px; margin-bottom: 4px; }
+.snake-shield-btn { background: #1e1b4b; border: 1px solid #818cf8; color: #c7d2fe; padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; cursor: pointer; }
+.snake-shield-btn.active { background: #065f46; border-color: #34d399; color: #a7f3d0; animation: pulseSlot 1s infinite alternate; }
+
 .snake-prompt-cz { font-size: 19px; font-weight: bold; color: var(--col-yellow); margin-bottom: 4px; }
 .snake-slots-row { display: flex; justify-content: center; gap: 5px; flex-wrap: wrap; }
 .snake-slot { min-width: 30px; height: 32px; padding: 0 4px; background: #111a2a; border: 2px solid var(--col-card-border); border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: bold; color: var(--col-text-muted); }
 .snake-slot.active { border-color: var(--col-yellow); color: var(--col-yellow); box-shadow: 0 0 8px rgba(250, 204, 21, 0.4); animation: pulseSlot 1s infinite alternate; }
 .snake-slot.done { background: #143c28; border-color: var(--col-green); color: var(--col-green); }
+@keyframes pulseSlot { from { transform: scale(1); } to { transform: scale(1.08); } }
 
 .snake-canvas-wrap { 
   position: relative; 
-  width: 320px; 
-  height: 320px; 
+  width: 340px; 
+  height: 340px; 
   max-width: 100%; 
   aspect-ratio: 1/1; 
   margin: 0 auto 6px auto; 
@@ -122,16 +127,16 @@ footer { height: 32px; background-color: var(--col-card); border-top: 1px solid 
   border-radius: 10px; 
   overflow: hidden; 
   background: #08101e; 
-  touch-action: none; /* DŮLEŽITÉ: Zamkne plátno, aby se nehýbalo */
+  touch-action: none !important;
+  overscroll-behavior: none !important;
 }
-#snake-canvas { width: 100%; height: 100%; display: block; touch-action: none; }
+#snake-canvas { width: 100%; height: 100%; display: block; touch-action: none !important; }
 
-/* Velký pohodlný kříž na palec */
 .snake-dpad { display: flex; flex-direction: column; align-items: center; gap: 4px; margin-top: 4px; width: 100%; }
 .dpad-row { display: flex; gap: 10px; }
 .dpad-btn { 
   width: 68px; 
-  height: 52px; 
+  height: 50px; 
   background: #18263e; 
   border: 2px solid var(--col-active-tab); 
   border-radius: 12px; 
