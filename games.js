@@ -1,10 +1,13 @@
 /**
- * HERNÍ REŽIMY: KARTY, ZKOUŠENÍ, SKLÁDÁNÍ, ARKÁDA, PEXESO, KVÍZ, ŘADA NA ČAS, HAD, KAMPAŇ
+ * HERNÍ REŽIMY: KARTY, ZKOUŠENÍ (DÁVKY 15 SLOV), SKLÁDÁNÍ, ARKÁDA, PEXESO, KVÍZ, ŘADA NA ČAS, HAD, KAMPAŇ
  */
 
 // --- GLOBÁLNÍ STAVOVÉ PROMĚNNÉ HER ---
 let vCardIdx = 0;
 let vMastery = {}, vActivePool = 3, vCurrentWord = 0, vLastWord = -1, vQuizRevealed = false;
+let adaptiveBatchIndices = [];
+let isAdaptiveBatchMode = false;
+
 let scrambleDeck = [], scramblePlaced = [], scrambleTiles = [], scrambleIsWordMode = false, scrambleHadMistake = false, scrambleDone = false, scrambleSolvedCount = 0;
 let pexesoPairCount = 4, pexesoCards = [], pexesoFlipped = [], pexesoMatched = [], pexesoLocked = false, pexesoAttempts = 0;
 let qCurStep = 0, qAnswered = false, qChosenOpt = null, qActiveList = [];
@@ -76,7 +79,7 @@ function speakCurrentCard() {
 }
 
 // ==========================================
-// 2. ZKOUŠENÍ Z HLAVY (LEITNER ADAPTIVE)
+// 2. ZKOUŠENÍ Z HLAVY (DÁVKY PO 15 POLOŽKÁCH)
 // ==========================================
 function initGameState() {
   const vItems = getVocabItems();
@@ -84,13 +87,45 @@ function initGameState() {
   const sItems = getSeqItems();
 
   if (vItems.length > 0) {
-    vMastery = {}; let masteredCount = 0;
+    vMastery = {};
     vItems.forEach((w, i) => {
-      const m = getSavedMastery(w.question, testingDirection);
-      vMastery[i] = m; if (m >= 2) masteredCount++;
+      vMastery[i] = getSavedMastery(w.question, testingDirection);
     });
-    vActivePool = Math.min(vItems.length, Math.max(getAdaptiveWindowSize(currentUser ? currentUser.grade : 2), masteredCount + 3));
-    vLastWord = -1; vCardIdx = 0;
+
+    // POKUD MÁ LEKCE VÍCE NEŽ 15 SLOV: Zvolíme chytrý blok 15 položek
+    if (vItems.length > 15) {
+      isAdaptiveBatchMode = true;
+      let unmastered = [];
+      vItems.forEach((_, i) => {
+        if ((vMastery[i] || 0) < 2) unmastered.push(i);
+      });
+
+      // 75 % položek, co ještě neumí (přednostně chyby s 0 ★)
+      let m0 = unmastered.filter(i => (vMastery[i] || 0) === 0).sort(() => Math.random() - 0.5);
+      let m1 = unmastered.filter(i => (vMastery[i] || 0) === 1).sort(() => Math.random() - 0.5);
+      let candidates = [...m0, ...m1];
+
+      let batchSize = Math.min(15, unmastered.length > 0 ? unmastered.length : 15);
+      adaptiveBatchIndices = candidates.slice(0, batchSize);
+
+      // Pokud jich je méně než 15, dobereme libovolná zbývající slova
+      if (adaptiveBatchIndices.length < batchSize) {
+        let remaining = vItems.map((_, i) => i).filter(i => !adaptiveBatchIndices.includes(i)).sort(() => Math.random() - 0.5);
+        adaptiveBatchIndices.push(...remaining.slice(0, batchSize - adaptiveBatchIndices.length));
+      }
+    } else {
+      isAdaptiveBatchMode = false;
+      adaptiveBatchIndices = vItems.map((_, i) => i);
+    }
+
+    let masteredInBatch = 0;
+    adaptiveBatchIndices.forEach(i => {
+      if ((vMastery[i] || 0) >= 2) masteredInBatch++;
+    });
+
+    vActivePool = Math.min(adaptiveBatchIndices.length, Math.max(getAdaptiveWindowSize(currentUser ? currentUser.grade : 2), masteredInBatch + 3));
+    vLastWord = -1; 
+    vCardIdx = 0;
 
     if (selectedGame === "CARDS" && isAutoTTS) speakWord(vItems[0].question, selectedSubject);
     if (selectedGame === "ADAPTIVE") pickNextAdaptiveWord();
@@ -108,13 +143,15 @@ function initGameState() {
 function getMasteryStats() {
   const vItems = getVocabItems();
   if (vItems.length === 0) return { current: 0, total: 1, masteredCount: 0, totalWords: 1 };
+  
+  const pool = isAdaptiveBatchMode ? adaptiveBatchIndices : vItems.map((_, i) => i);
   let current = 0, masteredCount = 0;
-  vItems.forEach((_, i) => {
+  pool.forEach(i => {
     const m = vMastery[i] || 0;
     current += m;
     if (m >= 2) masteredCount++;
   });
-  return { current, total: vItems.length * 2, masteredCount, totalWords: vItems.length };
+  return { current, total: pool.length * 2, masteredCount, totalWords: pool.length };
 }
 
 function pickNextAdaptiveWord() {
@@ -123,22 +160,15 @@ function pickNextAdaptiveWord() {
   const stats = getMasteryStats();
   if (stats.masteredCount >= stats.totalWords) { vCurrentWord = -1; return; }
 
-  while (vActivePool < vItems.length) {
-    let unmastered = 0;
-    for (let i = 0; i < vActivePool; i++) if ((vMastery[i] || 0) < 2) unmastered++;
-    if (unmastered >= 2) break;
-    vActivePool++;
-  }
+  const pool = isAdaptiveBatchMode ? adaptiveBatchIndices : vItems.map((_, i) => i);
+  let available = pool.filter(i => (vMastery[i] || 0) < 2);
+  let candidates = (available.length > 1 && vLastWord !== -1) ? available.filter(i => i !== vLastWord) : available;
 
-  let available = [];
-  for (let i = 0; i < vActivePool; i++) if ((vMastery[i] || 0) < 2) available.push(i);
-  if (available.length === 0) {
-    for (let i = 0; i < vItems.length; i++) if ((vMastery[i] || 0) < 2) available.push(i);
-  }
-
-  let candidates = available.length > 1 && vLastWord !== -1 ? available.filter(i => i !== vLastWord) : available;
   const mistakes = candidates.filter(i => (vMastery[i] || 0) === 0);
-  vCurrentWord = (mistakes.length > 0 && Math.random() < 0.75) ? mistakes[Math.floor(Math.random() * mistakes.length)] : candidates[Math.floor(Math.random() * candidates.length)];
+  vCurrentWord = (mistakes.length > 0 && Math.random() < 0.75) 
+    ? mistakes[Math.floor(Math.random() * mistakes.length)] 
+    : candidates[Math.floor(Math.random() * candidates.length)];
+    
   vLastWord = vCurrentWord;
 
   if (testingDirection === "DIR_IN" && isAutoTTS && vCurrentWord !== -1) {
@@ -163,7 +193,6 @@ function answerAdaptive(known) {
   if (known) {
     sndOk(); addReward(1, selectedGroupKey);
     vMastery[vCurrentWord] = Math.min(2, (vMastery[vCurrentWord] || 0) + 1);
-    if (vMastery[vCurrentWord] >= 2 && vActivePool < vItems.length) vActivePool++;
     saveWordMasteryToGoogle(w.question, vMastery[vCurrentWord], testingDirection);
   } else {
     sndErr(); vMastery[vCurrentWord] = 0;
@@ -173,12 +202,24 @@ function answerAdaptive(known) {
   renderActiveGame();
 }
 
+// Spustí skládání přesně těch 15 slov, která byla v bloku
+function startScrambleFromAdaptiveBatch() {
+  const vItems = getVocabItems();
+  selectedGame = "SCRAMBLE";
+  scrambleDeck = [...adaptiveBatchIndices].sort(() => Math.random() - 0.5);
+  scrambleSolvedCount = 0;
+  initScramble();
+  setScreen("PLAYING");
+}
+
 // ==========================================
 // 3. SKLÁDÁNÍ SLOV A FRÁZÍ (SCRAMBLE)
 // ==========================================
 function initScramble() {
   const vItems = getVocabItems();
-  if (!scrambleDeck || scrambleDeck.length === 0) scrambleDeck = vItems.map((_, i) => i).sort(() => Math.random() - 0.5);
+  if (!scrambleDeck || scrambleDeck.length === 0) {
+    scrambleDeck = vItems.map((_, i) => i).sort(() => Math.random() - 0.5);
+  }
   vCurrentWord = scrambleDeck.pop();
   const w = vItems[vCurrentWord];
   scramblePlaced = []; scrambleHadMistake = false; scrambleDone = false;
@@ -388,7 +429,7 @@ function clickPexesoCard(idx) {
 }
 
 // ==========================================
-// 6. KVÍZ (SAMOSTATNÝ)
+// 6. KVÍZ
 // ==========================================
 function clickQuizOpt(optIdx) {
   if (qAnswered) return;
@@ -506,11 +547,20 @@ function buySnakeShieldInGame() {
     snakeLives--;
     snakeShieldLetters = 20;
     sndFanfare();
+    snakeState = "PLAYING";
     renderActiveGame();
+    runSnakeLoop();
     setTimeout(attachSnakeTouchHandlers, 20);
   } else if (snakeLives <= 1) {
     alert("Nemůžeš obětovat své poslední srdíčko! ❤️");
   }
+}
+
+function resumeSnakeWithoutShield() {
+  snakeState = "PLAYING";
+  renderActiveGame();
+  runSnakeLoop();
+  setTimeout(attachSnakeTouchHandlers, 20);
 }
 
 function setupNextSnakeWord() {
@@ -535,6 +585,7 @@ function setupNextSnakeWord() {
   snakeTargetLetters = getGraphemes(cleanForeign);
   snakeCurrentIdx = 0;
   spawnSnakeFood();
+  updateSnakeSlotsDisplay();
 }
 
 function resetSnakePosition() {
@@ -603,6 +654,16 @@ function setSnakeDirection(dx, dy) {
   snakeNextDir = { x: dx, y: dy };
 }
 
+function updateSnakeSlotsDisplay() {
+  const container = document.getElementById("snake-slots-wrap");
+  if (!container || !snakeTargetLetters) return;
+  container.innerHTML = snakeTargetLetters.map((ch, idx) => `
+    <div class="snake-slot ${idx < snakeCurrentIdx ? 'done' : (idx === snakeCurrentIdx ? 'active' : '')}">
+      ${idx < snakeCurrentIdx ? ch : (idx === snakeCurrentIdx ? ch : '_')}
+    </div>
+  `).join('');
+}
+
 function updateSnake() {
   if (snakeState !== "PLAYING") return;
   snakeDir = { ...snakeNextDir };
@@ -644,9 +705,16 @@ function updateSnake() {
       snakeCurrentIdx++;
       snakeBody.unshift(head);
 
+      // OKAMŽITÉ DOPLNĚNÍ PÍSMENE NAHOŘE V REÁLNÉM ČASE
+      updateSnakeSlotsDisplay();
+
       if (snakeShieldLetters > 0) {
         snakeShieldLetters--;
-        if (snakeShieldLetters === 0) renderActiveGame();
+        if (snakeShieldLetters === 0) {
+          // ŠTÍT PRÁVĚ VYPRŠEL -> PAUZA A NABÍDKA NOVÉHO ŠTÍTU
+          handleShieldExpired();
+          return;
+        }
       }
 
       if (snakeCurrentIdx >= snakeTargetLetters.length) {
@@ -660,7 +728,7 @@ function updateSnake() {
     } else {
       if (snakeShieldLetters > 0) {
         sndErr();
-        snakeStatusMsg = `🛡️ Štít tě ochránil! Špatné písmeno [ ${eaten.char} ]. Hledej [ ${targetChar} ]`;
+        snakeStatusMsg = `🛡️ Štít tě ochránil před [ ${eaten.char} ]! Hledej [ ${targetChar} ]`;
         snakeState = "PAUSED_SHIELD";
         stopSnakeLoop();
         renderActiveGame();
@@ -679,6 +747,13 @@ function updateSnake() {
     snakeBody.unshift(head);
     snakeBody.pop();
   }
+}
+
+function handleShieldExpired() {
+  snakeState = "SHIELD_EXPIRED_PAUSE";
+  stopSnakeLoop();
+  sndErr();
+  renderActiveGame();
 }
 
 function handleSnakeWordComplete() {
@@ -834,6 +909,7 @@ window.addEventListener("keydown", (e) => {
   }
 });
 
+// Plynulý tah prstem (zatáčí okamžitě při tahu bez zvedání prstu)
 function attachSnakeTouchHandlers() {
   const wrap = document.querySelector(".snake-canvas-wrap");
   const canvas = document.getElementById("snake-canvas");
@@ -852,22 +928,26 @@ function attachSnakeTouchHandlers() {
     }
   }, { passive: false });
 
-  wrap.addEventListener("touchmove", preventDefaultTouch, { passive: false });
-
-  wrap.addEventListener("touchend", (e) => {
+  wrap.addEventListener("touchmove", (e) => {
     preventDefaultTouch(e);
-    if (!e.changedTouches || !e.changedTouches[0]) return;
-    const dx = e.changedTouches[0].clientX - snakeTouchStartX;
-    const dy = e.changedTouches[0].clientY - snakeTouchStartY;
-    
-    if (Math.abs(dx) > 15 || Math.abs(dy) > 15) {
+    if (!e.touches || !e.touches[0]) return;
+    const dx = e.touches[0].clientX - snakeTouchStartX;
+    const dy = e.touches[0].clientY - snakeTouchStartY;
+    const threshold = 18; // Zatočí okamžitě po 18 px posunu!
+
+    if (Math.abs(dx) > threshold || Math.abs(dy) > threshold) {
       if (Math.abs(dx) > Math.abs(dy)) {
         setSnakeDirection(dx > 0 ? 1 : -1, 0);
       } else {
         setSnakeDirection(0, dy > 0 ? 1 : -1);
       }
+      // Posuneme startovní bod na aktuální prst pro plynulé navazující zatáčení
+      snakeTouchStartX = e.touches[0].clientX;
+      snakeTouchStartY = e.touches[0].clientY;
     }
   }, { passive: false });
+
+  wrap.addEventListener("touchend", preventDefaultTouch, { passive: false });
 }
 
 // ==========================================
@@ -898,7 +978,7 @@ function startCampaign() {
       } else {
           qNewPassive.push({ type: 'QUIZ_IN', data: it });
           qNewActive.push({ type: 'QUIZ_OUT', data: it });
-          qSentences.push({ type: 'SCRAMBLE', data: it }); // Písmenkování
+          qSentences.push({ type: 'SCRAMBLE', data: it }); // Písmenkování!
       }
   });
 
@@ -1007,7 +1087,6 @@ function clickCmpScrambleTile(idx) {
       cmpState = 'EVAL'; 
       if (isAutoTTS) speakWord(task.data.question, selectedSubject); 
       
-      // Přičtení hvězd při bezchybném složení
       if (!task.hadMistake) {
         const mIn = getSavedMastery(task.data.question, 'DIR_IN');
         const mOut = getSavedMastery(task.data.question, 'DIR_OUT');
@@ -1078,7 +1157,7 @@ function finishCampaign(coins) {
 }
 
 // ==========================================
-// 10. HLAVNÍ RENDERÉR VŠECH AKTIVNÍCH HER
+// 10. HLAVNÍ RENDERÉR VŠECH HER
 // ==========================================
 function renderActiveGame() {
   const main = document.getElementById("main-content");
@@ -1110,7 +1189,7 @@ function renderActiveGame() {
     `;
   }
 
-  // ZKOUŠENÍ Z HLAVY (ADAPTIVE)
+  // ZKOUŠENÍ Z HLAVY (S PODPOROU DÁVEK PO 15 POLOŽKÁCH)
   else if (selectedGame === "ADAPTIVE") {
     const stats = getMasteryStats();
     const pct = Math.round((stats.current / stats.total) * 100);
@@ -1119,10 +1198,12 @@ function renderActiveGame() {
     if (stats.masteredCount >= stats.totalWords) {
       main.innerHTML = `
         <div style="text-align:center;padding:30px;">
-          <h2 style="color:var(--col-green);margin-bottom:10px;">KOMPLETNĚ ZVLÁDNUTO! 🎉</h2>
-          <p style="color:#fff;margin-bottom:15px;">Všech ${stats.totalWords} položek umíš na 2 ★!</p>
+          <h2 style="color:var(--col-green);margin-bottom:10px;">${isAdaptiveBatchMode ? 'BLOK 15 SLOV ZVLÁDNUT! 🎉' : 'KOMPLETNĚ ZVLÁDNUTO! 🎉'}</h2>
+          <p style="color:#fff;margin-bottom:15px;">Všech ${stats.totalWords} položek bloku umíš na 2 ★!</p>
+          <div class="action-btn" onclick="startScrambleFromAdaptiveBatch()">SKLÁDAT TĚCHTO ${stats.totalWords} SLOV 🧩</div>
+          ${isAdaptiveBatchMode ? `<div class="action-btn green" onclick="initGameState();renderActiveGame();">DALŠÍ BLOK (15 SLOV) ➔</div>` : ''}
           <div class="action-btn" onclick="toggleTestingDirection()">PŘEPNOUT SMĚR (${isDirOut ? 'Cizí ➔ 🇨🇿' : '🇨🇿 ➔ Cizí'}) ⇄</div>
-          <div class="action-btn green" onclick="setScreen('SELECT_GAME')">ZPĚT DO MENU</div>
+          <div class="action-btn" onclick="setScreen('SELECT_GAME')">ZPĚT DO MENU</div>
         </div>
       `;
       return;
@@ -1132,7 +1213,7 @@ function renderActiveGame() {
     main.innerHTML = `
       <div class="bargraph-container">
         <div class="bargraph-header">
-          <span>Zvládnuto: ${stats.masteredCount} z ${stats.totalWords} slov (2 ★)</span>
+          <span>${isAdaptiveBatchMode ? 'Blok: ' + stats.masteredCount + ' z ' + stats.totalWords + ' (2 ★)' : 'Zvládnuto: ' + stats.masteredCount + ' z ' + stats.totalWords}</span>
           <span style="color:var(--col-green);">${pct} % (${stats.current}/${stats.total} b.)</span>
         </div>
         <div class="bargraph-track"><div class="bargraph-fill" style="width:${pct}%;"></div></div>
@@ -1257,7 +1338,7 @@ function renderActiveGame() {
     `;
   }
 
-  // PEXESO
+  // PEXESO (S ROVNOMĚRNÝMI OTAZNÍKY)
   else if (selectedGame === "PEXESO") {
     const totalPairs = Math.min(pexesoPairCount, pexesoCards.length / 2);
     const isDone = pexesoMatched.length === totalPairs;
@@ -1407,7 +1488,7 @@ function renderActiveGame() {
     `;
   }
 
-  // HRA HAD (SNAKE S TLAČÍTKEM NA ŠTÍT)
+  // HRA HAD (SNAKE S PAUZOU PO VYPRŠENÍ ŠTÍTU A PEVNOU VÝŠKOU)
   else if (selectedGame === "SNAKE") {
     if (snakeState === "GAMEOVER") {
       main.innerHTML = `
@@ -1439,9 +1520,10 @@ function renderActiveGame() {
 
             <span style="color:var(--col-active-tab);">🐍 ${snakeBody.length} | Body: ${snakeScore}</span>
           </div>
+
           ${snakeCurrentWord ? `
             <div class="snake-prompt-cz">${snakeCurrentWord.czech}</div>
-            <div class="snake-slots-row">
+            <div id="snake-slots-wrap" class="snake-slots-row">
               ${snakeTargetLetters.map((ch, idx) => `
                 <div class="snake-slot ${idx < snakeCurrentIdx ? 'done' : (idx === snakeCurrentIdx ? 'active' : '')}">
                   ${idx < snakeCurrentIdx ? ch : (idx === snakeCurrentIdx ? ch : '_')}
@@ -1449,11 +1531,31 @@ function renderActiveGame() {
               `).join('')}
             </div>
           ` : ''}
-          ${snakeState === "HIT" || snakeState === "PAUSED_SHIELD" ? `<div style="color:${snakeState==='PAUSED_SHIELD'?'var(--col-yellow)':'var(--col-red)'};font-weight:bold;margin-top:6px;font-size:13px;">${snakeStatusMsg}</div>` : ''}
+
+          <!-- PEVNÁ VÝŠKA PRO ZPRÁVU – ZABRÁNÍ POSKAKOVÁNÍ PLOCHY -->
+          <div class="snake-status-bar" style="color:${snakeState==='PAUSED_SHIELD'?'var(--col-yellow)':'var(--col-red)'};">
+            ${snakeState === "HIT" || snakeState === "PAUSED_SHIELD" ? snakeStatusMsg : ''}
+          </div>
         </div>
 
         <div class="snake-canvas-wrap" style="touch-action:none!important;">
           <canvas id="snake-canvas" width="340" height="340" style="touch-action:none!important;"></canvas>
+
+          <!-- MODÁLNÍ DIALOG PŘI VYPRŠENÍ ŠTÍTU -->
+          ${snakeState === "SHIELD_EXPIRED_PAUSE" ? `
+            <div style="position:absolute;inset:0;background:rgba(8,16,30,0.85);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;text-align:center;z-index:20;">
+              <h3 style="color:var(--col-yellow);font-size:22px;margin-bottom:8px;">🛡️ ŠTÍT VYPRŠEL!</h3>
+              <p style="font-size:14px;color:#fff;margin-bottom:15px;">Dál už tě zdi ani tělo neochrání.</p>
+              ${canBuyShield ? `
+                <div class="action-btn" style="background:#4338ca;border-color:#818cf8;width:100%;margin-bottom:8px;padding:10px;font-size:15px;" onclick="buySnakeShieldInGame()">
+                  Koupit další štít (-1 ❤️ / 20 p.)
+                </div>
+              ` : ''}
+              <div class="action-btn green" style="width:100%;padding:10px;font-size:15px;" onclick="resumeSnakeWithoutShield()">
+                Pokračovat bez štítu ▶️
+              </div>
+            </div>
+          ` : ''}
         </div>
 
         <div class="snake-dpad">
