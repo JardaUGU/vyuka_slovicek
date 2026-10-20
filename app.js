@@ -16,7 +16,7 @@ let selectedGame = "";
 let selectedSeqIndex = 0;
 let testingDirection = localStorage.getItem("testing_dir") || "DIR_OUT";
 
-// Časomíra – bezpečně inicializovaná
+// Časomíra – bezpečně inicializovaná jako čistá čísla
 let todaySecondsStudied = 0;
 let lastUserActivityTime = Date.now();
 let isTimerPaused = false;
@@ -24,6 +24,66 @@ let lastCloudSyncSec = 0;
 
 let isAutoTTS = localStorage.getItem("auto_tts") !== "false";
 let cachedVoices = [];
+
+// --- BAREVNÉ SKINY APLIKACE ---
+const APP_SKINS = [
+  { id: 'default', name: '🌌 Hluboký vesmír', cost: 0, desc: 'Klasický tmavomodrý noční vzhled' },
+  { id: 'matrix', name: '💻 Hacker Matrix', cost: 60, desc: 'Černá se svítivě zeleným neonem' },
+  { id: 'gold', name: '👑 Zlatý šampion', cost: 80, desc: 'Exkluzivní zlato-černý design' },
+  { id: 'cyberpunk', name: '⚡ Kyberpunk', cost: 70, desc: 'Tmavě fialová s neonovou růžovou' },
+  { id: 'arctic', name: '❄️ Polární záře', cost: 50, desc: 'Ledově tyrkysový styl' }
+];
+
+function applyAppSkin(skinId) {
+  const s = skinId || 'default';
+  document.body.setAttribute('data-theme', s);
+  localStorage.setItem('active_skin', s);
+}
+applyAppSkin(localStorage.getItem('active_skin') || 'default');
+
+function buySkin(skinId, cost) {
+  if (!currentUser) return;
+  const currentCoins = getUserCoins(currentUser.name);
+  if (currentCoins >= cost) {
+    addCoins(currentUser.name, -cost);
+    if (!currentUser.unlockedThemes) currentUser.unlockedThemes = ['default'];
+    if (!currentUser.unlockedThemes.includes(skinId)) currentUser.unlockedThemes.push(skinId);
+    currentUser.activeTheme = skinId;
+    localStorage.setItem("cur_user", JSON.stringify(currentUser));
+    applyAppSkin(skinId);
+
+    try {
+      const fd = new URLSearchParams();
+      fd.append("action", "buy_theme");
+      fd.append("user", currentUser.name);
+      fd.append("themeId", skinId);
+      fd.append("cost", cost);
+      fetch(API_URL, { method: "POST", mode: "no-cors", body: fd });
+    } catch(e) {}
+
+    alert("Nový vzhled byl odemčen a nasazen! 🎨");
+    renderScreen();
+  } else {
+    alert("Nemáš dostatek zlaťáků! 💰");
+  }
+}
+
+function equipSkin(skinId) {
+  if (!currentUser) return;
+  currentUser.activeTheme = skinId;
+  localStorage.setItem("cur_user", JSON.stringify(currentUser));
+  applyAppSkin(skinId);
+
+  try {
+    const fd = new URLSearchParams();
+    fd.append("action", "set_theme");
+    fd.append("user", currentUser.name);
+    fd.append("themeId", skinId);
+    fetch(API_URL, { method: "POST", mode: "no-cors", body: fd });
+  } catch(e) {}
+
+  renderScreen();
+}
 
 // --- POMOCNÉ FUNKCE ---
 function forceHardReload() {
@@ -81,7 +141,9 @@ function isItemAllowedForGrade(it, userG) {
 function getUserCoins(userName) {
   if (!userName) return 0;
   const u = (appData.users || []).find(x => x.name.toLowerCase().trim() === userName.toLowerCase().trim());
-  return u ? Number(u.coins || 0) : Number(localStorage.getItem(`coins_${userName.toLowerCase().trim()}`) || 0);
+  const cloudCoins = u ? Number(u.coins || 0) : 0;
+  const localCoins = Number(localStorage.getItem(`coins_${userName.toLowerCase().trim()}`) || 0);
+  return Math.max(cloudCoins, localCoins);
 }
 
 function getUserItemCount(userName, itemKey) {
@@ -278,7 +340,7 @@ function sendTimeHeartbeatToGoogle() {
   } catch(e) {}
 }
 
-// --- VÝSLOVNOST (TTS) S PODPOROU JAHVE -> ADONAJ A iOS HLASŮ ---
+// --- VÝSLOVNOST (TTS) ---
 function updateVoices() {
   if ('speechSynthesis' in window) {
     const v = window.speechSynthesis.getVoices();
@@ -310,10 +372,7 @@ function speakWord(text, subjectName) {
   setTimeout(() => {
     let toSpeak = text;
 
-    // 1. Odstranění závorek (oni, ona se nečte)
     toSpeak = toSpeak.replace(/\s*\([^)]*\)/gi, '').trim();
-
-    // 2. Čtení Božího jména v hebrejštině (Jahve / Tetragrammaton -> Adonaj)
     toSpeak = toSpeak.replace(/יהוה/g, 'אֲדֹנָי');
     toSpeak = toSpeak.replace(/\b(Jahve|Jahveh|Yahweh|Yahwe|Jehova|JHVH|YHWH)\b/gi, 'Adonaj');
 
@@ -449,6 +508,8 @@ async function syncData() {
           currentUser.coins = Number(foundU.coins || 0);
           currentUser.inventory = foundU.inventory || {};
           currentUser.startLevels = foundU.startLevels || {};
+          currentUser.unlockedThemes = foundU.unlockedThemes || ['default'];
+          currentUser.activeTheme = foundU.activeTheme || 'default';
           
           if (foundU.todayMinutes !== undefined) {
             const cloudSec = Math.round(Number(foundU.todayMinutes) * 60);
@@ -457,6 +518,7 @@ async function syncData() {
             localStorage.setItem(getStudyTimeKey(currentUser.name), String(todaySecondsStudied));
           }
           localStorage.setItem("cur_user", JSON.stringify(currentUser));
+          applyAppSkin(currentUser.activeTheme);
         }
       }
     }
@@ -538,9 +600,12 @@ function selectUser(name, grade, targetMinutes) {
     stars: 0,
     startLevels: (foundU && foundU.startLevels) ? foundU.startLevels : {},
     inventory: (foundU && foundU.inventory) ? foundU.inventory : {},
+    unlockedThemes: (foundU && foundU.unlockedThemes) ? foundU.unlockedThemes : ['default'],
+    activeTheme: (foundU && foundU.activeTheme) ? foundU.activeTheme : 'default',
     coins: foundU ? Number(foundU.coins || 0) : 0
   };
   localStorage.setItem("cur_user", JSON.stringify(currentUser));
+  applyAppSkin(currentUser.activeTheme);
 
   let localSec = loadUserStudyTime(currentUser.name);
   let cloudSec = foundU ? Math.round(Number(foundU.todayMinutes || 0) * 60) : 0;
@@ -703,7 +768,7 @@ function renderScreen() {
     `;
   }
 
-  // 5. KAMPAŇ HUB (BEZ ROLETKY, ŘÍZENO TABULKOU)
+  // 5. KAMPAŇ HUB (BEZ ROLETKY, ŘÍZENO TABULKOU + OBCHOD SE SKINY)
   else if (currentScreen === "CAMPAIGN_HUB") {
     bSubj.style.display = "flex"; 
     bSubj.innerText = selectedSubject; 
@@ -763,11 +828,43 @@ function renderScreen() {
         </div>
         <p style="font-size:13px;color:var(--col-text-muted);margin-top:12px;">Udrž všech 5 ❤️ srdíček pro zisk zlaťáků!</p>
 
-        <div style="margin-top:30px;background:var(--col-card);padding:15px;border-radius:10px;border:1px solid var(--col-yellow);">
+        <!-- OBCHOD: ZMRAZENÍ + SKINY -->
+        <div style="margin-top:25px;background:var(--col-card);padding:15px;border-radius:10px;border:1px solid var(--col-yellow);">
            <h3 style="color:var(--col-yellow);font-size:18px;margin-bottom:8px;">🛒 Obchod</h3>
-           <p style="font-size:16px;">Tvoje zlaťáky: <b style="color:var(--col-yellow);">${coins} 💰</b></p>
-           <div class="action-btn" style="background:#2d2605;border-color:var(--col-yellow);color:var(--col-yellow);margin-top:12px;padding:10px;" onclick="buyFreeze()">
+           <p style="font-size:16px;margin-bottom:10px;">Tvoje zlaťáky: <b style="color:var(--col-yellow);">${coins} 💰</b></p>
+           
+           <div class="action-btn" style="background:#2d2605;border-color:var(--col-yellow);color:var(--col-yellow);padding:10px;font-size:15px;" onclick="buyFreeze()">
               🧊 Zmrazit sérii (Cena: 20 💰)
+           </div>
+
+           <div style="margin-top:20px;border-top:1px solid var(--col-card-border);padding-top:15px;text-align:left;">
+             <h4 style="color:var(--col-active-tab);font-size:15px;margin-bottom:10px;">🎨 Herní vzhledy aplikace:</h4>
+             <div style="display:flex;flex-direction:column;gap:8px;">
+               ${APP_SKINS.map(skin => {
+                 const isUnlocked = (currentUser.unlockedThemes || ['default']).includes(skin.id);
+                 const isActive = (currentUser.activeTheme || 'default') === skin.id;
+
+                 return `
+                   <div style="display:flex;justify-content:space-between;align-items:center;background:#101a2c;padding:8px 12px;border-radius:8px;border:1px solid ${isActive?'var(--col-active-tab)':'#24344d'};">
+                     <div>
+                       <b style="color:#fff;font-size:13px;">${skin.name}</b>
+                       <p style="font-size:11px;color:var(--col-text-muted);margin-top:2px;">${skin.desc}</p>
+                     </div>
+                     <div>
+                       ${isActive ? `
+                         <span style="color:var(--col-green);font-size:12px;font-weight:bold;">✅ Aktivní</span>
+                       ` : isUnlocked ? `
+                         <button class="toggle-btn on" style="font-size:12px;padding:4px 8px;" onclick="equipSkin('${skin.id}')">Nasadit</button>
+                       ` : `
+                         <button class="toggle-btn" style="font-size:12px;padding:4px 8px;background:#382b05;border-color:var(--col-yellow);color:var(--col-yellow);" onclick="buySkin('${skin.id}', ${skin.cost})">
+                           Koupit (${skin.cost} 💰)
+                         </button>
+                       `}
+                     </div>
+                   </div>
+                 `;
+               }).join('')}
+             </div>
            </div>
         </div>
       </div>
