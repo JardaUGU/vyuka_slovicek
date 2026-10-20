@@ -104,6 +104,15 @@ footer { height: 32px; background-color: var(--col-card); border-top: 1px solid 
   margin-bottom: 6px; 
   text-align: center; 
 }
+.snake-status-bar { 
+  min-height: 20px; 
+  height: 20px; 
+  line-height: 20px; 
+  font-weight: bold; 
+  font-size: 13px; 
+  margin-top: 4px; 
+  overflow: hidden; 
+}
 
 .snake-stats { display: flex; justify-content: space-between; align-items: center; font-weight: bold; font-size: 13px; margin-bottom: 4px; }
 .snake-shield-btn { background: #1e1b4b; border: 1px solid #818cf8; color: #c7d2fe; padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; cursor: pointer; }
