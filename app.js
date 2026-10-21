@@ -41,22 +41,70 @@ function applyAppSkin(skinId) {
 }
 applyAppSkin(localStorage.getItem('active_skin') || 'default');
 
+// Trvalé úložiště odemčených a aktivních skinů
+function getUserUnlockedThemes(userName) {
+  if (!userName) return ['default'];
+  const uKey = userName.toLowerCase().trim();
+  const u = (appData.users || []).find(x => x.name.toLowerCase().trim() === uKey);
+  
+  let cloudSkins = [];
+  if (u && u.unlockedThemes) {
+    cloudSkins = Array.isArray(u.unlockedThemes) ? u.unlockedThemes : String(u.unlockedThemes).split(',').map(s => s.trim());
+  }
+  
+  let localSkins = [];
+  try {
+    localSkins = JSON.parse(localStorage.getItem(`skins_${uKey}`) || '[]');
+  } catch(e) {}
+  
+  let curSkins = (currentUser && currentUser.name && currentUser.name.toLowerCase().trim() === uKey && Array.isArray(currentUser.unlockedThemes))
+    ? currentUser.unlockedThemes : [];
+
+  return [...new Set(['default', ...cloudSkins, ...localSkins, ...curSkins])];
+}
+
+function saveUserUnlockedThemes(userName, themesArr) {
+  if (!userName) return;
+  const uKey = userName.toLowerCase().trim();
+  localStorage.setItem(`skins_${uKey}`, JSON.stringify(themesArr));
+  
+  const u = (appData.users || []).find(x => x.name.toLowerCase().trim() === uKey);
+  if (u) u.unlockedThemes = themesArr;
+  
+  if (currentUser && currentUser.name.toLowerCase().trim() === uKey) {
+    currentUser.unlockedThemes = themesArr;
+    localStorage.setItem("cur_user", JSON.stringify(currentUser));
+  }
+}
+
+function getUserActiveTheme(userName) {
+  if (!userName) return 'default';
+  const uKey = userName.toLowerCase().trim();
+  const u = (appData.users || []).find(x => x.name.toLowerCase().trim() === uKey);
+  return localStorage.getItem(`active_theme_${uKey}`) || (u ? u.activeTheme : null) || (currentUser ? currentUser.activeTheme : null) || 'default';
+}
+
 function buySkin(skinId, cost) {
   if (!currentUser) return;
   const currentCoins = getUserCoins(currentUser.name);
   if (currentCoins >= cost) {
     addCoins(currentUser.name, -cost);
     
-    // Bezpečná inicializace pole
-    let themesArr = Array.isArray(currentUser.unlockedThemes) ? currentUser.unlockedThemes : [];
-    if (typeof currentUser.unlockedThemes === 'string') themesArr = currentUser.unlockedThemes.split(',').map(s=>s.trim());
-    if (!themesArr.includes('default')) themesArr.unshift('default');
-    if (!themesArr.includes(skinId)) themesArr.push(skinId);
+    const uKey = currentUser.name.toLowerCase().trim();
+    let themes = getUserUnlockedThemes(currentUser.name);
+    if (!themes.includes(skinId)) themes.push(skinId);
     
-    currentUser.unlockedThemes = themesArr;
+    saveUserUnlockedThemes(currentUser.name, themes);
+    localStorage.setItem(`active_theme_${uKey}`, skinId);
     currentUser.activeTheme = skinId;
     localStorage.setItem("cur_user", JSON.stringify(currentUser));
     applyAppSkin(skinId);
+
+    const u = (appData.users || []).find(x => x.name.toLowerCase().trim() === uKey);
+    if (u) {
+      u.unlockedThemes = themes;
+      u.activeTheme = skinId;
+    }
 
     try {
       const fd = new URLSearchParams();
@@ -76,9 +124,14 @@ function buySkin(skinId, cost) {
 
 function equipSkin(skinId) {
   if (!currentUser) return;
+  const uKey = currentUser.name.toLowerCase().trim();
   currentUser.activeTheme = skinId;
+  localStorage.setItem(`active_theme_${uKey}`, skinId);
   localStorage.setItem("cur_user", JSON.stringify(currentUser));
   applyAppSkin(skinId);
+
+  const u = (appData.users || []).find(x => x.name.toLowerCase().trim() === uKey);
+  if (u) u.activeTheme = skinId;
 
   try {
     const fd = new URLSearchParams();
@@ -482,7 +535,6 @@ async function loadData() {
   if (cached) {
     try {
       appData = JSON.parse(cached);
-      // Pokud byla cache stažena jiný den, vynulujeme dnešní minuty z cloudu, abychom netahali včerejší čas
       if (appData.syncDate !== getTodayDateStr() && appData.users) {
          appData.users.forEach(u => u.todayMinutes = 0);
       }
@@ -503,14 +555,13 @@ async function syncData() {
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000);
-    // Přikládáme dnešní datum pro absolutní shodu se serverem
     const fetchUrl = API_URL + (API_URL.includes('?') ? '&' : '?') + 't=' + Date.now() + '&clientDate=' + getTodayDateStr();
     
     const res = await fetch(fetchUrl, { signal: controller.signal });
     clearTimeout(timeoutId);
     const json = await res.json();
     if (json && json.items) {
-      json.syncDate = getTodayDateStr(); // Značka pro půlnoční reset
+      json.syncDate = getTodayDateStr();
       appData = json;
       localStorage.setItem("app_data", JSON.stringify(json));
       if (statusEl) statusEl.innerText = `OK: ${appData.items.length} úloh`;
@@ -523,14 +574,22 @@ async function syncData() {
           currentUser.coins = Number(foundU.coins || 0);
           currentUser.inventory = foundU.inventory || {};
           
-          // Bezpečné načtení skinů
-          let themesArr = Array.isArray(foundU.unlockedThemes) ? foundU.unlockedThemes : [];
-          if (typeof foundU.unlockedThemes === 'string') themesArr = foundU.unlockedThemes.split(',').map(s=>s.trim());
-          if (!themesArr.includes('default')) themesArr.unshift('default');
-          currentUser.unlockedThemes = themesArr;
+          // Sloučení odemčených skinů ze serveru i z lokálního zařízení
+          let cloudThemes = Array.isArray(foundU.unlockedThemes) ? foundU.unlockedThemes : [];
+          if (typeof foundU.unlockedThemes === 'string') cloudThemes = foundU.unlockedThemes.split(',').map(s => s.trim().toLowerCase());
+          
+          let localThemes = getUserUnlockedThemes(currentUser.name);
+          let mergedThemes = [...new Set(['default', ...cloudThemes, ...localThemes])];
+          
+          saveUserUnlockedThemes(currentUser.name, mergedThemes);
+          foundU.unlockedThemes = mergedThemes;
+          currentUser.unlockedThemes = mergedThemes;
+          
+          const activeTh = getUserActiveTheme(currentUser.name) || foundU.activeTheme || 'default';
+          currentUser.activeTheme = activeTh;
+          foundU.activeTheme = activeTh;
           
           currentUser.startLevels = foundU.startLevels || {};
-          currentUser.activeTheme = foundU.activeTheme || 'default';
           
           if (foundU.todayMinutes !== undefined) {
             const cloudSec = Math.round(Number(foundU.todayMinutes) * 60);
@@ -602,6 +661,7 @@ function goBack() {
     else if (selectedSubject === "Matematika") setScreen("SELECT_MATH_OP");
     else setScreen("SELECT_GAME");
   }
+  else if (currentScreen === "SHOP") setScreen("SELECT_SUBJECT");
   else if (currentScreen === "CAMPAIGN_HUB") setScreen("SELECT_SUBJECT"); 
   else if (currentScreen === "SELECT_MATH_OP") setScreen("SELECT_SUBJECT");
   else if (currentScreen === "SELECT_GAME") setScreen("SELECT_GROUP");
@@ -613,15 +673,11 @@ function setScreen(scr) { currentScreen = scr; registerUserAction(); renderScree
 
 function selectUser(name, grade, targetMinutes) {
   checkDateRollover();
-  const foundU = (appData.users || []).find(u => u.name.toLowerCase().trim() === name.toLowerCase().trim());
+  const uKey = name.toLowerCase().trim();
+  const foundU = (appData.users || []).find(u => u.name.toLowerCase().trim() === uKey);
   
-  // Bezpečné načtení skinů
-  let themesArr = ['default'];
-  if (foundU) {
-      themesArr = Array.isArray(foundU.unlockedThemes) ? foundU.unlockedThemes : [];
-      if (typeof foundU.unlockedThemes === 'string') themesArr = foundU.unlockedThemes.split(',').map(s=>s.trim());
-      if (!themesArr.includes('default')) themesArr.unshift('default');
-  }
+  const themesArr = getUserUnlockedThemes(name);
+  const activeTh = getUserActiveTheme(name);
 
   currentUser = { 
     name, 
@@ -631,7 +687,7 @@ function selectUser(name, grade, targetMinutes) {
     startLevels: (foundU && foundU.startLevels) ? foundU.startLevels : {},
     inventory: (foundU && foundU.inventory) ? foundU.inventory : {},
     unlockedThemes: themesArr,
-    activeTheme: (foundU && foundU.activeTheme) ? foundU.activeTheme : 'default',
+    activeTheme: activeTh,
     coins: foundU ? Number(foundU.coins || 0) : 0
   };
   localStorage.setItem("cur_user", JSON.stringify(currentUser));
@@ -639,7 +695,6 @@ function selectUser(name, grade, targetMinutes) {
 
   let localSec = loadUserStudyTime(currentUser.name);
   let cloudSec = 0;
-  // Pokud je cache ze stejného dne, vezmeme v potaz cloud minuty
   if (foundU && appData.syncDate === getTodayDateStr()) {
      cloudSec = Math.round(Number(foundU.todayMinutes || 0) * 60);
   }
@@ -730,16 +785,14 @@ function renderScreen() {
             const coins = Number(u.coins || 0);
             const freezes = (u.inventory && u.inventory['Zmrazeni']) ? u.inventory['Zmrazeni'] : 0;
             
-            let themesArr = Array.isArray(u.unlockedThemes) ? u.unlockedThemes : [];
-            if (typeof u.unlockedThemes === 'string') themesArr = u.unlockedThemes.split(',').map(s=>s.trim());
-            
-            const unlockedSkins = themesArr.filter(t=>t!=='default').map(t=>{
-                const s = APP_SKINS.find(x=>x.id===t);
+            let themesArr = getUserUnlockedThemes(u.name);
+            const unlockedSkins = themesArr.filter(t => t !== 'default').map(t => {
+                const s = APP_SKINS.find(x => x.id === t);
                 return s ? s.name.split(' ')[0] : t;
             }).join(' ');
 
             return `
-              <div class="tile" style="${isDone ? 'border-color:var(--col-yellow);background:#1a2512;' : ''}" onclick="selectUser('${u.name}', ${g}, ${targetM})">
+              <div class="tile" style="${isDone ? 'border-color:var(--col-yellow);background:#1a2512;' : ''}" onclick="selectUser('${u.name.replace(/'/g, "\\'")}', ${g}, ${targetM})">
                 <h2>${u.name}</h2><p>${g >= 10 && g < 90 ? `${g-9}. ročník SŠ` : (g<=9 ? `${g}. tř.` : 'Dospělý')}</p>
                 <p style="color:var(--col-orange);margin-top:4px;">🔥 Série: ${streakDays} dní</p>
                 <p style="color:${isDone ? 'var(--col-yellow)' : 'var(--col-text-muted)'};margin-top:2px;font-weight:bold;">⏱️ Dnes: ${uMin}/${targetM} min ${isDone?'★':''}</p>
@@ -754,12 +807,17 @@ function renderScreen() {
       `;
     }
 
-    // 2. VÝBĚR PŘEDMĚTU
+    // 2. VÝBĚR PŘEDMĚTU + VELKÁ KARTA OBCHODU
     else if (currentScreen === "SELECT_SUBJECT") {
       bSubj.style.display = "none"; bGroup.style.display = "none";
       const userG = parseInt(currentUser.grade) || 2;
       const subjs = {};
       (appData.items || []).forEach(it => { if (!isItemAllowedForGrade(it, userG)) return; subjs[it.subject] = (subjs[it.subject] || 0) + 1; });
+
+      const coins = getUserCoins(currentUser.name);
+      const freezes = getUserItemCount(currentUser.name, "Zmrazeni");
+      const unlocked = getUserUnlockedThemes(currentUser.name);
+      const skinCount = unlocked.length;
 
       let html = `
         <div class="filter-bar">
@@ -768,6 +826,24 @@ function renderScreen() {
             ${filterExactGradeOnly ? 'Jen má třída' : 'Všechny ročníky'}
           </button>
         </div>
+
+        <!-- SPOLEČNÝ OBCHOD PRO VŠECHNY PŘEDMĚTY -->
+        <div class="tile" style="border-color:var(--col-yellow);background:#1f1905;margin-bottom:10px;padding:12px 14px;cursor:pointer;" onclick="setScreen('SHOP')">
+          <div style="display:flex;align-items:center;justify-content:space-between;width:100%;">
+            <div style="display:flex;align-items:center;gap:12px;">
+              <span style="font-size:32px;">🛒</span>
+              <div style="text-align:left;">
+                <h2 style="color:var(--col-yellow);margin-bottom:2px;font-size:18px;">Obchod a Vzhledy</h2>
+                <p style="color:var(--col-text-muted);font-size:12px;">Společný obchod pro všechny předměty</p>
+              </div>
+            </div>
+            <div style="text-align:right;">
+              <div style="color:var(--col-yellow);font-size:18px;font-weight:bold;">${coins} 💰</div>
+              <div style="color:var(--col-active-tab);font-size:12px;margin-top:2px;">🧊 ${freezes}x | 🎨 ${skinCount}</div>
+            </div>
+          </div>
+        </div>
+
         <div class="grid-2">
           <div class="tile" style="border-color:var(--col-active-tab);background:#102538;" onclick="openMathOperationSelect()">
             <h2 style="color:var(--col-active-tab);">🔢 Matematika</h2><p>Výběr operací a dril</p>
@@ -784,13 +860,87 @@ function renderScreen() {
       main.innerHTML = html;
     }
 
-    // 3. VÝBĚR MATEMATIKY
+    // 3. SPOLEČNÝ OBCHOD
+    else if (currentScreen === "SHOP") {
+      bSubj.style.display = "flex"; 
+      bSubj.innerText = "🛒 Obchod"; 
+      bGroup.style.display = "none";
+
+      const coins = getUserCoins(currentUser.name);
+      const freezes = getUserItemCount(currentUser.name, "Zmrazeni");
+      const unlockedThemes = getUserUnlockedThemes(currentUser.name);
+      const activeTheme = getUserActiveTheme(currentUser.name);
+
+      main.innerHTML = `
+        <div style="padding:4px;">
+          <!-- KARTA PENĚŽENKY -->
+          <div style="background:var(--col-card);border:2px solid var(--col-yellow);border-radius:12px;padding:15px;text-align:center;margin-bottom:15px;">
+            <h2 style="color:var(--col-yellow);font-size:22px;margin-bottom:4px;">🛒 Školní Obchod</h2>
+            <p style="color:var(--col-text-muted);font-size:13px;margin-bottom:10px;">Zlaťáky získáváš učením a plněním úkolů ve všech předmětech.</p>
+            <div style="font-size:32px;font-weight:bold;color:var(--col-yellow);">
+              ${coins} 💰
+            </div>
+          </div>
+
+          <!-- ZMRAZENÍ SÉRIE -->
+          <div style="background:var(--col-card);border:1px solid var(--col-card-border);border-radius:12px;padding:14px;margin-bottom:15px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+              <div>
+                <b style="color:#fff;font-size:16px;">🧊 Zmrazení série (Streak Freeze)</b>
+                <p style="font-size:12px;color:var(--col-text-muted);margin-top:2px;">Ochrání tvou denní sérii, když se jeden den nestihneš učit.</p>
+              </div>
+              <span style="font-size:15px;color:var(--col-active-tab);font-weight:bold;white-space:nowrap;margin-left:8px;">Máš: ${freezes}x</span>
+            </div>
+            <button class="action-btn" style="background:#2d2605;border-color:var(--col-yellow);color:var(--col-yellow);padding:10px;font-size:15px;width:100%;margin-top:6px;" onclick="buyFreeze()">
+              Koupit zmrazení (Cena: 20 💰)
+            </button>
+          </div>
+
+          <!-- BAREVNÉ VZHLEDY (SKINY) -->
+          <div style="background:var(--col-card);border:1px solid var(--col-card-border);border-radius:12px;padding:14px;margin-bottom:15px;">
+            <h3 style="color:var(--col-active-tab);font-size:16px;margin-bottom:10px;">🎨 Herní vzhledy aplikace:</h3>
+            <div style="display:flex;flex-direction:column;gap:8px;">
+              ${APP_SKINS.map(skin => {
+                const isUnlocked = unlockedThemes.includes(skin.id);
+                const isActive = activeTheme === skin.id;
+
+                return `
+                  <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(0,0,0,0.3);padding:10px 12px;border-radius:8px;border:1px solid ${isActive?'var(--col-active-tab)':'var(--col-card-border)'};">
+                    <div>
+                      <b style="color:#fff;font-size:14px;">${skin.name}</b>
+                      <p style="font-size:11px;color:var(--col-text-muted);margin-top:2px;">${skin.desc}</p>
+                    </div>
+                    <div>
+                      ${isActive ? `
+                        <span style="color:var(--col-green);font-size:12px;font-weight:bold;padding:6px 10px;background:rgba(34,197,94,0.1);border-radius:6px;border:1px solid var(--col-green);">✅ Aktivní</span>
+                      ` : isUnlocked ? `
+                        <button class="toggle-btn on" style="font-size:13px;padding:6px 14px;" onclick="equipSkin('${skin.id}')">Nasadit</button>
+                      ` : `
+                        <button class="toggle-btn" style="font-size:13px;padding:6px 14px;background:#2d2605;border-color:var(--col-yellow);color:var(--col-yellow);" onclick="buySkin('${skin.id}', ${skin.cost})">
+                          Koupit (${skin.cost} 💰)
+                        </button>
+                      `}
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+
+          <div class="action-btn" style="margin-top:15px;" onclick="setScreen('SELECT_SUBJECT')">
+            ◀️ Zpět k výběru předmětů
+          </div>
+        </div>
+      `;
+    }
+
+    // 4. VÝBĚR MATEMATIKY
     else if (currentScreen === "SELECT_MATH_OP") {
       bSubj.style.display = "flex"; bSubj.innerText = "Matematika"; bGroup.style.display = "none";
       if (typeof renderMathOpSelection === "function") renderMathOpSelection();
     }
 
-    // 4. VÝBĚR SKUPINY (LEKCE / TÉMATA)
+    // 5. VÝBĚR SKUPINY (LEKCE / TÉMATA)
     else if (currentScreen === "SELECT_GROUP") {
       bSubj.style.display = "flex"; bSubj.innerText = selectedSubject; bGroup.style.display = "none";
       const userG = parseInt(currentUser.grade) || 2;
@@ -821,7 +971,7 @@ function renderScreen() {
       `;
     }
 
-    // 5. KAMPAŇ HUB (BEZ ROLETKY, ŘÍZENO TABULKOU + OBCHOD SE SKINY)
+    // 6. KAMPAŇ HUB (S ODKAZEM NA OBCHOD)
     else if (currentScreen === "CAMPAIGN_HUB") {
       bSubj.style.display = "flex"; 
       bSubj.innerText = selectedSubject; 
@@ -881,54 +1031,18 @@ function renderScreen() {
           </div>
           <p style="font-size:13px;color:var(--col-text-muted);margin-top:12px;">Udrž všech 5 ❤️ srdíček pro zisk zlaťáků!</p>
 
-          <!-- OBCHOD: ZMRAZENÍ + SKINY -->
-          <div style="margin-top:25px;background:var(--col-card);padding:15px;border-radius:10px;border:1px solid var(--col-yellow);">
-             <h3 style="color:var(--col-yellow);font-size:18px;margin-bottom:8px;">🛒 Obchod</h3>
-             <p style="font-size:16px;margin-bottom:10px;">Tvoje zlaťáky: <b style="color:var(--col-yellow);">${coins} 💰</b></p>
-             
-             <div class="action-btn" style="background:rgba(250, 204, 21, 0.1);border-color:var(--col-yellow);color:var(--col-yellow);padding:10px;font-size:15px;" onclick="buyFreeze()">
-                🧊 Zmrazit sérii (Cena: 20 💰)
-             </div>
-
-             <div style="margin-top:20px;border-top:1px solid var(--col-card-border);padding-top:15px;text-align:left;">
-               <h4 style="color:var(--col-active-tab);font-size:15px;margin-bottom:10px;">🎨 Herní vzhledy aplikace:</h4>
-               <div style="display:flex;flex-direction:column;gap:8px;">
-                 ${APP_SKINS.map(skin => {
-                   let themesArr = Array.isArray(currentUser.unlockedThemes) ? currentUser.unlockedThemes : [];
-                   if (typeof currentUser.unlockedThemes === 'string') themesArr = currentUser.unlockedThemes.split(',').map(s=>s.trim());
-                   if (!themesArr.includes('default')) themesArr.unshift('default');
-                   
-                   const isUnlocked = themesArr.includes(skin.id);
-                   const isActive = (currentUser.activeTheme || 'default') === skin.id;
-
-                   return `
-                     <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(0,0,0,0.3);padding:8px 12px;border-radius:8px;border:1px solid ${isActive?'var(--col-active-tab)':'var(--col-card-border)'};">
-                       <div>
-                         <b style="color:#fff;font-size:13px;">${skin.name}</b>
-                         <p style="font-size:11px;color:var(--col-text-muted);margin-top:2px;">${skin.desc}</p>
-                       </div>
-                       <div>
-                         ${isActive ? `
-                           <span style="color:var(--col-green);font-size:12px;font-weight:bold;">✅ Aktivní</span>
-                         ` : isUnlocked ? `
-                           <button class="toggle-btn on" style="font-size:12px;padding:4px 8px;" onclick="equipSkin('${skin.id}')">Nasadit</button>
-                         ` : `
-                           <button class="toggle-btn" style="font-size:12px;padding:4px 8px;background:transparent;border-color:var(--col-yellow);color:var(--col-yellow);" onclick="buySkin('${skin.id}', ${skin.cost})">
-                             Koupit (${skin.cost} 💰)
-                           </button>
-                         `}
-                       </div>
-                     </div>
-                   `;
-                 }).join('')}
-               </div>
-             </div>
+          <!-- ODKAZ DO OBCHODU -->
+          <div class="tile" style="border-color:var(--col-yellow);background:#1f1905;margin-top:20px;padding:12px;cursor:pointer;" onclick="setScreen('SHOP')">
+            <div style="display:flex;justify-content:space-between;align-items:center;width:100%;">
+              <span style="color:var(--col-yellow);font-weight:bold;font-size:15px;">🛒 Přejít do Obchodu</span>
+              <span style="color:var(--col-yellow);font-weight:bold;">${coins} 💰</span>
+            </div>
           </div>
         </div>
       `;
     }
 
-    // 6. VÝBĚR HRY (KLASICKÝ PŘEDMĚT)
+    // 7. VÝBĚR HRY (KLASICKÝ PŘEDMĚT)
     else if (currentScreen === "SELECT_GAME") {
       bSubj.style.display = "flex"; bGroup.style.display = "flex"; bGroup.innerText = selectedGroupKey;
       const vItems = getVocabItems(), qItems = getQuizItems(), sItems = getSeqItems(), quickMode = getQuickChoiceMode();
@@ -968,7 +1082,7 @@ function renderScreen() {
       main.innerHTML = html;
     }
 
-    // 7. VÝBĚR ŘADY (MEZIKROK)
+    // 8. VÝBĚR ŘADY (MEZIKROK)
     else if (currentScreen === "SELECT_SEQ_ITEM") {
       bGroup.style.display = "flex"; bGroup.innerText = selectedGroupKey;
       const sItems = getSeqItems();
@@ -985,7 +1099,7 @@ function renderScreen() {
       `;
     }
 
-    // 8. VELIKOST PEXESA
+    // 9. VELIKOST PEXESA
     else if (currentScreen === "SELECT_PEXESO_SIZE") {
       bGroup.style.display = "flex"; bGroup.innerText = selectedGroupKey;
       main.innerHTML = `
@@ -999,7 +1113,7 @@ function renderScreen() {
       `;
     }
 
-    // 9. AKTIVNÍ HRA
+    // 10. AKTIVNÍ HRA
     else if (currentScreen === "PLAYING") {
       bSubj.style.display = "flex"; bSubj.innerText = selectedSubject;
       bGroup.style.display = "flex"; bGroup.innerText = selectedGroupKey;
