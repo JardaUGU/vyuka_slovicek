@@ -23,6 +23,8 @@ let arcadeDeck = [], arcadeCurrent = null, arcadeLives = 3, arcadeScore = 0, arc
 
 // Had (Snake)
 let snakeInterval = null;
+let snakeCountdownInterval = null;
+let snakeCountdown = 5;
 let snakeGridSize = 17;
 let snakeCellSize = 20;
 let snakeBody = [];
@@ -92,7 +94,6 @@ function initGameState() {
       vMastery[i] = getSavedMastery(w.question, testingDirection);
     });
 
-    // POKUD MÁ LEKCE VÍCE NEŽ 15 SLOV: Zvolíme chytrý blok 15 položek
     if (vItems.length > 15) {
       isAdaptiveBatchMode = true;
       let unmastered = [];
@@ -100,7 +101,6 @@ function initGameState() {
         if ((vMastery[i] || 0) < 2) unmastered.push(i);
       });
 
-      // 75 % položek, co ještě neumí (přednostně chyby s 0 ★)
       let m0 = unmastered.filter(i => (vMastery[i] || 0) === 0).sort(() => Math.random() - 0.5);
       let m1 = unmastered.filter(i => (vMastery[i] || 0) === 1).sort(() => Math.random() - 0.5);
       let candidates = [...m0, ...m1];
@@ -108,7 +108,6 @@ function initGameState() {
       let batchSize = Math.min(15, unmastered.length > 0 ? unmastered.length : 15);
       adaptiveBatchIndices = candidates.slice(0, batchSize);
 
-      // Pokud jich je méně než 15, dobereme libovolná zbývající slova
       if (adaptiveBatchIndices.length < batchSize) {
         let remaining = vItems.map((_, i) => i).filter(i => !adaptiveBatchIndices.includes(i)).sort(() => Math.random() - 0.5);
         adaptiveBatchIndices.push(...remaining.slice(0, batchSize - adaptiveBatchIndices.length));
@@ -202,7 +201,6 @@ function answerAdaptive(known) {
   renderActiveGame();
 }
 
-// Spustí skládání přesně těch 15 slov, která byla v bloku
 function startScrambleFromAdaptiveBatch() {
   const vItems = getVocabItems();
   selectedGame = "SCRAMBLE";
@@ -217,8 +215,6 @@ function startScrambleFromAdaptiveBatch() {
 // ==========================================
 function initScramble() {
   const vItems = getVocabItems();
-  
-  // POKUD BYL DOKONČEN BLOK 15 SLOV: Skládáme POUZE tato slova!
   if (isAdaptiveBatchMode && adaptiveBatchIndices && adaptiveBatchIndices.length > 0) {
     if (!scrambleDeck || scrambleDeck.length === 0) {
       scrambleDeck = [...adaptiveBatchIndices].sort(() => Math.random() - 0.5);
@@ -516,11 +512,8 @@ function startGame(game) {
 }
 
 // ==========================================
-// 8. HRA HAD (SNAKE ENGINE S ODPOČTEM A POJISTKOU PÍSMEN)
+// 8. HRA HAD (SNAKE ENGINE)
 // ==========================================
-let snakeCountdown = 5;
-let snakeCountdownInterval = null;
-
 function stopSnakeLoop() {
   if (snakeInterval) { clearInterval(snakeInterval); snakeInterval = null; }
   if (snakeCountdownInterval) { clearInterval(snakeCountdownInterval); snakeCountdownInterval = null; }
@@ -584,7 +577,6 @@ function startCampaignSnake() {
   setTimeout(attachSnakeTouchHandlers, 50);
 }
 
-// Spuštění 5sekundového odpočtu (při startu i po smrti)
 function startSnakeCountdown(sec = 5, msg = "") {
   stopSnakeLoop();
   snakeCountdown = sec;
@@ -632,7 +624,6 @@ function buySnakeShieldInGame(e) {
   }
 }
 
-// Nákup štítu za zlaťáky (pokud má hráč už jen 1 srdce)
 function buySnakeShieldWithCoins(e) {
   if (e) { e.preventDefault(); e.stopPropagation(); }
   if (!currentUser) return;
@@ -697,7 +688,6 @@ function spawnSnakeFood() {
   const occupied = new Set();
   snakeBody.forEach(seg => occupied.add(`${seg.x},${seg.y}`));
 
-  // Vygenerujeme všechna písmena slova
   for (let i = snakeCurrentIdx; i < snakeTargetLetters.length; i++) {
     const ch = snakeTargetLetters[i];
     let pos = getRandomFreeGridPos(occupied);
@@ -707,7 +697,6 @@ function spawnSnakeFood() {
     }
   }
 
-  // Případné rušivé znaky
   if (snakeLevel >= 2) {
     const distractorsCount = Math.min(3, snakeLevel - 1);
     const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -724,7 +713,6 @@ function spawnSnakeFood() {
   ensureTargetFoodsExist();
 }
 
-// POJISTKA: Zaručuje, že na herní ploše VŽDY existují všechna zbývající písmena slova!
 function ensureTargetFoodsExist() {
   if (!snakeTargetLetters || snakeCurrentIdx >= snakeTargetLetters.length) return;
 
@@ -749,7 +737,6 @@ function ensureTargetFoodsExist() {
     const missing = needed - present;
 
     for (let m = 0; m < missing; m++) {
-      // Pokud by byla plocha plná, nahradíme rušivé písmeno
       const distractorIdx = snakeFoods.findIndex(f => !neededCount[f.char]);
       if (distractorIdx !== -1) {
         const removed = snakeFoods.splice(distractorIdx, 1)[0];
@@ -769,7 +756,6 @@ function ensureTargetFoodsExist() {
     }
   }
 
-  // Označíme aktuální cílové písmeno jako cíl
   const currentTargetChar = snakeTargetLetters[snakeCurrentIdx];
   let firstTargetMarked = false;
   snakeFoods.forEach(f => {
@@ -791,7 +777,6 @@ function getRandomFreeGridPos(occupied) {
     if (!occupied.has(key)) return { x, y };
     tries++;
   }
-  // Pokud náhodné pokusy minou, projdeme systematicky celou plochu
   for (let x = 1; x < snakeGridSize - 1; x++) {
     for (let y = 1; y < snakeGridSize - 1; y++) {
       let key = `${x},${y}`;
@@ -882,7 +867,7 @@ function updateSnake() {
         handleSnakeWordComplete();
         return;
       } else {
-        ensureTargetFoodsExist(); // Ihned ověříme zbývající písmena
+        ensureTargetFoodsExist();
       }
     } else {
       if (snakeShieldLetters > 0) {
@@ -1015,40 +1000,6 @@ function drawSnake() {
       ctx.beginPath();
       ctx.roundRect(px + 1, py + 1, snakeCellSize - 2, snakeCellSize - 2, 6);
       ctx.fill();
-      ctx.fillStyle = "#000000";
-      if (snakeDir.x === 1) {
-        ctx.fillRect(px + 13, py + 4, 3, 3); ctx.fillRect(px + 13, py + 13, 3, 3);
-      } else if (snakeDir.x === -1) {
-        ctx.fillRect(px + 4, py + 4, 3, 3); ctx.fillRect(px + 4, py + 13, 3, 3);
-      } else if (snakeDir.y === 1) {
-        ctx.fillRect(px + 4, py + 13, 3, 3); ctx.fillRect(px + 13, py + 13, 3, 3);
-      } else {
-        ctx.fillRect(px + 4, py + 4, 3, 3); ctx.fillRect(px + 13, py + 4, 3, 3);
-      }
-    } else {
-      if (snakeShieldLetters > 0) {
-        ctx.fillStyle = idx % 2 === 0 ? "#0284c7" : "#0369a1";
-      } else {
-        ctx.fillStyle = idx % 2 === 0 ? "#16a34a" : "#15803d";
-      }
-      ctx.beginPath();
-      ctx.roundRect(px + 2, py + 2, snakeCellSize - 4, snakeCellSize - 4, 4);
-      ctx.fill();
-    }
-    ctx.restore();
-  });
-}
-
-  snakeBody.forEach((seg, idx) => {
-    let px = seg.x * snakeCellSize;
-    let py = seg.y * snakeCellSize;
-
-    ctx.save();
-    if (idx === 0) {
-      ctx.fillStyle = snakeShieldLetters > 0 ? "#38bdf8" : "#22c55e";
-      ctx.beginPath();
-      ctx.roundRect(px + 1, py + 1, snakeCellSize - 2, snakeCellSize - 2, 6);
-      ctx.fill();
 
       ctx.fillStyle = "#000000";
       if (snakeDir.x === 1) {
@@ -1086,7 +1037,6 @@ window.addEventListener("keydown", (e) => {
   }
 });
 
-// Plynulý tah prstem (zatáčí okamžitě při tahu bez zvedání prstu)
 function attachSnakeTouchHandlers() {
   const wrap = document.querySelector(".snake-canvas-wrap");
   const canvas = document.getElementById("snake-canvas");
@@ -1110,7 +1060,7 @@ function attachSnakeTouchHandlers() {
     if (!e.touches || !e.touches[0]) return;
     const dx = e.touches[0].clientX - snakeTouchStartX;
     const dy = e.touches[0].clientY - snakeTouchStartY;
-    const threshold = 18; // Zatočí okamžitě po 18 px posunu!
+    const threshold = 18;
 
     if (Math.abs(dx) > threshold || Math.abs(dy) > threshold) {
       if (Math.abs(dx) > Math.abs(dy)) {
@@ -1118,7 +1068,6 @@ function attachSnakeTouchHandlers() {
       } else {
         setSnakeDirection(0, dy > 0 ? 1 : -1);
       }
-      // Posuneme startovní bod na aktuální prst pro plynulé navazující zatáčení
       snakeTouchStartX = e.touches[0].clientX;
       snakeTouchStartY = e.touches[0].clientY;
     }
@@ -1155,7 +1104,7 @@ function startCampaign() {
       } else {
           qNewPassive.push({ type: 'QUIZ_IN', data: it });
           qNewActive.push({ type: 'QUIZ_OUT', data: it });
-          qSentences.push({ type: 'SCRAMBLE', data: it }); // Písmenkování!
+          qSentences.push({ type: 'SCRAMBLE', data: it });
       }
   });
 
@@ -1323,47 +1272,18 @@ function launchCampaignMinigame() {
     let articlesCount = campaignMinigamePool.filter(it => /^(der|die|das)\s/i.test(it.question)).length;
     let hasArticles = isGerman && articlesCount >= 8;
 
-    // ROVNOMĚRNÝ VÝBĚR MINIHREK (ARKÁDA / PEXESO / HAD)
     if (hasArticles) {
         if (r < 0.25) startCampaignArcade("ARTICLES");
         else if (r < 0.50) startCampaignArcade("TRANSLATE");
         else if (r < 0.75) startCampaignPexeso();
-        else startCampaignSnake(); // 🐍 HAD PRO NĚMČINU
+        else startCampaignSnake();
     } else {
         if (r < 0.33) startCampaignArcade("TRANSLATE");
         else if (r < 0.66) startCampaignPexeso();
-        else startCampaignSnake(); // 🐍 HAD PRO ANGLIČTINU / ŠPANĚLŠTINU
+        else startCampaignSnake();
     }
 }
-function startCampaignSnake() {
-  stopArcadeLoop();
-  stopSnakeLoop();
-  isCampaignMinigame = true;
 
-  // Vybereme jednoslovná hesla z poolu kampaně
-  snakeDeck = campaignMinigamePool.filter(it => {
-    let clean = it.question.replace(/^(der|die|das|ein|eine|el|la|un|una)\s+/i, '').trim();
-    return clean.split(/\s+/).length === 1 && clean.length >= 2 && clean.length <= 10 && !clean.includes('.');
-  }).sort(() => Math.random() - 0.5);
-
-  if (snakeDeck.length === 0) {
-    startCampaignPexeso(); // Záloha, pokud by náhodou v lekci nebylo žádné slovo vhodné pro hada
-    return;
-  }
-
-  snakeLives = 3;
-  snakeScore = 0;
-  snakeLevel = 1;
-  snakeSpeed = 220;
-  snakeShieldLetters = 0;
-  selectedGame = "SNAKE";
-  setScreen("PLAYING");
-
-  setupNextSnakeWord();
-  resetSnakePosition();
-  runSnakeLoop();
-  setTimeout(attachSnakeTouchHandlers, 50);
-}
 function finishCampaign(coins) {
   addCoins(currentUser.name, coins);
   addReward(1, "Trénink: " + selectedGroupKey);
@@ -1375,6 +1295,7 @@ function finishCampaign(coins) {
 // ==========================================
 function renderActiveGame() {
   const main = document.getElementById("main-content");
+  if (!main) return;
   const isHebrew = (selectedSubject || '').toLowerCase().includes('hebr') || selectedSubject === 'HE';
   const vItems = getVocabItems();
   const sItems = getSeqItems();
@@ -1552,7 +1473,7 @@ function renderActiveGame() {
     `;
   }
 
-  // PEXESO (S ROVNOMĚRNÝMI OTAZNÍKY)
+  // PEXESO
   else if (selectedGame === "PEXESO") {
     const totalPairs = Math.min(pexesoPairCount, pexesoCards.length / 2);
     const isDone = pexesoMatched.length === totalPairs;
@@ -1702,7 +1623,7 @@ function renderActiveGame() {
     `;
   }
 
-// HRA HAD (RESPONZIVNÍ CANVAS + INTEGROVANÝ ODPOČET A NÁKUP ŠTÍTU)
+  // HRA HAD (SNAKE S ODPOČTEM A PLNÝM DISPLEJEM)
   else if (selectedGame === "SNAKE") {
     if (snakeState === "GAMEOVER") {
       if (isCampaignMinigame) {
@@ -1731,6 +1652,8 @@ function renderActiveGame() {
     const canBuyShield = snakeLives > 1 && snakeShieldLetters <= 0;
     const coins = currentUser ? getUserCoins(currentUser.name) : 0;
     const canBuyShieldCoins = snakeLives === 1 && snakeShieldLetters <= 0 && coins >= 15;
+
+    let targetLetterChar = (snakeTargetLetters && snakeTargetLetters[snakeCurrentIdx]) ? snakeTargetLetters[snakeCurrentIdx] : '';
 
     main.innerHTML = `
       <div class="snake-container">
@@ -1782,7 +1705,7 @@ function renderActiveGame() {
                 ${snakeStatusMsg || "Připrav se!"}
               </div>
               <div style="font-size:13px;color:var(--col-yellow);margin-bottom:12px;">
-                Hledej písmeno: <b style="font-size:20px;text-decoration:underline;">[ ${snakeTargetLetters[snakeCurrentIdx]} ]</b>
+                Hledej písmeno: <b style="font-size:20px;text-decoration:underline;">[ ${targetLetterChar} ]</b>
               </div>
 
               <div style="display:flex;flex-direction:column;gap:8px;width:100%;max-width:250px;">
