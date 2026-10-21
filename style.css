@@ -158,14 +158,46 @@ footer { height: 32px; background-color: var(--col-card); border-top: 1px solid 
 
 /* --- BAREVNÉ SKINY APLIKACE --- */
 
-/* 1. HACKER MATRIX (Černá + Neonová zelená) */
+/* 1. HACKER MATRIX (Opravený černo-zelený režim) */
 body[data-theme="matrix"] {
-  --col-bg: #030a05;
-  --col-card: #081a0e;
-  --col-card-border: #15803d;
-  --col-active-tab: #22c55e;
-  --col-text-muted: #86efac;
-  background-color: #010502;
+  --col-bg: #000000;
+  --col-card: #001100;
+  --col-card-border: #00ff00;
+  --col-active-tab: #00cc00;
+  --col-green: #00ff00;
+  --col-red: #ff0000;
+  --col-yellow: #00ff00;
+  --col-orange: #00ff00;
+  --col-text-muted: #00aa00;
+  background-color: #000000;
+  color: #00ff00;
+  font-family: 'Courier New', Courier, monospace;
+}
+body[data-theme="matrix"] .prompt-box, 
+body[data-theme="matrix"] .tile h2,
+body[data-theme="matrix"] .opt-btn {
+  color: #00ff00 !important;
+}
+body[data-theme="matrix"] .tile p {
+  color: #00aa00 !important;
+}
+body[data-theme="matrix"] .action-btn {
+  color: #000 !important;
+  background: #00ff00 !important;
+  border-color: #00ff00 !important;
+}
+body[data-theme="matrix"] .action-btn.red {
+  background: #ff0000 !important;
+  color: #fff !important;
+  border-color: #ff0000 !important;
+}
+body[data-theme="matrix"] .bargraph-fill {
+  background: #00ff00 !important;
+}
+body[data-theme="matrix"] .letter-slot.filled,
+body[data-theme="matrix"] .pexeso-card.flipped {
+  background: #004400 !important;
+  color: #00ff00 !important;
 }
 
 /* 2. ZLATÝ ŠAMPION (Luxusní černo-zlatá) */
