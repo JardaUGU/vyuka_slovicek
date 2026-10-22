@@ -209,6 +209,9 @@ body[data-theme="matrix"] .pexeso-card.flipped {
   background: #004400 !important;
   color: #00ff00 !important;
 }
+/* Oprava čitelnosti správné a špatné odpovědi v Matrix skinu */
+body[data-theme="matrix"] .opt-btn.correct { color: #000000 !important; font-weight: bold; }
+body[data-theme="matrix"] .opt-btn.wrong { color: #ffffff !important; }
 
 /* 2. ZLATÝ ŠAMPION (Luxusní černo-zlatá) */
 body[data-theme="gold"] {
