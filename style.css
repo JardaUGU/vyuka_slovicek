@@ -260,6 +260,8 @@ body[data-theme="arctic"] .badge { background: #e0f2fe; color: #0369a1; border-c
 body[data-theme="arctic"] .badge.active { background: #0284c7; color: #fff; }
 body[data-theme="arctic"] .tts-toggle-btn { background: #e0f2fe; color: #0369a1; border-color: #7dd3fc; }
 body[data-theme="arctic"] .tts-toggle-btn.active { background: #22c55e; color: #fff; border-color: #16a34a; }
+body[data-theme="arctic"] .opt-btn { color: #0c4a6e; }
+body[data-theme="arctic"] .opt-btn.correct { color: #fff; }
 
 /* --- PŘÍBĚHY (DUOLINGO STORIES) --- */
 .story-chat-container {
