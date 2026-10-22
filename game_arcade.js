@@ -1,6 +1,19 @@
+// ==========================================
+// HERNÍ MÓD: ARKÁDA (PADAJÍCÍ SLOVA)
+// ==========================================
+
 let arcadeMode = "";
 let arcadeCurrentOptions = [];
-let arcadeDeck = [], arcadeCurrent = null, arcadeLives = 3, arcadeScore = 0, arcadeLevel = 1, arcadeY = 0, arcadeX = 50, arcadeSpeed = 0.8, arcadeAnimId = null, arcadeState = "PLAYING";
+let arcadeDeck = [];
+let arcadeCurrent = null;
+let arcadeLives = 3;
+let arcadeScore = 0;
+let arcadeLevel = 1;
+let arcadeY = 0;
+let arcadeX = 50;
+let arcadeSpeed = 0.8;
+let arcadeAnimId = null;
+let arcadeState = "PLAYING";
 
 function stopArcadeLoop() {
   if (arcadeAnimId) { cancelAnimationFrame(arcadeAnimId); arcadeAnimId = null; }
@@ -68,16 +81,20 @@ function runArcadeLoop() {
   stopArcadeLoop();
   function step() {
     if (currentScreen !== "PLAYING" || selectedGame !== "ARCADE" || arcadeState !== "PLAYING") return;
-    if (typeof isTimerPaused !== "undefined" && !isTimerPaused) {
-      arcadeY += arcadeSpeed;
-      const el = document.getElementById("arcade-falling-elem");
-      const playfield = document.getElementById("arcade-field");
-      if (el && playfield && arcadeY >= playfield.clientHeight - el.clientHeight - 8) {
-        handleArcadeMiss();
-        return;
-      }
-      if (el) el.style.top = arcadeY + "px";
+    
+    // OPRAVA: Odstraněna kontrola isTimerPaused! 
+    // Arkáda nyní běží nezávisle na studijní časomíře.
+    arcadeY += arcadeSpeed;
+    const el = document.getElementById("arcade-falling-elem");
+    const playfield = document.getElementById("arcade-field");
+    
+    if (el && playfield && arcadeY >= playfield.clientHeight - el.clientHeight - 8) {
+      handleArcadeMiss();
+      return;
     }
+    
+    if (el) el.style.top = arcadeY + "px";
+    
     arcadeAnimId = requestAnimationFrame(step);
   }
   arcadeAnimId = requestAnimationFrame(step);
@@ -115,6 +132,6 @@ function handleArcadeMiss() {
     const m = el.querySelector(".falling-main-word");
     if (m) m.innerText = arcadeCurrent.question;
   }
-  if (isAutoTTS) speakWord(arcadeCurrent.question, selectedSubject);
+  if (isAutoTTS && typeof speakWord === 'function') speakWord(arcadeCurrent.question, selectedSubject);
   setTimeout(spawnArcadeWord, 1400);
 }
