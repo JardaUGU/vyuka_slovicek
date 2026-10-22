@@ -12,7 +12,7 @@
 * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; font-family: 'Roboto', sans-serif; }
 body { background-color: #030712; display: flex; justify-content: center; align-items: center; min-height: 100vh; color: #ffffff; }
 #app-container {
-  width: 100vw; max-width: 680px; height: 100vh; max-height: 600px;
+  width: 100vw; max-width: 680px; height: 100vh; max-height: 850px; /* Zvýšeno z 600px na 850px */
   background-color: var(--col-bg); display: flex; flex-direction: column;
   border: 2px solid var(--col-card-border); border-radius: 12px; overflow: hidden;
   box-shadow: 0 10px 25px rgba(0,0,0,0.6);
