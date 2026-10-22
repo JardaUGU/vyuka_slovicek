@@ -1,5 +1,6 @@
 /**
- * HERNÍ REŽIMY: KARTY, ZKOUŠENÍ (DÁVKY 15 SLOV), SKLÁDÁNÍ, ARKÁDA, PEXESO, KVÍZ, ŘADA NA ČAS, HAD, KAMPAŇ
+ * HERNÍ REŽIMY: KARTY, ZKOUŠENÍ, SKLÁDÁNÍ, ARKÁDA, PEXESO, KVÍZ, ŘADA NA ČAS, KAMPAŇ
+ * (Logika Hada je přesunuta do snake.js, ale vykresluje se zde).
  */
 
 // --- GLOBÁLNÍ STAVOVÉ PROMĚNNÉ HER ---
@@ -20,27 +21,6 @@ let campaignMinigamePool = [];
 let arcadeMode = "";
 let arcadeCurrentOptions = [];
 let arcadeDeck = [], arcadeCurrent = null, arcadeLives = 3, arcadeScore = 0, arcadeLevel = 1, arcadeY = 0, arcadeX = 50, arcadeSpeed = 0.8, arcadeAnimId = null, arcadeState = "PLAYING";
-
-// Had (Snake)
-let snakeInterval = null;
-let snakeGridSize = 17;
-let snakeCellSize = 20;
-let snakeBody = [];
-let snakeDir = { x: 1, y: 0 };
-let snakeNextDir = { x: 1, y: 0 };
-let snakeLives = 3;
-let snakeScore = 0;
-let snakeLevel = 1;
-let snakeSpeed = 220;
-let snakeDeck = [];
-let snakeCurrentWord = null;
-let snakeTargetLetters = [];
-let snakeCurrentIdx = 0;
-let snakeFoods = [];
-let snakeState = "PLAYING";
-let snakeStatusMsg = "";
-let snakeShieldLetters = 0;
-let snakeTouchStartX = 0, snakeTouchStartY = 0;
 
 // Kampaň (Spirála)
 let cmpQueue = [];
@@ -79,7 +59,7 @@ function speakCurrentCard() {
 }
 
 // ==========================================
-// 2. ZKOUŠENÍ Z HLAVY (DÁVKY PO 15 POLOŽKÁCH)
+// 2. ZKOUŠENÍ Z HLAVY
 // ==========================================
 function initGameState() {
   const vItems = getVocabItems();
@@ -88,19 +68,13 @@ function initGameState() {
 
   if (vItems.length > 0) {
     vMastery = {};
-    vItems.forEach((w, i) => {
-      vMastery[i] = getSavedMastery(w.question, testingDirection);
-    });
+    vItems.forEach((w, i) => { vMastery[i] = getSavedMastery(w.question, testingDirection); });
 
-    // POKUD MÁ LEKCE VÍCE NEŽ 15 SLOV: Zvolíme chytrý blok 15 položek
     if (vItems.length > 15) {
       isAdaptiveBatchMode = true;
       let unmastered = [];
-      vItems.forEach((_, i) => {
-        if ((vMastery[i] || 0) < 2) unmastered.push(i);
-      });
+      vItems.forEach((_, i) => { if ((vMastery[i] || 0) < 2) unmastered.push(i); });
 
-      // 75 % položek, co ještě neumí (přednostně chyby s 0 ★)
       let m0 = unmastered.filter(i => (vMastery[i] || 0) === 0).sort(() => Math.random() - 0.5);
       let m1 = unmastered.filter(i => (vMastery[i] || 0) === 1).sort(() => Math.random() - 0.5);
       let candidates = [...m0, ...m1];
@@ -108,7 +82,6 @@ function initGameState() {
       let batchSize = Math.min(15, unmastered.length > 0 ? unmastered.length : 15);
       adaptiveBatchIndices = candidates.slice(0, batchSize);
 
-      // Pokud jich je méně než 15, dobereme libovolná zbývající slova
       if (adaptiveBatchIndices.length < batchSize) {
         let remaining = vItems.map((_, i) => i).filter(i => !adaptiveBatchIndices.includes(i)).sort(() => Math.random() - 0.5);
         adaptiveBatchIndices.push(...remaining.slice(0, batchSize - adaptiveBatchIndices.length));
@@ -119,9 +92,7 @@ function initGameState() {
     }
 
     let masteredInBatch = 0;
-    adaptiveBatchIndices.forEach(i => {
-      if ((vMastery[i] || 0) >= 2) masteredInBatch++;
-    });
+    adaptiveBatchIndices.forEach(i => { if ((vMastery[i] || 0) >= 2) masteredInBatch++; });
 
     vActivePool = Math.min(adaptiveBatchIndices.length, Math.max(getAdaptiveWindowSize(currentUser ? currentUser.grade : 2), masteredInBatch + 3));
     vLastWord = -1; 
@@ -202,9 +173,10 @@ function answerAdaptive(known) {
   renderActiveGame();
 }
 
-// Spustí skládání přesně těch 15 slov, která byla v bloku
+// ==========================================
+// 3. SKLÁDÁNÍ SLOV (SCRAMBLE)
+// ==========================================
 function startScrambleFromAdaptiveBatch() {
-  const vItems = getVocabItems();
   selectedGame = "SCRAMBLE";
   scrambleDeck = [...adaptiveBatchIndices].sort(() => Math.random() - 0.5);
   scrambleSolvedCount = 0;
@@ -212,21 +184,12 @@ function startScrambleFromAdaptiveBatch() {
   setScreen("PLAYING");
 }
 
-// ==========================================
-// 3. SKLÁDÁNÍ SLOV A FRÁZÍ (SCRAMBLE)
-// ==========================================
 function initScramble() {
   const vItems = getVocabItems();
-  
-  // POKUD BYL DOKONČEN BLOK 15 SLOV: Skládáme POUZE tato slova!
   if (isAdaptiveBatchMode && adaptiveBatchIndices && adaptiveBatchIndices.length > 0) {
-    if (!scrambleDeck || scrambleDeck.length === 0) {
-      scrambleDeck = [...adaptiveBatchIndices].sort(() => Math.random() - 0.5);
-    }
+    if (!scrambleDeck || scrambleDeck.length === 0) scrambleDeck = [...adaptiveBatchIndices].sort(() => Math.random() - 0.5);
   } else {
-    if (!scrambleDeck || scrambleDeck.length === 0) {
-      scrambleDeck = vItems.map((_, i) => i).sort(() => Math.random() - 0.5);
-    }
+    if (!scrambleDeck || scrambleDeck.length === 0) scrambleDeck = vItems.map((_, i) => i).sort(() => Math.random() - 0.5);
   }
 
   vCurrentWord = scrambleDeck.pop();
@@ -282,7 +245,7 @@ function startArcadeGame() {
     return false;
   }).sort(() => Math.random() - 0.5);
 
-  if (arcadeDeck.length === 0) { alert("Málo vhodných slov v této lekci."); return; }
+  if (arcadeDeck.length === 0) { alert("Málo vhodných slov."); return; }
   arcadeLives = 3; arcadeScore = 0; arcadeLevel = 1; arcadeSpeed = 0.8; arcadeState = "PLAYING";
   selectedGame = "ARCADE";
   setScreen("PLAYING");
@@ -292,12 +255,8 @@ function startArcadeGame() {
 function startCampaignArcade(mode) {
   stopArcadeLoop();
   arcadeMode = mode;
-  
-  if (mode === "ARTICLES") {
-      arcadeDeck = campaignMinigamePool.filter(it => /^(der|die|das)\s/i.test(it.question));
-  } else {
-      arcadeDeck = [...campaignMinigamePool];
-  }
+  if (mode === "ARTICLES") arcadeDeck = campaignMinigamePool.filter(it => /^(der|die|das)\s/i.test(it.question));
+  else arcadeDeck = [...campaignMinigamePool];
   arcadeDeck.sort(() => Math.random() - 0.5);
   
   arcadeLives = 3; arcadeScore = 0; arcadeLevel = 1; arcadeSpeed = 0.8; arcadeState = "PLAYING";
@@ -334,7 +293,7 @@ function runArcadeLoop() {
   stopArcadeLoop();
   function step() {
     if (currentScreen !== "PLAYING" || selectedGame !== "ARCADE" || arcadeState !== "PLAYING") return;
-    if (!isTimerPaused) {
+    if (typeof isTimerPaused !== "undefined" && !isTimerPaused) {
       arcadeY += arcadeSpeed;
       const el = document.getElementById("arcade-falling-elem");
       const playfield = document.getElementById("arcade-field");
@@ -506,9 +465,10 @@ function clickSeqSlot(slot) {
   }
 }
 
+// Hlavní spouštěč všech her
 function startGame(game) { 
   stopArcadeLoop(); 
-  stopSnakeLoop();
+  if (typeof stopSnakeLoop === "function") stopSnakeLoop();
   selectedGame = game; 
   isCampaignMinigame = false; 
   initGameState(); 
@@ -516,454 +476,7 @@ function startGame(game) {
 }
 
 // ==========================================
-// 8. HRA HAD (SNAKE SPELLING ENGINE)
-// ==========================================
-function stopSnakeLoop() {
-  if (snakeInterval) { clearInterval(snakeInterval); snakeInterval = null; }
-}
-
-function startSnakeGame() {
-  stopArcadeLoop();
-  stopSnakeLoop();
-  
-  const vItems = getVocabItems();
-  snakeDeck = vItems.filter(it => {
-    let clean = it.question.replace(/^(der|die|das|ein|eine|el|la|un|una)\s+/i, '').trim();
-    return clean.split(/\s+/).length === 1 && clean.length >= 2 && clean.length <= 10 && !clean.includes('.');
-  }).sort(() => Math.random() - 0.5);
-
-  if (snakeDeck.length === 0) {
-    alert("V této lekci nejsou žádná vhodná jednoslovná slovíčka pro hada.");
-    return;
-  }
-
-  snakeLives = 3;
-  snakeScore = 0;
-  snakeLevel = 1;
-  snakeSpeed = 220;
-  snakeShieldLetters = 0;
-  selectedGame = "SNAKE";
-  setScreen("PLAYING");
-
-  setupNextSnakeWord();
-  resetSnakePosition();
-  runSnakeLoop();
-  setTimeout(attachSnakeTouchHandlers, 50);
-}
-
-function buySnakeShieldInGame(e) {
-  if (e) { e.preventDefault(); e.stopPropagation(); }
-  if (snakeLives > 1 && snakeShieldLetters <= 0) {
-    snakeLives--;
-    snakeShieldLetters = 20;
-    sndFanfare();
-    snakeStatusMsg = "🛡️ Štít aktivován! (20 písmen)";
-    snakeState = "PLAYING";
-    renderActiveGame();
-    runSnakeLoop();
-  } else if (snakeLives <= 1) {
-    alert("Nemůžeš obětovat své poslední srdíčko! ❤️");
-    resumeSnakeWithoutShield(e);
-  }
-}
-
-function resumeSnakeWithoutShield(e) {
-  if (e) { e.preventDefault(); e.stopPropagation(); }
-  snakeState = "PLAYING";
-  snakeStatusMsg = "";
-  renderActiveGame();
-  runSnakeLoop();
-}
-
-function setupNextSnakeWord() {
-  if (snakeDeck.length === 0) {
-    const vItems = getVocabItems();
-    snakeDeck = vItems.filter(it => {
-      let clean = it.question.replace(/^(der|die|das|ein|eine|el|la|un|una)\s+/i, '').trim();
-      return clean.split(/\s+/).length === 1 && clean.length >= 2 && clean.length <= 10;
-    }).sort(() => Math.random() - 0.5);
-  }
-
-  const rawItem = snakeDeck.pop();
-  let cleanForeign = rawItem.question.replace(/^(der|die|das|ein|eine|el|la|un|una)\s+/i, '').trim().toUpperCase();
-
-  snakeCurrentWord = {
-    raw: rawItem,
-    czech: cleanCzechTranslation(rawItem.answer),
-    foreign: rawItem.question,
-    cleanForeign: cleanForeign
-  };
-
-  snakeTargetLetters = getGraphemes(cleanForeign);
-  snakeCurrentIdx = 0;
-  spawnSnakeFood();
-  updateSnakeSlotsDisplay();
-}
-
-function resetSnakePosition() {
-  snakeBody = [
-    { x: 5, y: 8 },
-    { x: 4, y: 8 },
-    { x: 3, y: 8 }
-  ];
-  snakeDir = { x: 1, y: 0 };
-  snakeNextDir = { x: 1, y: 0 };
-}
-
-function spawnSnakeFood() {
-  snakeFoods = [];
-  const occupied = new Set();
-  snakeBody.forEach(seg => occupied.add(`${seg.x},${seg.y}`));
-
-  for (let i = snakeCurrentIdx; i < snakeTargetLetters.length; i++) {
-    const ch = snakeTargetLetters[i];
-    let pos = getRandomFreeGridPos(occupied);
-    if (pos) {
-      occupied.add(`${pos.x},${pos.y}`);
-      snakeFoods.push({ x: pos.x, y: pos.y, char: ch, isTarget: (i === snakeCurrentIdx) });
-    }
-  }
-
-  if (snakeLevel >= 2) {
-    const distractorsCount = Math.min(3, snakeLevel - 1);
-    const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-    for (let d = 0; d < distractorsCount; d++) {
-      let randChar = alphabet[Math.floor(Math.random() * alphabet.length)];
-      let pos = getRandomFreeGridPos(occupied);
-      if (pos) {
-        occupied.add(`${pos.x},${pos.y}`);
-        snakeFoods.push({ x: pos.x, y: pos.y, char: randChar, isTarget: false });
-      }
-    }
-  }
-}
-
-function getRandomFreeGridPos(occupied) {
-  let tries = 0;
-  while (tries < 150) {
-    let x = Math.floor(Math.random() * (snakeGridSize - 2)) + 1;
-    let y = Math.floor(Math.random() * (snakeGridSize - 2)) + 1;
-    let key = `${x},${y}`;
-    if (!occupied.has(key)) return { x, y };
-    tries++;
-  }
-  return null;
-}
-
-function runSnakeLoop() {
-  stopSnakeLoop();
-  snakeState = "PLAYING";
-  snakeInterval = setInterval(() => {
-    if (currentScreen !== "PLAYING" || selectedGame !== "SNAKE" || isTimerPaused) return;
-    updateSnake();
-    drawSnake();
-  }, snakeSpeed);
-}
-
-function setSnakeDirection(dx, dy) {
-  if (typeof registerUserAction === "function") registerUserAction();
-  if (snakeDir.x + dx === 0 && snakeDir.y + dy === 0) return;
-  snakeNextDir = { x: dx, y: dy };
-}
-
-function updateSnakeSlotsDisplay() {
-  const container = document.getElementById("snake-slots-wrap");
-  if (!container || !snakeTargetLetters) return;
-  container.innerHTML = snakeTargetLetters.map((ch, idx) => `
-    <div class="snake-slot ${idx < snakeCurrentIdx ? 'done' : (idx === snakeCurrentIdx ? 'active' : '')}">
-      ${idx < snakeCurrentIdx ? ch : (idx === snakeCurrentIdx ? ch : '_')}
-    </div>
-  `).join('');
-}
-
-function updateSnake() {
-  if (snakeState !== "PLAYING") return;
-  snakeDir = { ...snakeNextDir };
-
-  let nextX = snakeBody[0].x + snakeDir.x;
-  let nextY = snakeBody[0].y + snakeDir.y;
-
-  if (snakeShieldLetters > 0) {
-    if (nextX < 0) nextX = snakeGridSize - 1;
-    else if (nextX >= snakeGridSize) nextX = 0;
-    if (nextY < 0) nextY = snakeGridSize - 1;
-    else if (nextY >= snakeGridSize) nextY = 0;
-  } else {
-    if (nextX < 0 || nextX >= snakeGridSize || nextY < 0 || nextY >= snakeGridSize) {
-      handleSnakeDeath("Náraz do zdi! 💥");
-      return;
-    }
-  }
-
-  const head = { x: nextX, y: nextY };
-
-  if (snakeShieldLetters <= 0) {
-    for (let i = 0; i < snakeBody.length - 1; i++) {
-      if (snakeBody[i].x === head.x && snakeBody[i].y === head.y) {
-        handleSnakeDeath("Kousnutí se do ocasu! 💥");
-        return;
-      }
-    }
-  }
-
-  const foodIdx = snakeFoods.findIndex(f => f.x === head.x && f.y === head.y);
-  if (foodIdx !== -1) {
-    const eaten = snakeFoods[foodIdx];
-    const targetChar = snakeTargetLetters[snakeCurrentIdx];
-
-    if (eaten.char === targetChar) {
-      sndOk();
-      snakeFoods.splice(foodIdx, 1);
-      snakeCurrentIdx++;
-      snakeBody.unshift(head);
-
-      // OKAMŽITÉ DOPLNĚNÍ PÍSMENE NAHOŘE V REÁLNÉM ČASE
-      updateSnakeSlotsDisplay();
-
-      if (snakeShieldLetters > 0) {
-        snakeShieldLetters--;
-        if (snakeShieldLetters === 0) {
-          // ŠTÍT PRÁVĚ VYPRŠEL -> PAUZA A NABÍDKA NOVÉHO ŠTÍTU
-          handleShieldExpired();
-          return;
-        }
-      }
-
-      if (snakeCurrentIdx >= snakeTargetLetters.length) {
-        handleSnakeWordComplete();
-        return;
-      } else {
-        snakeFoods.forEach(f => {
-          f.isTarget = (f.char === snakeTargetLetters[snakeCurrentIdx]);
-        });
-      }
-    } else {
-      if (snakeShieldLetters > 0) {
-        sndErr();
-        snakeStatusMsg = `🛡️ Štít tě ochránil před [ ${eaten.char} ]! Hledej [ ${targetChar} ]`;
-        snakeState = "PAUSED_SHIELD";
-        stopSnakeLoop();
-        renderActiveGame();
-        setTimeout(() => {
-          snakeState = "PLAYING";
-          runSnakeLoop();
-          renderActiveGame();
-        }, 1200);
-        return;
-      } else {
-        handleSnakeDeath(`Špatné písmeno [ ${eaten.char} ]! Hledáš [ ${targetChar} ]`);
-        return;
-      }
-    }
-  } else {
-    snakeBody.unshift(head);
-    snakeBody.pop();
-  }
-}
-
-function handleShieldExpired() {
-  snakeState = "SHIELD_EXPIRED_PAUSE";
-  stopSnakeLoop();
-  sndErr();
-  renderActiveGame();
-}
-
-function handleSnakeWordComplete() {
-  snakeState = "WORD_DONE";
-  stopSnakeLoop();
-  sndFanfare();
-  snakeScore++;
-  addReward(1, "Had");
-
-  if (isAutoTTS && snakeCurrentWord) speakWord(snakeCurrentWord.foreign, selectedSubject);
-
-  if (snakeScore % 3 === 0) {
-    snakeLevel++;
-    snakeSpeed = Math.max(100, snakeSpeed - 15);
-  }
-
-  if (snakeShieldLetters <= 0) {
-    const nextX = snakeBody[0].x + snakeDir.x;
-    const nextY = snakeBody[0].y + snakeDir.y;
-    if (nextX < 0 || nextX >= snakeGridSize || nextY < 0 || nextY >= snakeGridSize) {
-      const turn1 = { x: -snakeDir.y, y: snakeDir.x };
-      const turn2 = { x: snakeDir.y, y: -snakeDir.x };
-      const t1X = snakeBody[0].x + turn1.x, t1Y = snakeBody[0].y + turn1.y;
-      if (t1X >= 0 && t1X < snakeGridSize && t1Y >= 0 && t1Y < snakeGridSize) {
-        snakeDir = turn1; snakeNextDir = turn1;
-      } else {
-        snakeDir = turn2; snakeNextDir = turn2;
-      }
-    }
-  }
-
-  setTimeout(() => {
-    setupNextSnakeWord();
-    runSnakeLoop();
-    renderActiveGame();
-    setTimeout(attachSnakeTouchHandlers, 20);
-  }, 1000);
-
-  renderActiveGame();
-}
-
-function handleSnakeDeath(reason) {
-  snakeState = "HIT";
-  stopSnakeLoop();
-  sndErr();
-  snakeLives--;
-  snakeStatusMsg = reason;
-
-  if (snakeLives <= 0) {
-    snakeState = "GAMEOVER";
-    renderActiveGame();
-  } else {
-    setTimeout(() => {
-      resetSnakePosition();
-      snakeCurrentIdx = 0;
-      spawnSnakeFood();
-      runSnakeLoop();
-      renderActiveGame();
-      setTimeout(attachSnakeTouchHandlers, 20);
-    }, 1400);
-    renderActiveGame();
-  }
-}
-
-function drawSnake() {
-  const canvas = document.getElementById("snake-canvas");
-  if (!canvas) return;
-  const ctx = canvas.getContext("2d");
-
-  ctx.fillStyle = "#08101e";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  ctx.strokeStyle = "rgba(255, 255, 255, 0.04)";
-  ctx.lineWidth = 1;
-  for (let x = 0; x <= canvas.width; x += snakeCellSize) {
-    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
-  }
-  for (let y = 0; y <= canvas.height; y += snakeCellSize) {
-    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
-  }
-
-  snakeFoods.forEach(f => {
-    let px = f.x * snakeCellSize;
-    let py = f.y * snakeCellSize;
-
-    ctx.save();
-    if (f.isTarget) {
-      ctx.fillStyle = "rgba(250, 204, 21, 0.25)";
-      ctx.strokeStyle = "#facc15";
-      ctx.lineWidth = 2;
-    } else {
-      ctx.fillStyle = "rgba(0, 188, 212, 0.15)";
-      ctx.strokeStyle = "#00bcd4";
-      ctx.lineWidth = 1;
-    }
-    ctx.beginPath();
-    ctx.roundRect(px + 2, py + 2, snakeCellSize - 4, snakeCellSize - 4, 4);
-    ctx.fill();
-    ctx.stroke();
-
-    ctx.fillStyle = f.isTarget ? "#facc15" : "#ffffff";
-    ctx.font = "bold 13px Roboto, sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(f.char, px + (snakeCellSize / 2), py + (snakeCellSize / 2) + 1);
-    ctx.restore();
-  });
-
-  snakeBody.forEach((seg, idx) => {
-    let px = seg.x * snakeCellSize;
-    let py = seg.y * snakeCellSize;
-
-    ctx.save();
-    if (idx === 0) {
-      ctx.fillStyle = snakeShieldLetters > 0 ? "#38bdf8" : "#22c55e";
-      ctx.beginPath();
-      ctx.roundRect(px + 1, py + 1, snakeCellSize - 2, snakeCellSize - 2, 6);
-      ctx.fill();
-
-      ctx.fillStyle = "#000000";
-      if (snakeDir.x === 1) {
-        ctx.fillRect(px + 13, py + 4, 3, 3); ctx.fillRect(px + 13, py + 13, 3, 3);
-      } else if (snakeDir.x === -1) {
-        ctx.fillRect(px + 4, py + 4, 3, 3); ctx.fillRect(px + 4, py + 13, 3, 3);
-      } else if (snakeDir.y === 1) {
-        ctx.fillRect(px + 4, py + 13, 3, 3); ctx.fillRect(px + 13, py + 13, 3, 3);
-      } else {
-        ctx.fillRect(px + 4, py + 4, 3, 3); ctx.fillRect(px + 13, py + 4, 3, 3);
-      }
-    } else {
-      if (snakeShieldLetters > 0) {
-        ctx.fillStyle = idx % 2 === 0 ? "#0284c7" : "#0369a1";
-      } else {
-        ctx.fillStyle = idx % 2 === 0 ? "#16a34a" : "#15803d";
-      }
-      ctx.beginPath();
-      ctx.roundRect(px + 2, py + 2, snakeCellSize - 4, snakeCellSize - 4, 4);
-      ctx.fill();
-    }
-    ctx.restore();
-  });
-}
-
-window.addEventListener("keydown", (e) => {
-  if (currentScreen === "PLAYING" && selectedGame === "SNAKE") {
-    if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space"].includes(e.code)) {
-      e.preventDefault();
-    }
-    if (e.code === "ArrowUp" || e.key === "w" || e.key === "W") setSnakeDirection(0, -1);
-    else if (e.code === "ArrowDown" || e.key === "s" || e.key === "S") setSnakeDirection(0, 1);
-    else if (e.code === "ArrowLeft" || e.key === "a" || e.key === "A") setSnakeDirection(-1, 0);
-    else if (e.code === "ArrowRight" || e.key === "d" || e.key === "D") setSnakeDirection(1, 0);
-  }
-});
-
-// Plynulý tah prstem (zatáčí okamžitě při tahu bez zvedání prstu)
-function attachSnakeTouchHandlers() {
-  const wrap = document.querySelector(".snake-canvas-wrap");
-  const canvas = document.getElementById("snake-canvas");
-  if (!wrap || !canvas) return;
-
-  const preventDefaultTouch = (e) => {
-    if (e.cancelable) e.preventDefault();
-  };
-
-  wrap.addEventListener("touchstart", (e) => {
-    preventDefaultTouch(e);
-    if (typeof registerUserAction === "function") registerUserAction();
-    if (e.touches && e.touches[0]) {
-      snakeTouchStartX = e.touches[0].clientX;
-      snakeTouchStartY = e.touches[0].clientY;
-    }
-  }, { passive: false });
-
-  wrap.addEventListener("touchmove", (e) => {
-    preventDefaultTouch(e);
-    if (!e.touches || !e.touches[0]) return;
-    const dx = e.touches[0].clientX - snakeTouchStartX;
-    const dy = e.touches[0].clientY - snakeTouchStartY;
-    const threshold = 18; // Zatočí okamžitě po 18 px posunu!
-
-    if (Math.abs(dx) > threshold || Math.abs(dy) > threshold) {
-      if (Math.abs(dx) > Math.abs(dy)) {
-        setSnakeDirection(dx > 0 ? 1 : -1, 0);
-      } else {
-        setSnakeDirection(0, dy > 0 ? 1 : -1);
-      }
-      // Posuneme startovní bod na aktuální prst pro plynulé navazující zatáčení
-      snakeTouchStartX = e.touches[0].clientX;
-      snakeTouchStartY = e.touches[0].clientY;
-    }
-  }, { passive: false });
-
-  wrap.addEventListener("touchend", preventDefaultTouch, { passive: false });
-}
-
-// ==========================================
-// 9. KAMPAŇ ENGINE (SPIRÁLA)
+// 8. KAMPAŇ (SPIRÁLA)
 // ==========================================
 function startCampaign() {
   let q = [];
@@ -990,7 +503,7 @@ function startCampaign() {
       } else {
           qNewPassive.push({ type: 'QUIZ_IN', data: it });
           qNewActive.push({ type: 'QUIZ_OUT', data: it });
-          qSentences.push({ type: 'SCRAMBLE', data: it }); // Písmenkování!
+          qSentences.push({ type: 'SCRAMBLE', data: it });
       }
   });
 
@@ -1158,47 +671,18 @@ function launchCampaignMinigame() {
     let articlesCount = campaignMinigamePool.filter(it => /^(der|die|das)\s/i.test(it.question)).length;
     let hasArticles = isGerman && articlesCount >= 8;
 
-    // ROVNOMĚRNÝ VÝBĚR MINIHREK (ARKÁDA / PEXESO / HAD)
     if (hasArticles) {
         if (r < 0.25) startCampaignArcade("ARTICLES");
         else if (r < 0.50) startCampaignArcade("TRANSLATE");
         else if (r < 0.75) startCampaignPexeso();
-        else startCampaignSnake(); // 🐍 HAD PRO NĚMČINU
+        else if (typeof startCampaignSnake === "function") startCampaignSnake();
     } else {
         if (r < 0.33) startCampaignArcade("TRANSLATE");
         else if (r < 0.66) startCampaignPexeso();
-        else startCampaignSnake(); // 🐍 HAD PRO ANGLIČTINU / ŠPANĚLŠTINU
+        else if (typeof startCampaignSnake === "function") startCampaignSnake();
     }
 }
-function startCampaignSnake() {
-  stopArcadeLoop();
-  stopSnakeLoop();
-  isCampaignMinigame = true;
 
-  // Vybereme jednoslovná hesla z poolu kampaně
-  snakeDeck = campaignMinigamePool.filter(it => {
-    let clean = it.question.replace(/^(der|die|das|ein|eine|el|la|un|una)\s+/i, '').trim();
-    return clean.split(/\s+/).length === 1 && clean.length >= 2 && clean.length <= 10 && !clean.includes('.');
-  }).sort(() => Math.random() - 0.5);
-
-  if (snakeDeck.length === 0) {
-    startCampaignPexeso(); // Záloha, pokud by náhodou v lekci nebylo žádné slovo vhodné pro hada
-    return;
-  }
-
-  snakeLives = 3;
-  snakeScore = 0;
-  snakeLevel = 1;
-  snakeSpeed = 220;
-  snakeShieldLetters = 0;
-  selectedGame = "SNAKE";
-  setScreen("PLAYING");
-
-  setupNextSnakeWord();
-  resetSnakePosition();
-  runSnakeLoop();
-  setTimeout(attachSnakeTouchHandlers, 50);
-}
 function finishCampaign(coins) {
   addCoins(currentUser.name, coins);
   addReward(1, "Trénink: " + selectedGroupKey);
@@ -1206,15 +690,15 @@ function finishCampaign(coins) {
 }
 
 // ==========================================
-// 10. HLAVNÍ RENDERÉR VŠECH HER
+// 10. HLAVNÍ RENDERÉR AKTIVNÍCH HER
 // ==========================================
 function renderActiveGame() {
   const main = document.getElementById("main-content");
+  if (!main) return;
   const isHebrew = (selectedSubject || '').toLowerCase().includes('hebr') || selectedSubject === 'HE';
   const vItems = getVocabItems();
   const sItems = getSeqItems();
 
-  // KARTY
   if (selectedGame === "CARDS") {
     const w = vItems[vCardIdx];
     const pct = Math.round(((vCardIdx + 1) / vItems.length) * 100);
@@ -1238,7 +722,6 @@ function renderActiveGame() {
     `;
   }
 
-  // ZKOUŠENÍ Z HLAVY (S PODPOROU DÁVEK PO 15 POLOŽKÁCH)
   else if (selectedGame === "ADAPTIVE") {
     const stats = getMasteryStats();
     const pct = Math.round((stats.current / stats.total) * 100);
@@ -1289,7 +772,6 @@ function renderActiveGame() {
     `;
   }
 
-  // SKLÁDÁNÍ (SCRAMBLE)
   else if (selectedGame === "SCRAMBLE") {
     const w = vItems[vCurrentWord];
     const pct = Math.min(100, Math.round((scrambleSolvedCount / vItems.length) * 100));
@@ -1318,7 +800,6 @@ function renderActiveGame() {
     `;
   }
 
-  // ARKÁDA: PADAJÍCÍ SLOVA
   else if (selectedGame === "ARCADE") {
     let btns = [];
     if (arcadeMode === "TRANSLATE") btns = arcadeCurrentOptions;
@@ -1350,8 +831,7 @@ function renderActiveGame() {
       return;
     }
 
-    let disp = "";
-    let subDisp = "";
+    let disp = "", subDisp = "";
     if (arcadeCurrent) {
         if (arcadeMode === "TRANSLATE") {
             disp = cleanCzechTranslation(arcadeCurrent.answer);
@@ -1387,7 +867,6 @@ function renderActiveGame() {
     `;
   }
 
-  // PEXESO (S ROVNOMĚRNÝMI OTAZNÍKY)
   else if (selectedGame === "PEXESO") {
     const totalPairs = Math.min(pexesoPairCount, pexesoCards.length / 2);
     const isDone = pexesoMatched.length === totalPairs;
@@ -1424,7 +903,6 @@ function renderActiveGame() {
     `;
   }
 
-  // KVÍZ (SAMOSTATNÝ)
   else if (selectedGame === "QUIZ") {
     if (qActiveList.length === 0) {
       main.innerHTML = `<div style="text-align:center;padding:30px;"><h2>V této lekci není žádný kvíz.</h2><div class="action-btn" onclick="setScreen('SELECT_GAME')">ZPĚT</div></div>`;
@@ -1484,7 +962,6 @@ function renderActiveGame() {
     `;
   }
 
-  // PROCEDURÁLNÍ MATEMATIKA
   else if (selectedGame === "PROCEDURAL_MATH") {
     const isAns = (typeof mathChosenAnswer !== "undefined" && mathChosenAnswer !== null);
     main.innerHTML = `
@@ -1505,7 +982,6 @@ function renderActiveGame() {
     `;
   }
 
-  // ŘADA NA ČAS
   else if (selectedGame === "SEQ") {
     if (sItems.length === 0) return;
     const seqConfig = sItems[selectedSeqIndex] || sItems[0];
@@ -1537,11 +1013,17 @@ function renderActiveGame() {
     `;
   }
 
-// HRA HAD (SNAKE NA PLNÝ DISPLEJ + FUNKČNÍ DIALOG)
+  // --- ZDE MŮŽETE VYTVOŘIT NAPOJENÍ NA HADA, KTERÉ SE ODKAZUJE NA SNAKE.JS ---
   else if (selectedGame === "SNAKE") {
+    // Ověříme, zda je připojen soubor snake.js s potřebnými proměnnými
+    if (typeof snakeState === "undefined") {
+      main.innerHTML = `<div style="text-align:center;padding:30px;color:var(--col-red);">Chyba: Soubor snake.js chybí nebo se nenačetl!</div>`;
+      return;
+    }
+
     if (snakeState === "GAMEOVER") {
       if (isCampaignMinigame) {
-        let bonusCoins = Math.floor(snakeScore / 2); // 1 zlaťák za každá 2 slova poskládaná hadem
+        let bonusCoins = Math.floor(snakeScore / 2);
         main.innerHTML = `
           <div style="text-align:center;padding:35px;">
             <h2 style="color:var(--col-green);font-size:28px;">TRÉNINK DOKONČEN! 🎉</h2>
@@ -1564,6 +1046,10 @@ function renderActiveGame() {
     }
 
     const canBuyShield = snakeLives > 1 && snakeShieldLetters <= 0;
+    const coins = typeof currentUser !== 'undefined' && currentUser ? getUserCoins(currentUser.name) : 0;
+    const canBuyShieldCoins = snakeLives === 1 && snakeShieldLetters <= 0 && coins >= 15;
+
+    let targetLetterChar = (typeof snakeTargetLetters !== "undefined" && snakeTargetLetters && snakeTargetLetters[snakeCurrentIdx]) ? snakeTargetLetters[snakeCurrentIdx] : '';
 
     main.innerHTML = `
       <div class="snake-container">
@@ -1572,15 +1058,20 @@ function renderActiveGame() {
             <span>${"❤️".repeat(snakeLives)}</span>
             
             ${snakeShieldLetters > 0 ? `
-              <span class="snake-shield-btn active">🛡️ Štít: ještě ${snakeShieldLetters} p.</span>
-            ` : `
-              <button class="snake-shield-btn" style="${!canBuyShield?'opacity:0.4;cursor:default;':''}" 
-                      ontouchstart="buySnakeShieldInGame(event)" onclick="buySnakeShieldInGame(event)">
-                🛡️ Koupit štít (-1 ❤️ / 20 p.)
+              <span class="snake-shield-btn active">🛡️ Štít: ${snakeShieldLetters} p.</span>
+            ` : (canBuyShield ? `
+              <button class="snake-shield-btn" ontouchstart="buySnakeShieldInGame(event)" onclick="buySnakeShieldInGame(event)">
+                🛡️ Štít (-1 ❤️ / 20 p.)
               </button>
-            `}
+            ` : (canBuyShieldCoins ? `
+              <button class="snake-shield-btn" style="border-color:var(--col-yellow);color:var(--col-yellow);" ontouchstart="buySnakeShieldWithCoins(event)" onclick="buySnakeShieldWithCoins(event)">
+                🛡️ Štít (15 💰 / 20 p.)
+              </button>
+            ` : `
+              <span class="snake-shield-btn" style="opacity:0.4;">🛡️ Štít</span>
+            `))}
 
-            <span style="color:var(--col-active-tab);">🐍 ${snakeBody.length} | Body: ${snakeScore}</span>
+            <span style="color:var(--col-active-tab);">Body: ${snakeScore}</span>
           </div>
 
           ${snakeCurrentWord ? `
@@ -1602,39 +1093,78 @@ function renderActiveGame() {
         <div class="snake-canvas-wrap">
           <canvas id="snake-canvas" width="340" height="340"></canvas>
 
-          <!-- NEBLOKOVANÝ MODÁLNÍ DIALOG PŘI VYPRŠENÍ ŠTÍTU -->
-          ${snakeState === "SHIELD_EXPIRED_PAUSE" ? `
-            <div style="position:absolute;inset:0;background:rgba(8,16,30,0.9);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;text-align:center;z-index:100;pointer-events:auto;">
-              <h3 style="color:var(--col-yellow);font-size:24px;margin-bottom:8px;">🛡️ ŠTÍT VYPRŠEL!</h3>
-              <p style="font-size:15px;color:#fff;margin-bottom:18px;">Dál už tě zdi ani tvůj ocas neochrání.</p>
-              ${canBuyShield ? `
-                <div class="action-btn" style="background:#4338ca;border-color:#818cf8;width:100%;max-width:280px;margin-bottom:10px;padding:12px;font-size:16px;" 
-                     ontouchstart="buySnakeShieldInGame(event)" onclick="buySnakeShieldInGame(event)">
-                  Koupit další štít (-1 ❤️ / 20 p.)
-                </div>
-              ` : ''}
-              <div class="action-btn green" style="width:100%;max-width:280px;padding:12px;font-size:16px;" 
-                   ontouchstart="resumeSnakeWithoutShield(event)" onclick="resumeSnakeWithoutShield(event)">
-                Pokračovat bez štítu ▶️
+          <!-- 5SEKUNDOVÝ ODPOČET NEBO ČEKÁNÍ NA TAH -->
+          ${snakeState === "WAITING" ? `
+            <div class="snake-overlay">
+              <div style="font-size:18px;color:#fff;font-weight:bold;margin-bottom:12px;">
+                ${snakeStatusMsg || "Potáhni prstem (nebo šipkou) a hra začne!"}
               </div>
+              <div style="font-size:13px;color:var(--col-yellow);margin-bottom:18px;">
+                Hledej písmeno: <b style="font-size:22px;text-decoration:underline;">[ ${targetLetterChar} ]</b>
+              </div>
+
+              <div style="display:flex;flex-direction:column;gap:8px;width:100%;max-width:250px;">
+                ${canBuyShield ? `
+                  <button class="action-btn" style="background:#4338ca;border-color:#818cf8;padding:8px;font-size:14px;margin:0;"
+                          ontouchstart="buySnakeShieldInGame(event)" onclick="buySnakeShieldInGame(event)">
+                    🛡️ Koupit štít (-1 ❤️ / 20 p.)
+                  </button>
+                ` : (snakeShieldLetters > 0 ? `
+                  <div style="background:rgba(6,95,70,0.9);border:1px solid #34d399;color:#a7f3d0;padding:6px;border-radius:6px;font-size:12px;font-weight:bold;">
+                    🛡️ Štít je aktivní (${snakeShieldLetters} p.)
+                  </div>
+                ` : (canBuyShieldCoins ? `
+                  <button class="action-btn" style="background:#2d2605;border-color:var(--col-yellow);color:var(--col-yellow);padding:8px;font-size:14px;margin:0;"
+                          ontouchstart="buySnakeShieldWithCoins(event)" onclick="buySnakeShieldWithCoins(event)">
+                    🛡️ Koupit štít za 15 💰 (20 p.)
+                  </button>
+                ` : ''))}
+              </div>
+            </div>
+          ` : ''}
+
+          <!-- DIALOG PŘI VYPRŠENÍ ŠTÍTU -->
+          ${snakeState === "SHIELD_EXPIRED_PAUSE" ? `
+            <div class="snake-overlay">
+              <h3 style="color:var(--col-yellow);font-size:22px;margin-bottom:6px;">🛡️ ŠTÍT VYPRŠEL!</h3>
+              <p style="font-size:13px;color:#fff;margin-bottom:14px;">Dál už tě zdi ani tvůj ocas neochrání.</p>
+              ${canBuyShield ? `
+                <button class="action-btn" style="background:#4338ca;border-color:#818cf8;width:100%;max-width:250px;margin-bottom:8px;padding:9px;font-size:14px;" 
+                        ontouchstart="buySnakeShieldInGame(event)" onclick="buySnakeShieldInGame(event)">
+                  Koupit další štít (-1 ❤️ / 20 p.)
+                </button>
+              ` : (canBuyShieldCoins ? `
+                <button class="action-btn" style="background:#2d2605;border-color:var(--col-yellow);color:var(--col-yellow);width:100%;max-width:250px;margin-bottom:8px;padding:9px;font-size:14px;" 
+                        ontouchstart="buySnakeShieldWithCoins(event)" onclick="buySnakeShieldWithCoins(event)">
+                  Koupit štít za 15 💰 (20 p.)
+                </button>
+              ` : '')}
+              <button class="action-btn green" style="width:100%;max-width:250px;padding:9px;font-size:14px;" 
+                      ontouchstart="resumeSnakeWithoutShield(event)" onclick="resumeSnakeWithoutShield(event)">
+                Pokračovat bez štítu ▶️
+              </button>
             </div>
           ` : ''}
         </div>
 
         <div class="snake-dpad">
           <div class="dpad-row">
-            <button class="dpad-btn" ontouchstart="event.preventDefault(); setSnakeDirection(0, -1);" onclick="setSnakeDirection(0, -1)">▲</button>
+            <button class="dpad-btn" ontouchstart="event.preventDefault(); if(typeof setSnakeDirection === 'function') setSnakeDirection(0, -1);" onclick="if(typeof setSnakeDirection === 'function') setSnakeDirection(0, -1)">▲</button>
           </div>
           <div class="dpad-row">
-            <button class="dpad-btn" ontouchstart="event.preventDefault(); setSnakeDirection(-1, 0);" onclick="setSnakeDirection(-1, 0)">◄</button>
-            <button class="dpad-btn" ontouchstart="event.preventDefault(); setSnakeDirection(0, 1);" onclick="setSnakeDirection(0, 1)">▼</button>
-            <button class="dpad-btn" ontouchstart="event.preventDefault(); setSnakeDirection(1, 0);" onclick="setSnakeDirection(1, 0)">►</button>
+            <button class="dpad-btn" ontouchstart="event.preventDefault(); if(typeof setSnakeDirection === 'function') setSnakeDirection(-1, 0);" onclick="if(typeof setSnakeDirection === 'function') setSnakeDirection(-1, 0)">◄</button>
+            <button class="dpad-btn" ontouchstart="event.preventDefault(); if(typeof setSnakeDirection === 'function') setSnakeDirection(0, 1);" onclick="if(typeof setSnakeDirection === 'function') setSnakeDirection(0, 1)">▼</button>
+            <button class="dpad-btn" ontouchstart="event.preventDefault(); if(typeof setSnakeDirection === 'function') setSnakeDirection(1, 0);" onclick="if(typeof setSnakeDirection === 'function') setSnakeDirection(1, 0)">►</button>
           </div>
         </div>
       </div>
     `;
-    drawSnake();
-    setTimeout(attachSnakeTouchHandlers, 50);
+    
+    // Vyžaduje funkce v snake.js
+    if (typeof drawSnake === "function") {
+       drawSnake();
+       setTimeout(attachSnakeTouchHandlers, 50);
+    }
   }
 
   // KAMPAŇ (SPIRÁLA)
