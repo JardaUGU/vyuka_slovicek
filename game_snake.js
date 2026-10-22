@@ -36,7 +36,7 @@ window.buySnakeShieldInGame = function(e) {
     
     if (typeof renderActiveGame === "function") renderActiveGame();
     setTimeout(resizeSnakeCanvas, 10);
-    runSnakeLoop(); // <--- OPRAVA: Znovu spustí hru
+    runSnakeLoop();
   } else if (snakeLives <= 1) {
     alert("Nemůžeš obětovat své poslední srdíčko! ❤️");
   }
@@ -57,7 +57,7 @@ window.buySnakeShieldWithCoins = function(e) {
     
     if (typeof renderActiveGame === "function") renderActiveGame();
     setTimeout(resizeSnakeCanvas, 10);
-    runSnakeLoop(); // <--- OPRAVA: Znovu spustí hru
+    runSnakeLoop();
   } else {
     alert("Potřebuješ alespoň 15 zlaťáků! 💰");
   }
@@ -68,10 +68,9 @@ window.resumeSnakeWithoutShield = function(e) {
   isSnakeWaitingForInput = true;
   snakeState = "WAITING";
   snakeStatusMsg = "Hraješ bez štítu. Potáhni nebo stiskni šipku!";
-  
   if (typeof renderActiveGame === "function") renderActiveGame();
   setTimeout(resizeSnakeCanvas, 10);
-  runSnakeLoop(); // <--- OPRAVA: Znovu spustí hru
+  runSnakeLoop();
 };
 
 function stopSnakeLoop() {
@@ -331,7 +330,6 @@ function setSnakeDirection(dx, dy) {
   // Detekce pohybu proti směru hada
   if ((snakeDir.x !== 0 && snakeDir.x === -dx) || (snakeDir.y !== 0 && snakeDir.y === -dy)) {
       if (isSnakeWaitingForInput) {
-          // Pokud hra stojí na začátku a dáš zpět, prostě celého hada vizuálně otočíme na druhou stranu
           snakeBody.reverse();
           snakeDir = { x: dx, y: dy };
       } else {
@@ -397,19 +395,27 @@ function updateSnake() {
       snakeBody.unshift(head);
 
       updateSnakeSlotsDisplay();
+      
+      let isWordDone = (snakeCurrentIdx >= snakeTargetLetters.length);
 
       if (snakeShieldLetters > 0) {
         snakeShieldLetters--;
         const shieldEl = document.getElementById("snake-shield-indicator");
         if (shieldEl) shieldEl.innerText = `🛡️ Štít: ${snakeShieldLetters} p.`;
 
+        // OPRAVA BUGU S UNDEFINED:
         if (snakeShieldLetters === 0) {
-          handleShieldExpired();
+          if (isWordDone) {
+             // Pokud se slovo dokončilo, ignorujeme dialog o štítu a dáme rovnou další slovo
+             handleSnakeWordComplete(); 
+          } else {
+             handleShieldExpired();
+          }
           return;
         }
       }
 
-      if (snakeCurrentIdx >= snakeTargetLetters.length) {
+      if (isWordDone) {
         handleSnakeWordComplete();
         return;
       } else {
@@ -467,7 +473,7 @@ function handleSnakeDeath(reason) {
   
   if (snakeLives <= 0) {
     snakeState = "GAMEOVER";
-    stopSnakeLoop(); // <--- OPRAVA: Při GAME OVER úplně zastavíme hru
+    stopSnakeLoop(); 
     if (typeof renderActiveGame === "function") renderActiveGame();
   } else {
     isSnakeWaitingForInput = true;
