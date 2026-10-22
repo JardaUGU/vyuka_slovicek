@@ -499,40 +499,16 @@ function renderActiveGame() {
       return;
     }
 
-    if (snakeState === "GAMEOVER") {
-      if (isCampaignMinigame) {
-        let bonusCoins = Math.floor(snakeScore / 2);
-        main.innerHTML = `
-          <div style="text-align:center;padding:35px;">
-            <h2 style="color:var(--col-green);font-size:28px;">GAME OVER! (Trénink dokončen) 🎉</h2>
-            <p style="font-size:20px;color:${colorWhite};margin:10px 0;">Had poskládal: <b>${snakeScore} slov</b> (Bonus: +${bonusCoins} 💰)</p>
-            <p style="font-size:24px;color:var(--col-yellow);margin-bottom:25px;">Celkem získáváš: +${campaignMinigameCoins + bonusCoins} 💰</p>
-            <div class="action-btn green" onclick="finishCampaign(${campaignMinigameCoins + bonusCoins})">PŘIPSAT ZLAŤÁKY A ZPĚT</div>
-          </div>
-        `;
-      } else {
-        main.innerHTML = `
-          <div style="text-align:center;padding:35px;">
-            <h2 style="color:var(--col-red);font-size:32px;font-weight:bold;">GAME OVER! 💔</h2>
-            <p style="font-size:20px;color:${colorWhite};margin:12px 0;">Správně složeno: <b>${snakeScore} slov</b></p>
-            <div class="action-btn green" onclick="if(typeof startSnakeGame === 'function') startSnakeGame()">HRÁT ZNOVU ➔</div>
-            <div class="action-btn" onclick="setScreen('SELECT_GAME')">ZPĚT</div>
-          </div>
-        `;
-      }
-      return;
-    }
-
     const canBuyShield = snakeLives > 1 && snakeShieldLetters <= 0;
     const coins = typeof currentUser !== 'undefined' && currentUser ? getUserCoins(currentUser.name) : 0;
     const canBuyShieldCoins = snakeLives === 1 && snakeShieldLetters <= 0 && coins >= 15;
-    let targetLetterChar = (typeof snakeTargetLetters !== "undefined" && snakeTargetLetters && snakeTargetLetters[snakeCurrentIdx]) ? snakeTargetLetters[snakeCurrentIdx] : '';
+    let bonusCoins = Math.floor(snakeScore / 2);
 
     main.innerHTML = `
       <div class="snake-container">
         <div class="snake-header-box">
           <div class="snake-stats">
-            <span>${"❤️".repeat(snakeLives)}</span>
+            <span>${snakeLives > 0 ? "❤️".repeat(snakeLives) : "💀"}</span>
             
             ${snakeShieldLetters > 0 ? `
               <span id="snake-shield-indicator" class="snake-shield-btn active">🛡️ Štít: ${snakeShieldLetters} p.</span>
@@ -569,6 +545,25 @@ function renderActiveGame() {
 
         <div class="snake-canvas-wrap">
           <canvas id="snake-canvas" width="340" height="340"></canvas>
+
+          <!-- PŘEKRYVNÝ GAME OVER (HRÁČ VIDÍ HADA POD NÍM) -->
+          ${snakeState === "GAMEOVER" ? `
+            <div class="snake-overlay" style="background: rgba(8, 16, 30, 0.78);">
+              ${isCampaignMinigame ? `
+                <h2 style="color:var(--col-green);font-size:26px;margin-bottom:6px;">GAME OVER! 🎉</h2>
+                <p style="font-size:14px;color:#cbd5e1;margin-bottom:8px;">${snakeStatusMsg}</p>
+                <p style="font-size:18px;color:#fff;margin:6px 0;">Složeno: <b>${snakeScore} slov</b> (+${bonusCoins} 💰)</p>
+                <p style="font-size:22px;color:var(--col-yellow);margin-bottom:16px;">Celkem: +${campaignMinigameCoins + bonusCoins} 💰</p>
+                <div class="action-btn green" style="width:100%;max-width:250px;" onclick="finishCampaign(${campaignMinigameCoins + bonusCoins})">PŘIPSAT ZLAŤÁKY A ZPĚT</div>
+              ` : `
+                <h2 style="color:var(--col-red);font-size:30px;font-weight:bold;margin-bottom:6px;">GAME OVER! 💔</h2>
+                <p style="font-size:14px;color:var(--col-yellow);margin-bottom:10px;">${snakeStatusMsg}</p>
+                <p style="font-size:18px;color:#fff;margin-bottom:18px;">Správně složeno: <b>${snakeScore} slov</b></p>
+                <div class="action-btn green" style="width:100%;max-width:240px;margin-bottom:8px;" onclick="if(typeof startSnakeGame === 'function') startSnakeGame()">HRÁT ZNOVU ➔</div>
+                <div class="action-btn" style="width:100%;max-width:240px;" onclick="setScreen('SELECT_GAME')">ZPĚT DO MENU</div>
+              `}
+            </div>
+          ` : ''}
 
           <!-- DIALOG PŘI VYPRŠENÍ ŠTÍTU -->
           ${snakeState === "SHIELD_EXPIRED_PAUSE" ? `
