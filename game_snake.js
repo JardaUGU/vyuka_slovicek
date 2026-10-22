@@ -1,7 +1,6 @@
 // ==========================================
-// HRA HAD (PLNÁ ŠÍŘKA, ZASTAVENÍ NA MÍSTĚ, OKAMŽITÉ ČTENÍ SLOV)
+// HRA HAD (LOGIKA)
 // ==========================================
-
 let snakeInterval = null;
 let snakeGridSize = 17;
 let snakeCellSize = 20;
@@ -23,70 +22,13 @@ let snakeShieldLetters = 0;
 let snakeTouchStartX = 0, snakeTouchStartY = 0;
 let isSnakeWaitingForInput = true;
 
-window.buySnakeShieldInGame = function(e) {
-  if (e) { e.preventDefault(); e.stopPropagation(); }
-  if (snakeLives > 1 && snakeShieldLetters <= 0) {
-    snakeLives--;
-    snakeShieldLetters = 20;
-    if (typeof sndFanfare === "function") sndFanfare();
-    
-    isSnakeWaitingForInput = true;
-    snakeState = "WAITING";
-    snakeStatusMsg = "🛡️ Štít aktivován! Potáhni nebo stiskni šipku.";
-    
-    if (typeof renderActiveGame === "function") renderActiveGame();
-    setTimeout(resizeSnakeCanvas, 10);
-  } else if (snakeLives <= 1) {
-    alert("Nemůžeš obětovat své poslední srdíčko! ❤️");
-  }
-};
-
-window.buySnakeShieldWithCoins = function(e) {
-  if (e) { e.preventDefault(); e.stopPropagation(); }
-  if (typeof currentUser === "undefined" || !currentUser) return;
-  const coins = getUserCoins(currentUser.name);
-  if (coins >= 15 && snakeShieldLetters <= 0) {
-    addCoins(currentUser.name, -15);
-    snakeShieldLetters = 20;
-    if (typeof sndFanfare === "function") sndFanfare();
-    
-    isSnakeWaitingForInput = true;
-    snakeState = "WAITING";
-    snakeStatusMsg = "🛡️ Štít koupen! Potáhni nebo stiskni šipku.";
-    
-    if (typeof renderActiveGame === "function") renderActiveGame();
-    setTimeout(resizeSnakeCanvas, 10);
-  } else {
-    alert("Potřebuješ alespoň 15 zlaťáků! 💰");
-  }
-};
-
-window.resumeSnakeWithoutShield = function(e) {
-  if (e) { e.preventDefault(); e.stopPropagation(); }
-  isSnakeWaitingForInput = true;
-  snakeState = "WAITING";
-  snakeStatusMsg = "Hraješ bez štítu. Potáhni nebo stiskni šipku!";
-  if (typeof renderActiveGame === "function") renderActiveGame();
-  setTimeout(resizeSnakeCanvas, 10);
-};
-
+// VŠECHNY DALŠÍ FUNKCE (startSnakeGame, drawSnake, updateSnake atd.) 
+// vlož přesně tak, jak je máš v snake.txt. Zde už ničemu nevadí.
 function stopSnakeLoop() {
   if (snakeInterval) { clearInterval(snakeInterval); snakeInterval = null; }
 }
 
-function resizeSnakeCanvas() {
-  const wrap = document.querySelector(".snake-canvas-wrap");
-  const cvs = document.getElementById("snake-canvas");
-  if (wrap && cvs) {
-    cvs.width = wrap.clientWidth;
-    cvs.height = wrap.clientWidth; 
-    snakeCellSize = cvs.width / snakeGridSize;
-    drawSnake();
-  }
-}
-
 function startSnakeGame() {
-  if (typeof stopArcadeLoop === "function") stopArcadeLoop();
   stopSnakeLoop();
   
   const vItems = getVocabItems();
