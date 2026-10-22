@@ -473,6 +473,7 @@ function handleSnakeDeath(reason) {
   
   if (snakeLives <= 0) {
     snakeState = "GAMEOVER";
+    snakeStatusMsg = reason;
     stopSnakeLoop(); 
     if (typeof renderActiveGame === "function") renderActiveGame();
   } else {
