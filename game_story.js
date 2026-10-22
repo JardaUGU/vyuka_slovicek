@@ -20,16 +20,24 @@ function getStoryItems(lessonName) {
   );
 }
 
+// Zkontroluje lokální paměť I cloudovou Google Tabulku (list Pokrok)
 function isStoryCompleted(lessonName) {
   if (!currentUser) return false;
-  const key = `story_done_${currentUser.name.toLowerCase().trim()}_${selectedSubject}_${lessonName}`;
-  return localStorage.getItem(key) === "true";
+  const targetLesson = lessonName || selectedGroupKey;
+  const key = `story_done_${currentUser.name.toLowerCase().trim()}_${selectedSubject}_${targetLesson}`;
+  const localDone = localStorage.getItem(key) === "true";
+  const cloudDone = (typeof getSavedMastery === "function") && getSavedMastery(`__STORY_DONE__${targetLesson}`, "DIR_OUT") >= 2;
+  return localDone || cloudDone;
 }
 
 function markStoryCompleted(lessonName) {
   if (!currentUser) return;
-  const key = `story_done_${currentUser.name.toLowerCase().trim()}_${selectedSubject}_${lessonName}`;
+  const targetLesson = lessonName || selectedGroupKey;
+  const key = `story_done_${currentUser.name.toLowerCase().trim()}_${selectedSubject}_${targetLesson}`;
   localStorage.setItem(key, "true");
+  if (typeof saveWordMasteryToGoogle === "function") {
+    saveWordMasteryToGoogle(`__STORY_DONE__${targetLesson}`, 2, "DIR_OUT");
+  }
 }
 
 function startStoryGame(lessonName) {
@@ -62,7 +70,6 @@ function parseSpeakerAndText(rawQuestion) {
   return { speaker: "📖 Vypravěč", text: rawQuestion.trim() };
 }
 
-// ÚPRAVA: Různé hlasy podle pohlaví postavy!
 function speakStoryLine(text, speaker) {
   if (!('speechSynthesis' in window)) return;
   window.speechSynthesis.cancel();
@@ -75,13 +82,12 @@ function speakStoryLine(text, speaker) {
     u.lang = targetLang;
     u.rate = 0.88;
 
-    // Magie pro změnu výšky hlasu podle emoji
     let pitch = 1.0;
     const spk = speaker.toLowerCase();
-    if (spk.includes('👦') || spk.includes('👨') || spk.includes('tom') || spk.includes('paul')) {
-      pitch = 0.4; // Hluboký kluk/muž
-    } else if (spk.includes('👧') || spk.includes('👩') || spk.includes('lucy') || spk.includes('emma')) {
-      pitch = 1.7; // Vysoká holka/žena
+    if (spk.includes('👦') || spk.includes('👨') || spk.includes('tom') || spk.includes('paul') || spk.includes('max') || spk.includes('dad')) {
+      pitch = 0.6;
+    } else if (spk.includes('👧') || spk.includes('👩') || spk.includes('lucy') || spk.includes('emma') || spk.includes('mom')) {
+      pitch = 1.5;
     }
     u.pitch = pitch;
 
@@ -109,19 +115,12 @@ function advanceStoryStep() {
     storyQuizAnswered = false;
     storyChosenOpt = null;
 
-    // CHYTRÁ ZÁCHRANA MOŽNOSTÍ: Pokud chybí sloupec "Možnosti"
     let rawOpts = currentItem.options || currentItem.opts;
-    if (!rawOpts || rawOpts.length <= 1) {
-      if (typeof currentItem.help === 'string' && currentItem.help.includes('|')) rawOpts = currentItem.help.split('|');
-      else if (typeof currentItem.answer === 'string' && currentItem.answer.includes('|')) rawOpts = currentItem.answer.split('|');
-    }
-
     if (Array.isArray(rawOpts) && rawOpts.length > 1) {
       currentItem.options = rawOpts;
     } else if (typeof rawOpts === 'string' && rawOpts.includes('|')) {
       currentItem.options = rawOpts.split('|').map(s => s.trim());
     } else {
-      // Pokud opravdu nic nenajde, vygeneruje 2 náhodné špatné odpovědi z celého příběhu!
       let pool = storyItems.filter(it => it.answer && it.answer !== currentItem.answer).map(it => it.answer);
       pool = [...new Set(pool)].sort(() => Math.random() - 0.5);
       currentItem.options = [currentItem.answer, ...pool.slice(0, 2)].sort(() => Math.random() - 0.5);
@@ -179,12 +178,15 @@ function toggleStoryTranslation(histIdx) {
   }
 }
 
+// ODMĚNA POUZE POPRVÉ!
 function finishStory() {
   const alreadyDone = isStoryCompleted(selectedGroupKey);
-  const rewardCoins = alreadyDone ? 2 : Math.max(5, 15 - (storyMistakes * 2));
-  markStoryCompleted(selectedGroupKey);
-  addCoins(currentUser.name, rewardCoins);
-  addReward(3, "Příběh: " + currentStoryTitle);
+  if (!alreadyDone) {
+    const rewardCoins = Math.max(5, 15 - (storyMistakes * 2));
+    markStoryCompleted(selectedGroupKey);
+    addCoins(currentUser.name, rewardCoins);
+    addReward(3, "Příběh: " + currentStoryTitle);
+  }
   sndFanfare();
   
   const sLow = (selectedSubject || "").toLowerCase();
@@ -206,15 +208,22 @@ function renderStoryGame(main, colorWhite) {
 
   if (isFinished) {
     const alreadyDone = isStoryCompleted(selectedGroupKey);
-    const rewardCoins = alreadyDone ? 2 : Math.max(5, 15 - (storyMistakes * 2));
+    const rewardCoins = alreadyDone ? 0 : Math.max(5, 15 - (storyMistakes * 2));
+
     main.innerHTML = `
       <div style="text-align:center;padding:30px 15px;">
         <div style="font-size:52px;margin-bottom:10px;">📖🎉</div>
         <h2 style="color:var(--col-green);font-size:26px;margin-bottom:8px;">PŘÍBĚH DOKONČEN!</h2>
         <p style="font-size:18px;color:${colorWhite};margin-bottom:6px;"><b>${currentStoryTitle}</b></p>
         <p style="font-size:14px;color:var(--col-text-muted);margin-bottom:18px;">Počet chybiček: ${storyMistakes}</p>
-        <p style="font-size:24px;color:var(--col-yellow);font-weight:bold;margin-bottom:25px;">Odměna: +${rewardCoins} 💰 a +3 ★</p>
-        <div class="action-btn green" onclick="finishStory()">VYBRAT ODMĚNU A POKRAČOVAT ➔</div>
+        ${alreadyDone ? `
+          <p style="font-size:16px;color:var(--col-text-muted);margin-bottom:25px;background:rgba(0,0,0,0.2);padding:10px;border-radius:8px;">
+            ✅ Tento příběh už máš splněný z dřívějška.<br>(Odměnu lze získat jen jednou)
+          </p>
+        ` : `
+          <p style="font-size:24px;color:var(--col-yellow);font-weight:bold;margin-bottom:25px;">Odměna: +${rewardCoins} 💰 a +3 ★</p>
+        `}
+        <div class="action-btn green" onclick="finishStory()">${alreadyDone ? 'ZPĚT DO MENU ➔' : 'VYBRAT ODMĚNU A POKRAČOVAT ➔'}</div>
       </div>
     `;
     return;
@@ -232,7 +241,7 @@ function renderStoryGame(main, colorWhite) {
       <div class="bargraph-track"><div class="bargraph-fill" style="width:${pct}%;"></div></div>
     </div>
     <div style="font-size:11px;text-align:center;color:var(--col-text-muted);margin-bottom:6px;">
-      💡 Tip: Klikni na větu pro český překlad
+      💡 Tip: Klikni na jakoukoliv větu pro český překlad
     </div>
 
     <div id="story-chat-box" class="story-chat-container">
@@ -274,9 +283,8 @@ function renderStoryGame(main, colorWhite) {
     `;
   }
 
-  html += `</div>`; // konec chatu
+  html += `</div>`;
 
-  // Spodní ovládací panel - TLAČÍTKA NYNÍ MAJÍ colorWhite PRO SPRÁVNOU ČITELNOST V ARCTIC SKINU
   if (storyWaitingForQuiz && !storyQuizAnswered) {
     html += `
       <div class="story-controls">
