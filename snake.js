@@ -1,5 +1,5 @@
 // ==========================================
-// HRA HAD (PLNÁ ŠÍŘKA, ZASTAVENÍ NA MÍSTĚ, OKAMŽITÉ ČTENÍ SLOV)
+// HRA HAD (BEZ RESETU DÉLKY PO SLOVU, PROJÍŽDÍ ZDÍ, ČTE NOVÁ SLOVA, OPRAVENÝ ŠTÍT)
 // ==========================================
 
 let snakeInterval = null;
@@ -30,9 +30,19 @@ window.buySnakeShieldInGame = function(e) {
     snakeLives--;
     snakeShieldLetters = 20;
     if (typeof sndFanfare === "function") sndFanfare();
-    snakeStatusMsg = "🛡️ Štít aktivován! (20 písmen)";
+    
+    // OPRAVA: Pokud jsme byli v okně s vypršeným štítem, okno zavřeme a čekáme na pohyb
+    if (snakeState === "SHIELD_EXPIRED_PAUSE") {
+      isSnakeWaitingForInput = true;
+      snakeState = "WAITING";
+      snakeStatusMsg = "Štít obnoven! Potáhni pro pokračování.";
+      runSnakeLoop();
+    } else {
+      snakeStatusMsg = "🛡️ Štít aktivován! (20 písmen)";
+    }
+    
     if (typeof renderActiveGame === "function") renderActiveGame();
-    resizeSnakeCanvas();
+    setTimeout(resizeSnakeCanvas, 10);
   } else if (snakeLives <= 1) {
     alert("Nemůžeš obětovat své poslední srdíčko! ❤️");
   }
@@ -46,9 +56,19 @@ window.buySnakeShieldWithCoins = function(e) {
     addCoins(currentUser.name, -15);
     snakeShieldLetters = 20;
     if (typeof sndFanfare === "function") sndFanfare();
-    snakeStatusMsg = "🛡️ Štít koupen za 15 💰! (20 písmen)";
+    
+    // OPRAVA ZAMRZNUTÍ:
+    if (snakeState === "SHIELD_EXPIRED_PAUSE") {
+      isSnakeWaitingForInput = true;
+      snakeState = "WAITING";
+      snakeStatusMsg = "Štít obnoven! Potáhni pro pokračování.";
+      runSnakeLoop();
+    } else {
+      snakeStatusMsg = "🛡️ Štít koupen za 15 💰! (20 písmen)";
+    }
+    
     if (typeof renderActiveGame === "function") renderActiveGame();
-    resizeSnakeCanvas();
+    setTimeout(resizeSnakeCanvas, 10);
   } else {
     alert("Potřebuješ alespoň 15 zlaťáků! 💰");
   }
@@ -60,7 +80,9 @@ window.resumeSnakeWithoutShield = function(e) {
   snakeState = "WAITING";
   snakeStatusMsg = "Hraješ bez štítu. Potáhni nebo stiskni šipku!";
   if (typeof renderActiveGame === "function") renderActiveGame();
-  resizeSnakeCanvas();
+  setTimeout(resizeSnakeCanvas, 10);
+  // OPRAVA ZAMRZNUTÍ: Musíme znovu nahodit hlavní herní smyčku!
+  runSnakeLoop();
 };
 
 function stopSnakeLoop() {
@@ -102,7 +124,7 @@ function startSnakeGame() {
   setScreen("PLAYING");
 
   setupNextSnakeWord();
-  resetSnakeToCenter("Potáhni prstem nebo stiskni šipku pro START!");
+  resetSnakeToWait("Potáhni prstem nebo stiskni šipku pro START!");
   
   window.addEventListener('resize', resizeSnakeCanvas);
   setTimeout(() => {
@@ -135,7 +157,7 @@ function startCampaignSnake() {
   setScreen("PLAYING");
 
   setupNextSnakeWord();
-  resetSnakeToCenter("Potáhni prstem nebo stiskni šipku pro START!");
+  resetSnakeToWait("Potáhni prstem nebo stiskni šipku pro START!");
   
   window.addEventListener('resize', resizeSnakeCanvas);
   setTimeout(() => {
@@ -144,8 +166,8 @@ function startCampaignSnake() {
   }, 50);
 }
 
-// Výchozí teleportace do středu probíhá pouze na ÚPLNÉM STARTU HRY
-function resetSnakeToCenter(msg) {
+// Zastaví a umístí hada do středu (Používá se jen při startu a po smrti)
+function resetSnakeToWait(msg) {
   snakeBody = [
     { x: Math.floor(snakeGridSize/2), y: Math.floor(snakeGridSize/2) },
     { x: Math.floor(snakeGridSize/2) - 1, y: Math.floor(snakeGridSize/2) },
@@ -157,8 +179,12 @@ function resetSnakeToCenter(msg) {
   snakeState = "WAITING";
   snakeStatusMsg = msg;
   
+  if (typeof isAutoTTS !== "undefined" && isAutoTTS && snakeCurrentWord && typeof speakWord === "function") {
+    speakWord(snakeCurrentWord.foreign, typeof selectedSubject !== 'undefined' ? selectedSubject : '');
+  }
+
   if (typeof renderActiveGame === "function") renderActiveGame();
-  resizeSnakeCanvas();
+  setTimeout(resizeSnakeCanvas, 10);
   runSnakeLoop();
 }
 
@@ -186,7 +212,7 @@ function setupNextSnakeWord() {
   spawnSnakeFood();
   updateSnakeSlotsDisplay();
 
-  // OKAMŽITÉ ZVUKOVÉ ČTENÍ NOVÉHO SLOVA ANGICKY/NĚMECKY
+  // OKAMŽITÉ ZVUKOVÉ ČTENÍ NOVÉHO SLOVA 
   if (typeof isAutoTTS !== "undefined" && isAutoTTS && typeof speakWord === "function") {
     speakWord(snakeCurrentWord.foreign, typeof selectedSubject !== 'undefined' ? selectedSubject : '');
   }
@@ -282,6 +308,7 @@ function getRandomFreeGridPos(occupied) {
     let y = Math.floor(Math.random() * (snakeGridSize - 2)) + 1;
     let key = `${x},${y}`;
     
+    // Zabráníme generování potravy těsně před rozjetým hadem
     if (head && snakeDir.x !== 0 && snakeDir.y !== 0) {
         if (x === head.x + snakeDir.x && y === head.y + snakeDir.y) { tries++; continue; }
         if (x === head.x + snakeDir.x*2 && y === head.y + snakeDir.y*2) { tries++; continue; }
@@ -427,7 +454,7 @@ function handleShieldExpired() {
   stopSnakeLoop();
   if (typeof sndErr === "function") sndErr();
   if (typeof renderActiveGame === "function") renderActiveGame();
-  resizeSnakeCanvas(); // Překreslení dialogu proběhne čistě
+  resizeSnakeCanvas();
 }
 
 function handleSnakeWordComplete() {
@@ -439,7 +466,7 @@ function handleSnakeWordComplete() {
     snakeLevel++;
     snakeSpeed = Math.max(110, snakeSpeed - 15);
     stopSnakeLoop();
-    runSnakeLoop(); 
+    runSnakeLoop(); // Uplatní novou rychlost za jízdy
   }
 
   // Příprava dalšího slova (had se neteleportuje, hned si sype do cesty nová písmena!)
