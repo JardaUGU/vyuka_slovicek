@@ -5,7 +5,7 @@ const API_URL = "https://script.google.com/macros/s/AKfycbxaxBIXP-ECpWstcqRDw8Ru
 
 let appData = { users: [], progress: {}, items: [], syncDate: "" };
 let currentUser = JSON.parse(localStorage.getItem("cur_user") || 'null');
-let filterExactGradeOnly = true;
+let filterExactGradeOnly = false;
 let viewMode = "LESSONS";
 
 let currentScreen = "SELECT_USER";
@@ -24,6 +24,20 @@ let lastCloudSyncSec = 0;
 
 let isAutoTTS = localStorage.getItem("auto_tts") !== "false";
 let cachedVoices = [];
+
+let previewingSkin = null;
+
+function previewSkin(skinId) {
+  previewingSkin = skinId;
+  document.body.setAttribute('data-theme', skinId);
+  renderScreen();
+}
+
+function cancelPreview() {
+  previewingSkin = null;
+  applyAppSkin(currentUser.activeTheme);
+  renderScreen();
+}
 
 // --- BAREVNÉ SKINY APLIKACE ---
 const APP_SKINS = [
@@ -433,7 +447,7 @@ function speakWord(text, subjectName) {
 
     toSpeak = toSpeak.replace(/\s*\([^)]*\)/gi, '').trim();
     toSpeak = toSpeak.replace(/יהוה/g, 'אֲדֹנָי');
-    toSpeak = toSpeak.replace(/\b(Jahve|Jahveh|Yahweh|Yahwe|Jehova|JHVH|YHWH)\b/gi, 'Adonaj');
+    
 
     if (/read\s*-\s*read\s*-\s*read/i.test(toSpeak)) toSpeak = "read, red, red";
     else toSpeak = toSpeak.replace(/\//g, ' or ').replace(/\s*-\s*/g, ', ');
@@ -896,30 +910,32 @@ function renderScreen() {
             </button>
           </div>
 
-          <!-- BAREVNÉ VZHLEDY (SKINY) -->
-          <div style="background:var(--col-card);border:1px solid var(--col-card-border);border-radius:12px;padding:14px;margin-bottom:15px;">
-            <h3 style="color:var(--col-active-tab);font-size:16px;margin-bottom:10px;">🎨 Herní vzhledy aplikace:</h3>
-            <div style="display:flex;flex-direction:column;gap:8px;">
-              ${APP_SKINS.map(skin => {
+         ${APP_SKINS.map(skin => {
                 const isUnlocked = unlockedThemes.includes(skin.id);
                 const isActive = activeTheme === skin.id;
+                const isPreview = previewingSkin === skin.id;
 
                 return `
-                  <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(0,0,0,0.3);padding:10px 12px;border-radius:8px;border:1px solid ${isActive?'var(--col-active-tab)':'var(--col-card-border)'};">
-                    <div>
-                      <b style="color:#fff;font-size:14px;">${skin.name}</b>
-                      <p style="font-size:11px;color:var(--col-text-muted);margin-top:2px;">${skin.desc}</p>
-                    </div>
-                    <div>
-                      ${isActive ? `
-                        <span style="color:var(--col-green);font-size:12px;font-weight:bold;padding:6px 10px;background:rgba(34,197,94,0.1);border-radius:6px;border:1px solid var(--col-green);">✅ Aktivní</span>
-                      ` : isUnlocked ? `
-                        <button class="toggle-btn on" style="font-size:13px;padding:6px 14px;" onclick="equipSkin('${skin.id}')">Nasadit</button>
-                      ` : `
-                        <button class="toggle-btn" style="font-size:13px;padding:6px 14px;background:#2d2605;border-color:var(--col-yellow);color:var(--col-yellow);" onclick="buySkin('${skin.id}', ${skin.cost})">
-                          Koupit (${skin.cost} 💰)
-                        </button>
-                      `}
+                  <div style="display:flex;flex-direction:column;background:rgba(0,0,0,0.3);padding:10px 12px;border-radius:8px;border:1px solid ${isActive?'var(--col-active-tab)':'var(--col-card-border)'};">
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                      <div>
+                        <b style="color:#fff;font-size:14px;">${skin.name}</b>
+                        <p style="font-size:11px;color:var(--col-text-muted);margin-top:2px;">${skin.desc}</p>
+                      </div>
+                      <div>
+                        ${isActive ? `
+                          <span style="color:var(--col-green);font-size:12px;font-weight:bold;padding:6px 10px;background:rgba(34,197,94,0.1);border-radius:6px;border:1px solid var(--col-green);">✅ Aktivní</span>
+                        ` : isUnlocked ? `
+                          <button class="toggle-btn on" style="font-size:13px;padding:6px 14px;" onclick="equipSkin('${skin.id}')">Nasadit</button>
+                        ` : (isPreview ? `
+                           <button class="toggle-btn" style="font-size:12px;padding:4px 8px;background:#1e293b;border-color:#94a3b8;" onclick="cancelPreview()">Zrušit náhled</button>
+                           <button class="toggle-btn" style="font-size:13px;padding:6px 10px;background:#2d2605;border-color:var(--col-yellow);color:var(--col-yellow);" onclick="buySkin('${skin.id}', ${skin.cost})">
+                            Koupit (${skin.cost} 💰)
+                           </button>
+                        ` : `
+                          <button class="toggle-btn" style="font-size:12px;padding:4px 8px;background:#101c2e;border-color:var(--col-active-tab);" onclick="previewSkin('${skin.id}')">👁️ Náhled</button>
+                        `)}
+                      </div>
                     </div>
                   </div>
                 `;
