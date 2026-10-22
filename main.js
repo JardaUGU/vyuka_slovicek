@@ -246,8 +246,11 @@ window.addEventListener('keydown', registerUserAction, true);
 
 setInterval(() => {
   checkDateRollover();
-  if (currentScreen === "PLAYING" && selectedGame === "SNAKE" && typeof snakeState !== "undefined" && snakeState === "PLAYING") lastUserActivityTime = Date.now();
-  if (currentScreen === "PLAYING" && currentUser) {
+
+  // Oddechové hry (Had, Arkáda) nezapočítáváme do času studia
+  const isJustGame = (currentScreen === "PLAYING" && (selectedGame === "SNAKE" || selectedGame === "ARCADE"));
+
+  if (currentScreen === "PLAYING" && currentUser && !isJustGame) {
     const idleTime = Date.now() - lastUserActivityTime;
     if (idleTime < 15000) {
       todaySecondsStudied++;
@@ -258,6 +261,7 @@ setInterval(() => {
       if (todaySecondsStudied - lastCloudSyncSec >= 45) { lastCloudSyncSec = todaySecondsStudied; sendTimeHeartbeatToGoogle(); }
     } else { isTimerPaused = true; }
   } else { isTimerPaused = true; }
+  
   updateStudyTimerUI();
 }, 1000);
 
