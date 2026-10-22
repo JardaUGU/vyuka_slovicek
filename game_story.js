@@ -11,7 +11,6 @@ let storyChosenOpt = null;
 let storyMistakes = 0;
 let currentStoryTitle = "";
 
-// Pomocná funkce pro získání položek příběhu v aktuální lekci
 function getStoryItems(lessonName) {
   const targetLesson = lessonName || selectedGroupKey;
   return (appData.items || []).filter(it => 
@@ -21,7 +20,6 @@ function getStoryItems(lessonName) {
   );
 }
 
-// Zjistí, zda je příběh v dané lekci už přečtený
 function isStoryCompleted(lessonName) {
   if (!currentUser) return false;
   const key = `story_done_${currentUser.name.toLowerCase().trim()}_${selectedSubject}_${lessonName}`;
@@ -34,7 +32,6 @@ function markStoryCompleted(lessonName) {
   localStorage.setItem(key, "true");
 }
 
-// Spuštění příběhu
 function startStoryGame(lessonName) {
   if (typeof stopArcadeLoop === "function") stopArcadeLoop();
   if (typeof stopSnakeLoop === "function") stopSnakeLoop();
@@ -42,10 +39,7 @@ function startStoryGame(lessonName) {
   if (lessonName) selectedGroupKey = lessonName;
   storyItems = getStoryItems(selectedGroupKey);
 
-  if (storyItems.length === 0) {
-    alert("V této lekci zatím není připravený žádný příběh.");
-    return;
-  }
+  if (storyItems.length === 0) return;
 
   currentStoryTitle = storyItems[0].topic || "Příběh";
   storyStepIdx = 0;
@@ -60,75 +54,97 @@ function startStoryGame(lessonName) {
   advanceStoryStep();
 }
 
-// Rozdělí text "👦 Tom: Hello!" na mluvčího a samotnou větu
 function parseSpeakerAndText(rawQuestion) {
   const idx = rawQuestion.indexOf(":");
   if (idx !== -1 && idx < 25) {
-    return {
-      speaker: rawQuestion.slice(0, idx).trim(),
-      text: rawQuestion.slice(idx + 1).trim()
-    };
+    return { speaker: rawQuestion.slice(0, idx).trim(), text: rawQuestion.slice(idx + 1).trim() };
   }
   return { speaker: "📖 Vypravěč", text: rawQuestion.trim() };
 }
 
-// Přehraje větu s mírnou úpravou výšky hlasu podle postavy
+// ÚPRAVA: Různé hlasy podle pohlaví postavy!
 function speakStoryLine(text, speaker) {
   if (!('speechSynthesis' in window)) return;
-  const cleanText = text.replace(/___+/g, '...').replace(/[*_]/g, '').trim();
+  window.speechSynthesis.cancel();
   
-  // Využijeme existující speakWord, ale můžeme upravit pitch, pokud chceme
-  speakWord(cleanText, selectedSubject);
+  setTimeout(() => {
+    const cleanText = text.replace(/___+/g, '...').replace(/[*_]/g, '').trim();
+    const u = new SpeechSynthesisUtterance(cleanText);
+    
+    const targetLang = getTargetLang(selectedSubject);
+    u.lang = targetLang;
+    u.rate = 0.88;
+
+    // Magie pro změnu výšky hlasu podle emoji
+    let pitch = 1.0;
+    const spk = speaker.toLowerCase();
+    if (spk.includes('👦') || spk.includes('👨') || spk.includes('tom') || spk.includes('paul')) {
+      pitch = 0.4; // Hluboký kluk/muž
+    } else if (spk.includes('👧') || spk.includes('👩') || spk.includes('lucy') || spk.includes('emma')) {
+      pitch = 1.7; // Vysoká holka/žena
+    }
+    u.pitch = pitch;
+
+    if (cachedVoices.length === 0) updateVoices();
+    let voices = cachedVoices.length ? cachedVoices : window.speechSynthesis.getVoices();
+
+    if (voices && voices.length > 0) {
+      const langPrefix = targetLang.split('-')[0];
+      let match = voices.find(v => v.lang.startsWith(langPrefix) && /(enhanced|premium|natural|pro)/i.test(v.name));
+      if (!match) match = voices.find(v => v.lang.startsWith(langPrefix));
+      if (match) { u.voice = match; u.lang = match.lang; }
+    }
+    window.speechSynthesis.speak(u);
+  }, 40);
 }
 
-// Posun na další bublinu v příběhu
 function advanceStoryStep() {
-  if (storyStepIdx >= storyItems.length) {
-    renderActiveGame();
-    return;
-  }
+  if (storyStepIdx >= storyItems.length) { renderActiveGame(); return; }
 
   const currentItem = storyItems[storyStepIdx];
   const type = currentItem.type.toUpperCase().trim();
 
-  // Pokud jde o interaktivní úkol (DOPLN nebo KVIZ), čekáme na odpověď
   if (type === "PRIBEH_DOPLN" || type === "PRIBEH_KVIZ") {
     storyWaitingForQuiz = true;
     storyQuizAnswered = false;
     storyChosenOpt = null;
 
-    // Pokud v tabulce nejsou možnosti oddělené |, vytvoříme je
-    if (!currentItem.options || currentItem.options.length === 0) {
-      currentItem.options = [currentItem.answer];
+    // CHYTRÁ ZÁCHRANA MOŽNOSTÍ: Pokud chybí sloupec "Možnosti"
+    let rawOpts = currentItem.options || currentItem.opts;
+    if (!rawOpts || rawOpts.length <= 1) {
+      if (typeof currentItem.help === 'string' && currentItem.help.includes('|')) rawOpts = currentItem.help.split('|');
+      else if (typeof currentItem.answer === 'string' && currentItem.answer.includes('|')) rawOpts = currentItem.answer.split('|');
+    }
+
+    if (Array.isArray(rawOpts) && rawOpts.length > 1) {
+      currentItem.options = rawOpts;
+    } else if (typeof rawOpts === 'string' && rawOpts.includes('|')) {
+      currentItem.options = rawOpts.split('|').map(s => s.trim());
+    } else {
+      // Pokud opravdu nic nenajde, vygeneruje 2 náhodné špatné odpovědi z celého příběhu!
+      let pool = storyItems.filter(it => it.answer && it.answer !== currentItem.answer).map(it => it.answer);
+      pool = [...new Set(pool)].sort(() => Math.random() - 0.5);
+      currentItem.options = [currentItem.answer, ...pool.slice(0, 2)].sort(() => Math.random() - 0.5);
     }
   } else {
-    // Běžná replika PRIBEH
     storyWaitingForQuiz = false;
     const parsed = parseSpeakerAndText(currentItem.question);
     storyHistory.push({
-      speaker: parsed.speaker,
-      text: parsed.text,
-      translation: currentItem.answer,
-      showTranslation: false
+      speaker: parsed.speaker, text: parsed.text, translation: currentItem.answer, showTranslation: false
     });
-
-    if (isAutoTTS) {
-      speakStoryLine(parsed.text, parsed.speaker);
-    }
+    if (isAutoTTS) speakStoryLine(parsed.text, parsed.speaker);
   }
 
   renderActiveGame();
   scrollToStoryBottom();
 }
 
-// Kliknutí na tlačítko "Pokračovat"
 function nextStoryLine() {
   if (storyWaitingForQuiz && !storyQuizAnswered) return;
   storyStepIdx++;
   advanceStoryStep();
 }
 
-// Kliknutí na odpověď v příběhovém úkolu
 function clickStoryOption(opt) {
   if (storyQuizAnswered) return;
   const currentItem = storyItems[storyStepIdx];
@@ -145,25 +161,17 @@ function clickStoryOption(opt) {
       const cleanForSpeech = parsed.text.replace(/___+/g, currentItem.answer);
 
       storyHistory.push({
-        speaker: parsed.speaker,
-        text: completedText,
-        cleanText: cleanForSpeech,
-        translation: currentItem.help || "",
-        showTranslation: false
+        speaker: parsed.speaker, text: completedText, cleanText: cleanForSpeech, translation: currentItem.help || "", showTranslation: false
       });
-
       if (isAutoTTS) speakStoryLine(cleanForSpeech, parsed.speaker);
     }
   } else {
-    sndErr();
-    storyMistakes++;
+    sndErr(); storyMistakes++;
   }
-
   renderActiveGame();
   scrollToStoryBottom();
 }
 
-// Zobrazení / skrytí českého překladu po kliknutí na bublinu
 function toggleStoryTranslation(histIdx) {
   if (storyHistory[histIdx]) {
     storyHistory[histIdx].showTranslation = !storyHistory[histIdx].showTranslation;
@@ -171,22 +179,17 @@ function toggleStoryTranslation(histIdx) {
   }
 }
 
-// Dokončení příběhu a připsání odměny
 function finishStory() {
   const alreadyDone = isStoryCompleted(selectedGroupKey);
   const rewardCoins = alreadyDone ? 2 : Math.max(5, 15 - (storyMistakes * 2));
-
   markStoryCompleted(selectedGroupKey);
   addCoins(currentUser.name, rewardCoins);
   addReward(3, "Příběh: " + currentStoryTitle);
   sndFanfare();
-
-  const sLow = selectedSubject.toLowerCase();
-  if (sLow.includes("cesta") || sLow.includes("postupn") || sLow.includes("inteligentn")) {
-    setScreen("CAMPAIGN_HUB");
-  } else {
-    setScreen("SELECT_GAME");
-  }
+  
+  const sLow = (selectedSubject || "").toLowerCase();
+  if (sLow.includes("cesta") || sLow.includes("postupn") || sLow.includes("inteligentn")) setScreen("CAMPAIGN_HUB");
+  else setScreen("SELECT_GAME");
 }
 
 function scrollToStoryBottom() {
@@ -196,7 +199,6 @@ function scrollToStoryBottom() {
   }, 60);
 }
 
-// Vykreslení příběhu (volá se z renderActiveGame)
 function renderStoryGame(main, colorWhite) {
   const totalSteps = storyItems.length;
   const pct = Math.min(100, Math.round((storyStepIdx / totalSteps) * 100));
@@ -205,7 +207,6 @@ function renderStoryGame(main, colorWhite) {
   if (isFinished) {
     const alreadyDone = isStoryCompleted(selectedGroupKey);
     const rewardCoins = alreadyDone ? 2 : Math.max(5, 15 - (storyMistakes * 2));
-
     main.innerHTML = `
       <div style="text-align:center;padding:30px 15px;">
         <div style="font-size:52px;margin-bottom:10px;">📖🎉</div>
@@ -247,7 +248,6 @@ function renderStoryGame(main, colorWhite) {
       `).join('')}
   `;
 
-  // Pokud právě čekáme na doplnění nebo kvíz, vykreslíme aktivní kartu dole v chatu
   if (storyWaitingForQuiz && !storyQuizAnswered) {
     if (type === "PRIBEH_DOPLN") {
       const parsed = parseSpeakerAndText(currentItem.question);
@@ -274,15 +274,15 @@ function renderStoryGame(main, colorWhite) {
     `;
   }
 
-  html += `</div>`; // Konec #story-chat-box
+  html += `</div>`; // konec chatu
 
-  // Spodní ovládací panel (buď možnosti kvízu, nebo tlačítko Pokračovat)
+  // Spodní ovládací panel - TLAČÍTKA NYNÍ MAJÍ colorWhite PRO SPRÁVNOU ČITELNOST V ARCTIC SKINU
   if (storyWaitingForQuiz && !storyQuizAnswered) {
     html += `
       <div class="story-controls">
         <div class="grid-2">
-          ${currentItem.options.map(opt => `
-            <div class="opt-btn ${storyChosenOpt === opt ? 'wrong' : ''}" style="padding:10px;font-size:16px;" onclick="clickStoryOption('${opt.replace(/'/g, "\\'")}')">
+          ${(currentItem.options || [currentItem.answer]).map(opt => `
+            <div class="opt-btn ${storyChosenOpt === opt ? 'wrong' : ''}" style="padding:10px;font-size:16px;color:${colorWhite};" onclick="clickStoryOption('${opt.replace(/'/g, "\\'")}')">
               ${opt}
             </div>
           `).join('')}
