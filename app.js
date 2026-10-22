@@ -333,7 +333,9 @@ window.addEventListener('keydown', registerUserAction, true);
 
 setInterval(() => {
   checkDateRollover();
-
+  if (currentScreen === "PLAYING" && selectedGame === "SNAKE" && typeof snakeState !== "undefined" && snakeState === "PLAYING") {
+    lastUserActivityTime = Date.now();
+  }
   if (currentScreen === "PLAYING" && currentUser) {
     const idleTime = Date.now() - lastUserActivityTime;
     if (idleTime < 15000) {
