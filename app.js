@@ -446,9 +446,15 @@ function speakWord(text, subjectName) {
     let toSpeak = text;
 
     toSpeak = toSpeak.replace(/\s*\([^)]*\)/gi, '').trim();
+    
+    // Hebrejské čtení Božího jména (samostatné i s předložkou Lamed)
+    toSpeak = toSpeak.replace(/ליהוה/g, 'לַאדֹנָי');
     toSpeak = toSpeak.replace(/יהוה/g, 'אֲדֹנָי');
     
-
+    // Latinský přepis (JHVH nebo L'JHVH)
+    toSpeak = toSpeak.replace(/L'?(Jahve|Jahveh|Yahweh|Yahwe|Jehova|JHVH|YHWH|JVHV)/gi, "L'Adonaj");
+    toSpeak = toSpeak.replace(/\b(Jahve|Jahveh|Yahweh|Yahwe|Jehova|JHVH|YHWH|JVHV)\b/gi, 'Adonaj');
+    
     if (/read\s*-\s*read\s*-\s*read/i.test(toSpeak)) toSpeak = "read, red, red";
     else toSpeak = toSpeak.replace(/\//g, ' or ').replace(/\s*-\s*/g, ', ');
 
