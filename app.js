@@ -5,7 +5,7 @@ const API_URL = "https://script.google.com/macros/s/AKfycbxaxBIXP-ECpWstcqRDw8Ru
 
 let appData = { users: [], progress: {}, items: [], syncDate: "" };
 let currentUser = JSON.parse(localStorage.getItem("cur_user") || 'null');
-let filterExactGradeOnly = false;
+let filterExactGradeOnly = false; // VÝCHOZÍ STAV VŠECHNY ROČNÍKY
 let viewMode = "LESSONS";
 
 let currentScreen = "SELECT_USER";
@@ -25,27 +25,15 @@ let lastCloudSyncSec = 0;
 let isAutoTTS = localStorage.getItem("auto_tts") !== "false";
 let cachedVoices = [];
 
+// --- BAREVNÉ SKINY APLIKACE A NÁHLEDY ---
 let previewingSkin = null;
 
-function previewSkin(skinId) {
-  previewingSkin = skinId;
-  document.body.setAttribute('data-theme', skinId);
-  renderScreen();
-}
-
-function cancelPreview() {
-  previewingSkin = null;
-  applyAppSkin(currentUser.activeTheme);
-  renderScreen();
-}
-
-// --- BAREVNÉ SKINY APLIKACE ---
 const APP_SKINS = [
   { id: 'default', name: '🌌 Hluboký vesmír', cost: 0, desc: 'Klasický tmavomodrý noční vzhled' },
   { id: 'matrix', name: '💻 Hacker Matrix', cost: 60, desc: 'Čistý černo-zelený terminál' },
   { id: 'gold', name: '👑 Zlatý šampion', cost: 80, desc: 'Exkluzivní zlato-černý design' },
   { id: 'cyberpunk', name: '⚡ Kyberpunk', cost: 70, desc: 'Tmavě fialová s neonovou růžovou' },
-  { id: 'arctic', name: '❄️ Polární záře', cost: 50, desc: 'Ledově tyrkysový styl' }
+  { id: 'arctic', name: '❄️ Polární záře', cost: 50, desc: 'Ledově tyrkysový světlý styl' }
 ];
 
 function applyAppSkin(skinId) {
@@ -55,7 +43,18 @@ function applyAppSkin(skinId) {
 }
 applyAppSkin(localStorage.getItem('active_skin') || 'default');
 
-// Trvalé úložiště odemčených a aktivních skinů
+function previewSkin(skinId) {
+  previewingSkin = skinId;
+  document.body.setAttribute('data-theme', skinId);
+  renderScreen();
+}
+
+function cancelPreview() {
+  previewingSkin = null;
+  applyAppSkin(currentUser ? currentUser.activeTheme : 'default');
+  renderScreen();
+}
+
 function getUserUnlockedThemes(userName) {
   if (!userName) return ['default'];
   const uKey = userName.toLowerCase().trim();
@@ -67,9 +66,7 @@ function getUserUnlockedThemes(userName) {
   }
   
   let localSkins = [];
-  try {
-    localSkins = JSON.parse(localStorage.getItem(`skins_${uKey}`) || '[]');
-  } catch(e) {}
+  try { localSkins = JSON.parse(localStorage.getItem(`skins_${uKey}`) || '[]'); } catch(e) {}
   
   let curSkins = (currentUser && currentUser.name && currentUser.name.toLowerCase().trim() === uKey && Array.isArray(currentUser.unlockedThemes))
     ? currentUser.unlockedThemes : [];
@@ -81,10 +78,8 @@ function saveUserUnlockedThemes(userName, themesArr) {
   if (!userName) return;
   const uKey = userName.toLowerCase().trim();
   localStorage.setItem(`skins_${uKey}`, JSON.stringify(themesArr));
-  
   const u = (appData.users || []).find(x => x.name.toLowerCase().trim() === uKey);
   if (u) u.unlockedThemes = themesArr;
-  
   if (currentUser && currentUser.name.toLowerCase().trim() === uKey) {
     currentUser.unlockedThemes = themesArr;
     localStorage.setItem("cur_user", JSON.stringify(currentUser));
@@ -99,11 +94,11 @@ function getUserActiveTheme(userName) {
 }
 
 function buySkin(skinId, cost) {
+  previewingSkin = null;
   if (!currentUser) return;
   const currentCoins = getUserCoins(currentUser.name);
   if (currentCoins >= cost) {
     addCoins(currentUser.name, -cost);
-    
     const uKey = currentUser.name.toLowerCase().trim();
     let themes = getUserUnlockedThemes(currentUser.name);
     if (!themes.includes(skinId)) themes.push(skinId);
@@ -115,20 +110,14 @@ function buySkin(skinId, cost) {
     applyAppSkin(skinId);
 
     const u = (appData.users || []).find(x => x.name.toLowerCase().trim() === uKey);
-    if (u) {
-      u.unlockedThemes = themes;
-      u.activeTheme = skinId;
-    }
+    if (u) { u.unlockedThemes = themes; u.activeTheme = skinId; }
 
     try {
       const fd = new URLSearchParams();
-      fd.append("action", "buy_theme");
-      fd.append("user", currentUser.name);
-      fd.append("themeId", skinId);
-      fd.append("cost", cost);
+      fd.append("action", "buy_theme"); fd.append("user", currentUser.name);
+      fd.append("themeId", skinId); fd.append("cost", cost);
       fetch(API_URL, { method: "POST", mode: "no-cors", body: fd });
     } catch(e) {}
-
     alert("Nový vzhled byl odemčen a nasazen! 🎨");
     renderScreen();
   } else {
@@ -137,6 +126,7 @@ function buySkin(skinId, cost) {
 }
 
 function equipSkin(skinId) {
+  previewingSkin = null;
   if (!currentUser) return;
   const uKey = currentUser.name.toLowerCase().trim();
   currentUser.activeTheme = skinId;
@@ -149,16 +139,12 @@ function equipSkin(skinId) {
 
   try {
     const fd = new URLSearchParams();
-    fd.append("action", "set_theme");
-    fd.append("user", currentUser.name);
-    fd.append("themeId", skinId);
+    fd.append("action", "set_theme"); fd.append("user", currentUser.name); fd.append("themeId", skinId);
     fetch(API_URL, { method: "POST", mode: "no-cors", body: fd });
   } catch(e) {}
-
   renderScreen();
 }
 
-// --- POMOCNÉ FUNKCE ---
 function forceHardReload() {
   window.location.href = window.location.origin + window.location.pathname + '?reload=' + Date.now();
 }
@@ -210,7 +196,6 @@ function isItemAllowedForGrade(it, userG) {
   return itemG === userG;
 }
 
-// --- MODULÁRNÍ EKONOMIKA A INVENTÁŘ ---
 function getUserCoins(userName) {
   if (!userName) return 0;
   const u = (appData.users || []).find(x => x.name.toLowerCase().trim() === userName.toLowerCase().trim());
@@ -260,11 +245,8 @@ function buyShopItem(itemKey, cost) {
   }
 }
 
-window.buyFreeze = function() {
-  buyShopItem("Zmrazeni", 20);
-};
+window.buyFreeze = function() { buyShopItem("Zmrazeni", 20); };
 
-// --- ČASOVAČ, STREAK A HLÍDÁNÍ PŮLNOCI ---
 function getTodayDateStr() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -289,6 +271,10 @@ function checkDateRollover() {
 function updateFooter() {
   const fUser = document.getElementById("footer-user");
   if (fUser) fUser.innerText = currentUser ? `Žák: ${currentUser.name}` : "Žák: --";
+  const statusEl = document.getElementById("footer-status");
+  if (statusEl && statusEl.innerText.includes("Restart")) {
+      statusEl.innerText = "v7.0 (OK)";
+  }
 }
 
 function getStudyTimeKey(userName) {
@@ -413,7 +399,6 @@ function sendTimeHeartbeatToGoogle() {
   } catch(e) {}
 }
 
-// --- VÝSLOVNOST (TTS) ---
 function updateVoices() {
   if ('speechSynthesis' in window) {
     const v = window.speechSynthesis.getVoices();
@@ -444,16 +429,12 @@ function speakWord(text, subjectName) {
   
   setTimeout(() => {
     let toSpeak = text;
-
     toSpeak = toSpeak.replace(/\s*\([^)]*\)/gi, '').trim();
     
-    // Hebrejské čtení Božího jména (samostatné i s předložkou Lamed)
+    // Hebrejština a zástupná jména bez ovlivnění češtiny
     toSpeak = toSpeak.replace(/ליהוה/g, 'לַאדֹנָי');
     toSpeak = toSpeak.replace(/יהוה/g, 'אֲדֹנָי');
-    
-    // Latinský přepis (JHVH nebo L'JHVH)
     toSpeak = toSpeak.replace(/L'?(Jahve|Jahveh|Yahweh|Yahwe|Jehova|JHVH|YHWH|JVHV)/gi, "L'Adonaj");
-    toSpeak = toSpeak.replace(/\b(Jahve|Jahveh|Yahweh|Yahwe|Jehova|JHVH|YHWH|JVHV)\b/gi, 'Adonaj');
     
     if (/read\s*-\s*read\s*-\s*read/i.test(toSpeak)) toSpeak = "read, red, red";
     else toSpeak = toSpeak.replace(/\//g, ' or ').replace(/\s*-\s*/g, ', ');
@@ -545,27 +526,18 @@ function addReward(count = 1, section = "Lekce") {
   } catch(e) {}
 }
 
-// --- SYNCHRONIZACE DAT ---
 async function loadData() {
   checkDateRollover();
-  if (currentUser) {
-    todaySecondsStudied = loadUserStudyTime(currentUser.name);
-  }
+  if (currentUser) todaySecondsStudied = loadUserStudyTime(currentUser.name);
   const cached = localStorage.getItem("app_data");
   if (cached) {
     try {
       appData = JSON.parse(cached);
-      if (appData.syncDate !== getTodayDateStr() && appData.users) {
-         appData.users.forEach(u => u.todayMinutes = 0);
-      }
+      if (appData.syncDate !== getTodayDateStr() && appData.users) appData.users.forEach(u => u.todayMinutes = 0);
       if (!appData.items) appData.items = [];
       renderScreen();
-    } catch(e) {
-      console.error("Chyba při čtení cache", e);
-    }
-  } else { 
-    renderScreen(); 
-  }
+    } catch(e) {}
+  } else { renderScreen(); }
   await syncData();
 }
 
@@ -594,7 +566,6 @@ async function syncData() {
           currentUser.coins = Number(foundU.coins || 0);
           currentUser.inventory = foundU.inventory || {};
           
-          // Sloučení odemčených skinů ze serveru i z lokálního zařízení
           let cloudThemes = Array.isArray(foundU.unlockedThemes) ? foundU.unlockedThemes : [];
           if (typeof foundU.unlockedThemes === 'string') cloudThemes = foundU.unlockedThemes.split(',').map(s => s.trim().toLowerCase());
           
@@ -681,7 +652,10 @@ function goBack() {
     else if (selectedSubject === "Matematika") setScreen("SELECT_MATH_OP");
     else setScreen("SELECT_GAME");
   }
-  else if (currentScreen === "SHOP") setScreen("SELECT_SUBJECT");
+  else if (currentScreen === "SHOP") {
+    cancelPreview();
+    setScreen("SELECT_SUBJECT");
+  }
   else if (currentScreen === "CAMPAIGN_HUB") setScreen("SELECT_SUBJECT"); 
   else if (currentScreen === "SELECT_MATH_OP") setScreen("SELECT_SUBJECT");
   else if (currentScreen === "SELECT_GAME") setScreen("SELECT_GROUP");
@@ -715,9 +689,7 @@ function selectUser(name, grade, targetMinutes) {
 
   let localSec = loadUserStudyTime(currentUser.name);
   let cloudSec = 0;
-  if (foundU && appData.syncDate === getTodayDateStr()) {
-     cloudSec = Math.round(Number(foundU.todayMinutes || 0) * 60);
-  }
+  if (foundU && appData.syncDate === getTodayDateStr()) cloudSec = Math.round(Number(foundU.todayMinutes || 0) * 60);
   todaySecondsStudied = Math.max(localSec, cloudSec);
   localStorage.setItem(getStudyTimeKey(currentUser.name), String(todaySecondsStudied));
 
@@ -827,7 +799,7 @@ function renderScreen() {
       `;
     }
 
-    // 2. VÝBĚR PŘEDMĚTU + VELKÁ KARTA OBCHODU
+    // 2. VÝBĚR PŘEDMĚTU + OBCHOD
     else if (currentScreen === "SELECT_SUBJECT") {
       bSubj.style.display = "none"; bGroup.style.display = "none";
       const userG = parseInt(currentUser.grade) || 2;
@@ -847,7 +819,6 @@ function renderScreen() {
           </button>
         </div>
 
-        <!-- SPOLEČNÝ OBCHOD PRO VŠECHNY PŘEDMĚTY -->
         <div class="tile" style="border-color:var(--col-yellow);background:#1f1905;margin-bottom:10px;padding:12px 14px;cursor:pointer;" onclick="setScreen('SHOP')">
           <div style="display:flex;align-items:center;justify-content:space-between;width:100%;">
             <div style="display:flex;align-items:center;gap:12px;">
@@ -874,7 +845,7 @@ function renderScreen() {
         const isCesta = sLow.includes("cesta") || sLow.includes("postupn") || sLow.includes("inteligentn");
         const stl = isCesta ? 'border-color:var(--col-green);background:#112a1f;' : '';
         const ikn = isCesta ? '🚀 ' : '';
-        html += `<div class="tile" style="${stl}" onclick="chooseSubject('${s}')"><h2>${ikn}${s}</h2><p>${subjs[s]} úloh</p></div>`;
+        html += `<div class="tile" style="${stl}" onclick="chooseSubject('${s.replace(/'/g, "\\'")}')"><h2>${ikn}${s}</h2><p>${subjs[s]} úloh</p></div>`;
       });
       html += `</div>`;
       main.innerHTML = html;
@@ -893,16 +864,6 @@ function renderScreen() {
 
       main.innerHTML = `
         <div style="padding:4px;">
-          <!-- KARTA PENĚŽENKY -->
-          <div style="background:var(--col-card);border:2px solid var(--col-yellow);border-radius:12px;padding:15px;text-align:center;margin-bottom:15px;">
-            <h2 style="color:var(--col-yellow);font-size:22px;margin-bottom:4px;">🛒 Školní Obchod</h2>
-            <p style="color:var(--col-text-muted);font-size:13px;margin-bottom:10px;">Zlaťáky získáváš učením a plněním úkolů ve všech předmětech.</p>
-            <div style="font-size:32px;font-weight:bold;color:var(--col-yellow);">
-              ${coins} 💰
-            </div>
-          </div>
-
-          <!-- ZMRAZENÍ SÉRIE -->
           <div style="background:var(--col-card);border:1px solid var(--col-card-border);border-radius:12px;padding:14px;margin-bottom:15px;">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
               <div>
@@ -916,19 +877,21 @@ function renderScreen() {
             </button>
           </div>
 
-         ${APP_SKINS.map(skin => {
+          <div style="background:var(--col-card);border:1px solid var(--col-card-border);border-radius:12px;padding:14px;margin-bottom:15px;">
+            <div style="display:flex;flex-direction:column;gap:8px;">
+              ${APP_SKINS.map(skin => {
                 const isUnlocked = unlockedThemes.includes(skin.id);
                 const isActive = activeTheme === skin.id;
                 const isPreview = previewingSkin === skin.id;
 
                 return `
-                  <div style="display:flex;flex-direction:column;background:rgba(0,0,0,0.3);padding:10px 12px;border-radius:8px;border:1px solid ${isActive?'var(--col-active-tab)':'var(--col-card-border)'};">
-                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                  <div style="display:flex;flex-direction:column;background:var(--col-bg);padding:10px 12px;border-radius:8px;border:1px solid ${isActive?'var(--col-active-tab)':'var(--col-card-border)'};">
+                    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
                       <div>
-                        <b style="color:#fff;font-size:14px;">${skin.name}</b>
-                        <p style="font-size:11px;color:var(--col-text-muted);margin-top:2px;">${skin.desc}</p>
+                        <b style="color:var(--col-yellow);font-size:15px;">${skin.name}</b>
+                        <p style="font-size:12px;color:var(--col-text-muted);margin-top:2px;">${skin.desc}</p>
                       </div>
-                      <div>
+                      <div style="display:flex;gap:6px;flex-wrap:wrap;">
                         ${isActive ? `
                           <span style="color:var(--col-green);font-size:12px;font-weight:bold;padding:6px 10px;background:rgba(34,197,94,0.1);border-radius:6px;border:1px solid var(--col-green);">✅ Aktivní</span>
                         ` : isUnlocked ? `
@@ -939,7 +902,7 @@ function renderScreen() {
                             Koupit (${skin.cost} 💰)
                            </button>
                         ` : `
-                          <button class="toggle-btn" style="font-size:12px;padding:4px 8px;background:#101c2e;border-color:var(--col-active-tab);" onclick="previewSkin('${skin.id}')">👁️ Náhled</button>
+                          <button class="toggle-btn" style="font-size:12px;padding:6px 10px;background:var(--col-card);border-color:var(--col-active-tab);" onclick="previewSkin('${skin.id}')">👁️ Náhled</button>
                         `)}
                       </div>
                     </div>
@@ -949,7 +912,7 @@ function renderScreen() {
             </div>
           </div>
 
-          <div class="action-btn" style="margin-top:15px;" onclick="setScreen('SELECT_SUBJECT')">
+          <div class="action-btn" style="margin-top:15px;" onclick="cancelPreview(); setScreen('SELECT_SUBJECT')">
             ◀️ Zpět k výběru předmětů
           </div>
         </div>
@@ -962,7 +925,7 @@ function renderScreen() {
       if (typeof renderMathOpSelection === "function") renderMathOpSelection();
     }
 
-    // 5. VÝBĚR SKUPINY (LEKCE / TÉMATA)
+    // 5. VÝBĚR SKUPINY
     else if (currentScreen === "SELECT_GROUP") {
       bSubj.style.display = "flex"; bSubj.innerText = selectedSubject; bGroup.style.display = "none";
       const userG = parseInt(currentUser.grade) || 2;
@@ -983,7 +946,7 @@ function renderScreen() {
           ${Object.values(groupsMap).map(g => {
             const mPct = getGroupMasteryPercent(g.raw, selectedSubject);
             return `
-              <div class="tile" style="flex-direction:column;align-items:stretch;padding:12px;" onclick="chooseGroup('${g.name}')">
+              <div class="tile" style="flex-direction:column;align-items:stretch;padding:12px;" onclick="chooseGroup('${g.name.replace(/'/g, "\\'")}')">
                 <div style="display:flex;justify-content:space-between;"><h2>${g.name}</h2><span style="color:var(--col-active-tab);">${g.count} úloh</span></div>
                 <div class="bargraph-track" style="height:6px;margin-top:6px;"><div class="bargraph-fill" style="width:${mPct}%;"></div></div>
               </div>
@@ -993,7 +956,7 @@ function renderScreen() {
       `;
     }
 
-    // 6. KAMPAŇ HUB (S ODKAZEM NA OBCHOD)
+    // 6. KAMPAŇ HUB
     else if (currentScreen === "CAMPAIGN_HUB") {
       bSubj.style.display = "flex"; 
       bSubj.innerText = selectedSubject; 
@@ -1053,7 +1016,6 @@ function renderScreen() {
           </div>
           <p style="font-size:13px;color:var(--col-text-muted);margin-top:12px;">Udrž všech 5 ❤️ srdíček pro zisk zlaťáků!</p>
 
-          <!-- ODKAZ DO OBCHODU -->
           <div class="tile" style="border-color:var(--col-yellow);background:#1f1905;margin-top:20px;padding:12px;cursor:pointer;" onclick="setScreen('SHOP')">
             <div style="display:flex;justify-content:space-between;align-items:center;width:100%;">
               <span style="color:var(--col-yellow);font-weight:bold;font-size:15px;">🛒 Přejít do Obchodu</span>
@@ -1064,7 +1026,7 @@ function renderScreen() {
       `;
     }
 
-    // 7. VÝBĚR HRY (KLASICKÝ PŘEDMĚT)
+    // 7. VÝBĚR HRY
     else if (currentScreen === "SELECT_GAME") {
       bSubj.style.display = "flex"; bGroup.style.display = "flex"; bGroup.innerText = selectedGroupKey;
       const vItems = getVocabItems(), qItems = getQuizItems(), sItems = getSeqItems(), quickMode = getQuickChoiceMode();
@@ -1104,7 +1066,7 @@ function renderScreen() {
       main.innerHTML = html;
     }
 
-    // 8. VÝBĚR ŘADY (MEZIKROK)
+    // 8. VÝBĚR ŘADY
     else if (currentScreen === "SELECT_SEQ_ITEM") {
       bGroup.style.display = "flex"; bGroup.innerText = selectedGroupKey;
       const sItems = getSeqItems();
@@ -1127,10 +1089,10 @@ function renderScreen() {
       main.innerHTML = `
         <h2 style="font-size:18px;margin-bottom:12px;text-align:center;color:var(--col-yellow);">Vyber velikost pexesa:</h2>
         <div class="grid-2">
-          <div class="tile" onclick="startPexesoGame(3)"><h2>6 KARET</h2><p>3 dvojice</p></div>
-          <div class="tile" onclick="startPexesoGame(4)"><h2>8 KARET</h2><p>4 dvojice</p></div>
-          <div class="tile" onclick="startPexesoGame(6)"><h2>12 KARET</h2><p>6 dvojic</p></div>
-          <div class="tile" onclick="startPexesoGame(8)"><h2>16 KARET</h2><p>8 dvojic</p></div>
+          <div class="tile" onclick="if(typeof startPexesoGame === 'function') startPexesoGame(3)"><h2>6 KARET</h2><p>3 dvojice</p></div>
+          <div class="tile" onclick="if(typeof startPexesoGame === 'function') startPexesoGame(4)"><h2>8 KARET</h2><p>4 dvojice</p></div>
+          <div class="tile" onclick="if(typeof startPexesoGame === 'function') startPexesoGame(6)"><h2>12 KARET</h2><p>6 dvojic</p></div>
+          <div class="tile" onclick="if(typeof startPexesoGame === 'function') startPexesoGame(8)"><h2>16 KARET</h2><p>8 dvojic</p></div>
         </div>
       `;
     }
@@ -1147,7 +1109,6 @@ function renderScreen() {
   }
 }
 
-// Spuštění po načtení dokumentu
 if (document.readyState === "loading") { 
   document.addEventListener("DOMContentLoaded", () => loadData()); 
 } else { 
