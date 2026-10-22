@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Tinos:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=7.0">
+  <link rel="stylesheet" href="style.css?v=7.1">
 </head>
 <body>
 
@@ -38,14 +38,20 @@
 
   <footer>
     <div id="footer-user">Žák: --</div>
-    <div id="footer-status" style="color:var(--col-active-tab);cursor:pointer;" onclick="forceHardReload()">v7.0 (Restart)</div>
+    <div id="footer-status" style="color:var(--col-active-tab);cursor:pointer;" onclick="forceHardReload()">v7.1 (OK)</div>
     <div id="footer-goal">0 / 15 min ⏱️</div>
   </footer>
 </div>
 
-<script src="app.js?v=7.0"></script>
-<script src="math_engine.js?v=7.0"></script>
-<script src="games.js?v=7.0"></script>
-<script src="snake.js?v=7.0"></script>
+<!-- NADEFINOVANÉ POŘADÍ SKRIPTŮ (DŮLEŽITÉ) -->
+<script src="main.js?v=7.1"></script>
+<script src="game_core.js?v=7.1"></script>
+<script src="game_modes.js?v=7.1"></script>
+<script src="game_arcade.js?v=7.1"></script>
+<script src="game_pexeso.js?v=7.1"></script>
+<script src="game_snake.js?v=7.1"></script>
+<script src="game_campaign.js?v=7.1"></script>
+<script src="game_math.js?v=7.1"></script>
+
 </body>
 </html>
