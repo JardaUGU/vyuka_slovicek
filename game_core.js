@@ -1,3 +1,6 @@
+/**
+ * SDÍLENÉ HERNÍ JÁDRO: VÝSLOVNOST (TTS), ZVUKY, UKLÁDÁNÍ POSTUPU A VYKRESLOVÁNÍ HER
+ */
 let isAutoTTS = localStorage.getItem("auto_tts") !== "false";
 let cachedVoices = [];
 
@@ -140,11 +143,14 @@ function goBack() {
   if (typeof stopSnakeLoop === "function") stopSnakeLoop();
   if (typeof sendTimeHeartbeatToGoogle === "function") sendTimeHeartbeatToGoogle();
 
-  if (currentScreen === "PLAYING" && selectedGame === "PEXESO") setScreen("SELECT_PEXESO_SIZE");
+  const sLow = (selectedSubject || "").toLowerCase();
+  const isCesta = sLow.includes("cesta") || sLow.includes("postupn") || sLow.includes("inteligentn");
+
+  if (currentScreen === "PLAYING" && selectedGame === "PEXESO" && !isCampaignMinigame) setScreen("SELECT_PEXESO_SIZE");
   else if (currentScreen === "PLAYING" && selectedGame === "SEQ" && getSeqItems().length > 1) setScreen("SELECT_SEQ_ITEM");
   else if (currentScreen === "SELECT_PEXESO_SIZE" || currentScreen === "SELECT_SEQ_ITEM") setScreen("SELECT_GAME");
   else if (currentScreen === "PLAYING") {
-    if (selectedGame === "CAMPAIGN") setScreen("CAMPAIGN_HUB");
+    if (selectedGame === "CAMPAIGN" || isCesta) setScreen("CAMPAIGN_HUB");
     else if (selectedSubject === "Matematika") setScreen("SELECT_MATH_OP");
     else setScreen("SELECT_GAME");
   }
@@ -168,6 +174,9 @@ function startGame(game) {
   setScreen("PLAYING"); 
 }
 
+// ==========================================
+// HLAVNÍ VYKRESLOVÁNÍ AKTIVNÍCH HER
+// ==========================================
 function renderActiveGame() {
   const main = document.getElementById("main-content");
   if (!main) return;
@@ -175,7 +184,7 @@ function renderActiveGame() {
   const vItems = getVocabItems();
   const sItems = getSeqItems();
 
-  // OPRAVA BÍLÉHO TEXTU V ARCTIC SKINU:
+  // Dynamická barva pro světlý Arktický vzhled
   const activeTheme = document.body.getAttribute('data-theme') || 'default';
   const colorWhite = (activeTheme === 'arctic') ? '#0c4a6e' : '#fff';
 
@@ -495,7 +504,7 @@ function renderActiveGame() {
 
   else if (selectedGame === "SNAKE") {
     if (typeof snakeState === "undefined") {
-      main.innerHTML = `<div style="text-align:center;padding:30px;color:var(--col-red);">Chyba: Soubor snake.js chybí nebo se nenačetl!</div>`;
+      main.innerHTML = `<div style="text-align:center;padding:30px;color:var(--col-red);">Chyba: Soubor game_snake.js chybí nebo se nenačetl!</div>`;
       return;
     }
 
@@ -666,7 +675,7 @@ function renderActiveGame() {
       html += `
         <div class="prompt-box">Slož: <b style="color:${colorWhite};">${cleanCzechTranslation(task.data.answer)}</b></div>
         <div class="slots-row ${isHebrew ? 'hebrew-text' : ''}">
-          ${task.tiles.map((t, i) => `<div class="letter-slot ${task.isWordMode?'word-slot':''} ${i<task.placed.length?'filled':''}">${i<task.placed.length?task.placed[i]:'_'}</div>`).join('')}
+          ${task.tiles.map((t, i) => `<div class="letter-slot ${task.isWordMode?'word-slot':''} ${i<task.placed.length?'filled':''}">${i<scramblePlaced.length?scramblePlaced[i]:'_'}</div>`).join('')}
         </div>
       `;
       if (cmpState !== 'EVAL') {
@@ -678,7 +687,13 @@ function renderActiveGame() {
     }
     main.innerHTML = html;
   }
+
+  // --- PŘÍBĚHY (DUOLINGO STORIES) ---
   else if (selectedGame === "STORY") {
-  if (typeof renderStoryGame === "function") renderStoryGame(main, colorWhite);
-}
+    if (typeof renderStoryGame === "function") {
+      renderStoryGame(main, colorWhite);
+    } else {
+      main.innerHTML = `<div style="text-align:center;padding:30px;color:var(--col-red);">Chyba: Soubor game_story.js chybí nebo se nenačetl!</div>`;
+    }
+  }
 }
