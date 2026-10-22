@@ -87,7 +87,7 @@ footer { height: 32px; background-color: var(--col-card); border-top: 1px solid 
   flex-direction: column; 
   align-items: center; 
   width: 100%; 
-  max-width: 500px;
+  max-width: 100%; /* Plná šířka na mobilu */
   margin: 0 auto; 
   user-select: none; 
   touch-action: none !important;
@@ -106,24 +106,29 @@ footer { height: 32px; background-color: var(--col-card); border-top: 1px solid 
 .snake-canvas-wrap { 
   position: relative; 
   width: 100%; 
-  max-width: 360px; /* Zmenšeno z 440px, aby se plátno na PC vždy vešlo na obrazovku i s horní lištou */
-  aspect-ratio: 1/1; 
+  max-width: 100%; /* Na mobilu se roztáhne od okraje k okraji */
+  aspect-ratio: 1/1; /* Garance naprostého čtverce, žádné poskakování! */
   margin: 0 auto 6px auto; 
   border: 2px solid var(--col-card-border); 
-  border-radius: 12px; 
-  overflow: hidden; 
+  border-radius: 8px; 
   background: #08101e; 
   touch-action: none !important;
 }
-#snake-canvas { width: 100%; height: 100%; display: block; touch-action: none !important; }
+/* Interní canvas se přizpůsobí naprosto přesně obalu */
+#snake-canvas { width: 100% !important; height: 100% !important; display: block; touch-action: none !important; }
+.snake-overlay { position: absolute; inset: 0; background: rgba(8, 16, 30, 0.85); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 15px; text-align: center; z-index: 50; backdrop-filter: blur(2px); }
 
-/* Skryje dotyková tlačítka na velkých PC monitorech, protože tam jsou šipky na klávesnici */
-@media (min-width: 700px) and (min-height: 700px) {
-  .snake-dpad { display: none !important; }
-}
+.snake-dpad { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 100%; margin-top: 4px; }
 .dpad-row { display: flex; gap: 10px; }
 .dpad-btn { width: 68px; height: 46px; background: #18263e; border: 2px solid var(--col-active-tab); border-radius: 8px; color: #fff; font-size: 22px; display: flex; align-items: center; justify-content: center; cursor: pointer; touch-action: manipulation; }
 .dpad-btn:active { background: var(--col-active-tab); transform: scale(0.92); }
+
+/* --- PC VELIKOST A SKRYTÍ TLAČÍTEK --- */
+@media (min-width: 700px) and (min-height: 700px) {
+  .snake-container { max-width: 480px; }
+  .snake-canvas-wrap { max-width: 480px; }
+  .snake-dpad { display: none !important; } /* Skryje D-pad, PC má šipky na klávesnici */
+}
 
 /* --- BAREVNÉ SKINY APLIKACE --- */
 
