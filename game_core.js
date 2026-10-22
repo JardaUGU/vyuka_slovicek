@@ -1,3 +1,6 @@
+/**
+ * SDÍLENÉ HERNÍ JÁDRO: VÝSLOVNOST (TTS), ZVUKY, UKLÁDÁNÍ POSTUPU A VYKRESLOVÁNÍ HER
+ */
 let isAutoTTS = localStorage.getItem("auto_tts") !== "false";
 let cachedVoices = [];
 
@@ -140,11 +143,14 @@ function goBack() {
   if (typeof stopSnakeLoop === "function") stopSnakeLoop();
   if (typeof sendTimeHeartbeatToGoogle === "function") sendTimeHeartbeatToGoogle();
 
-  if (currentScreen === "PLAYING" && selectedGame === "PEXESO") setScreen("SELECT_PEXESO_SIZE");
+  const sLow = (selectedSubject || "").toLowerCase();
+  const isCesta = sLow.includes("cesta") || sLow.includes("postupn") || sLow.includes("inteligentn");
+
+  if (currentScreen === "PLAYING" && selectedGame === "PEXESO" && !isCampaignMinigame) setScreen("SELECT_PEXESO_SIZE");
   else if (currentScreen === "PLAYING" && selectedGame === "SEQ" && getSeqItems().length > 1) setScreen("SELECT_SEQ_ITEM");
   else if (currentScreen === "SELECT_PEXESO_SIZE" || currentScreen === "SELECT_SEQ_ITEM") setScreen("SELECT_GAME");
   else if (currentScreen === "PLAYING") {
-    if (selectedGame === "CAMPAIGN") setScreen("CAMPAIGN_HUB");
+    if (selectedGame === "CAMPAIGN" || isCesta) setScreen("CAMPAIGN_HUB");
     else if (selectedSubject === "Matematika") setScreen("SELECT_MATH_OP");
     else setScreen("SELECT_GAME");
   }
@@ -168,6 +174,9 @@ function startGame(game) {
   setScreen("PLAYING"); 
 }
 
+// ==========================================
+// HLAVNÍ VYKRESLOVÁNÍ AKTIVNÍCH HER
+// ==========================================
 function renderActiveGame() {
   const main = document.getElementById("main-content");
   if (!main) return;
@@ -175,7 +184,7 @@ function renderActiveGame() {
   const vItems = getVocabItems();
   const sItems = getSeqItems();
 
-  // OPRAVA BÍLÉHO TEXTU V ARCTIC SKINU:
+  // Dynamická barva pro světlý Arktický vzhled
   const activeTheme = document.body.getAttribute('data-theme') || 'default';
   const colorWhite = (activeTheme === 'arctic') ? '#0c4a6e' : '#fff';
 
@@ -495,44 +504,20 @@ function renderActiveGame() {
 
   else if (selectedGame === "SNAKE") {
     if (typeof snakeState === "undefined") {
-      main.innerHTML = `<div style="text-align:center;padding:30px;color:var(--col-red);">Chyba: Soubor snake.js chybí nebo se nenačetl!</div>`;
-      return;
-    }
-
-    if (snakeState === "GAMEOVER") {
-      if (isCampaignMinigame) {
-        let bonusCoins = Math.floor(snakeScore / 2);
-        main.innerHTML = `
-          <div style="text-align:center;padding:35px;">
-            <h2 style="color:var(--col-green);font-size:28px;">GAME OVER! (Trénink dokončen) 🎉</h2>
-            <p style="font-size:20px;color:${colorWhite};margin:10px 0;">Had poskládal: <b>${snakeScore} slov</b> (Bonus: +${bonusCoins} 💰)</p>
-            <p style="font-size:24px;color:var(--col-yellow);margin-bottom:25px;">Celkem získáváš: +${campaignMinigameCoins + bonusCoins} 💰</p>
-            <div class="action-btn green" onclick="finishCampaign(${campaignMinigameCoins + bonusCoins})">PŘIPSAT ZLAŤÁKY A ZPĚT</div>
-          </div>
-        `;
-      } else {
-        main.innerHTML = `
-          <div style="text-align:center;padding:35px;">
-            <h2 style="color:var(--col-red);font-size:32px;font-weight:bold;">GAME OVER! 💔</h2>
-            <p style="font-size:20px;color:${colorWhite};margin:12px 0;">Správně složeno: <b>${snakeScore} slov</b></p>
-            <div class="action-btn green" onclick="if(typeof startSnakeGame === 'function') startSnakeGame()">HRÁT ZNOVU ➔</div>
-            <div class="action-btn" onclick="setScreen('SELECT_GAME')">ZPĚT</div>
-          </div>
-        `;
-      }
+      main.innerHTML = `<div style="text-align:center;padding:30px;color:var(--col-red);">Chyba: Soubor game_snake.js chybí nebo se nenačetl!</div>`;
       return;
     }
 
     const canBuyShield = snakeLives > 1 && snakeShieldLetters <= 0;
     const coins = typeof currentUser !== 'undefined' && currentUser ? getUserCoins(currentUser.name) : 0;
     const canBuyShieldCoins = snakeLives === 1 && snakeShieldLetters <= 0 && coins >= 15;
-    let targetLetterChar = (typeof snakeTargetLetters !== "undefined" && snakeTargetLetters && snakeTargetLetters[snakeCurrentIdx]) ? snakeTargetLetters[snakeCurrentIdx] : '';
+    let bonusCoins = Math.floor(snakeScore / 2);
 
     main.innerHTML = `
       <div class="snake-container">
         <div class="snake-header-box">
           <div class="snake-stats">
-            <span>${"❤️".repeat(snakeLives)}</span>
+            <span>${snakeLives > 0 ? "❤️".repeat(snakeLives) : "💀"}</span>
             
             ${snakeShieldLetters > 0 ? `
               <span id="snake-shield-indicator" class="snake-shield-btn active">🛡️ Štít: ${snakeShieldLetters} p.</span>
@@ -569,6 +554,25 @@ function renderActiveGame() {
 
         <div class="snake-canvas-wrap">
           <canvas id="snake-canvas" width="340" height="340"></canvas>
+
+          <!-- PŘEKRYVNÝ GAME OVER (HRÁČ VIDÍ HADA POD NÍM) -->
+          ${snakeState === "GAMEOVER" ? `
+            <div class="snake-overlay" style="background: rgba(8, 16, 30, 0.78);">
+              ${isCampaignMinigame ? `
+                <h2 style="color:var(--col-green);font-size:26px;margin-bottom:6px;">GAME OVER! 🎉</h2>
+                <p style="font-size:14px;color:#cbd5e1;margin-bottom:8px;">${snakeStatusMsg}</p>
+                <p style="font-size:18px;color:#fff;margin:6px 0;">Složeno: <b>${snakeScore} slov</b> (+${bonusCoins} 💰)</p>
+                <p style="font-size:22px;color:var(--col-yellow);margin-bottom:16px;">Celkem: +${campaignMinigameCoins + bonusCoins} 💰</p>
+                <div class="action-btn green" style="width:100%;max-width:250px;" onclick="finishCampaign(${campaignMinigameCoins + bonusCoins})">PŘIPSAT ZLAŤÁKY A ZPĚT</div>
+              ` : `
+                <h2 style="color:var(--col-red);font-size:30px;font-weight:bold;margin-bottom:6px;">GAME OVER! 💔</h2>
+                <p style="font-size:14px;color:var(--col-yellow);margin-bottom:10px;">${snakeStatusMsg}</p>
+                <p style="font-size:18px;color:#fff;margin-bottom:18px;">Správně složeno: <b>${snakeScore} slov</b></p>
+                <div class="action-btn green" style="width:100%;max-width:240px;margin-bottom:8px;" onclick="if(typeof startSnakeGame === 'function') startSnakeGame()">HRÁT ZNOVU ➔</div>
+                <div class="action-btn" style="width:100%;max-width:240px;" onclick="setScreen('SELECT_GAME')">ZPĚT DO MENU</div>
+              `}
+            </div>
+          ` : ''}
 
           <!-- DIALOG PŘI VYPRŠENÍ ŠTÍTU -->
           ${snakeState === "SHIELD_EXPIRED_PAUSE" ? `
@@ -671,7 +675,7 @@ function renderActiveGame() {
       html += `
         <div class="prompt-box">Slož: <b style="color:${colorWhite};">${cleanCzechTranslation(task.data.answer)}</b></div>
         <div class="slots-row ${isHebrew ? 'hebrew-text' : ''}">
-          ${task.tiles.map((t, i) => `<div class="letter-slot ${task.isWordMode?'word-slot':''} ${i<task.placed.length?'filled':''}">${i<task.placed.length?task.placed[i]:'_'}</div>`).join('')}
+          ${task.tiles.map((t, i) => `<div class="letter-slot ${task.isWordMode?'word-slot':''} ${i<task.placed.length?'filled':''}">${i<scramblePlaced.length?scramblePlaced[i]:'_'}</div>`).join('')}
         </div>
       `;
       if (cmpState !== 'EVAL') {
@@ -682,5 +686,14 @@ function renderActiveGame() {
       }
     }
     main.innerHTML = html;
+  }
+
+  // --- PŘÍBĚHY (DUOLINGO STORIES) ---
+  else if (selectedGame === "STORY") {
+    if (typeof renderStoryGame === "function") {
+      renderStoryGame(main, colorWhite);
+    } else {
+      main.innerHTML = `<div style="text-align:center;padding:30px;color:var(--col-red);">Chyba: Soubor game_story.js chybí nebo se nenačetl!</div>`;
+    }
   }
 }

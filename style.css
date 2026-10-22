@@ -127,7 +127,45 @@ footer { height: 32px; background-color: var(--col-card); border-top: 1px solid 
 @media (min-width: 700px) and (min-height: 700px) {
   .snake-dpad { display: none !important; }
 }
-
+/* --- OVLÁDACÍ KŘÍŽ (D-PAD) PRO HADA NA MOBILU --- */
+.snake-dpad {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  width: 100%;
+}
+.dpad-row {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+}
+.dpad-btn {
+  width: 68px;
+  height: 54px;
+  background: var(--col-card);
+  border: 2px solid var(--col-active-tab);
+  border-radius: 12px;
+  color: #fff;
+  font-size: 26px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+  user-select: none;
+  touch-action: manipulation;
+}
+.dpad-btn:active {
+  background: var(--col-active-tab);
+  transform: scale(0.92);
+}
+body[data-theme="arctic"] .dpad-btn {
+  color: #0284c7;
+  background: #fff;
+}
 /* --- BAREVNÉ SKINY APLIKACE --- */
 
 /* 1. HACKER MATRIX (Opravený černo-zelený režim) */
@@ -222,3 +260,67 @@ body[data-theme="arctic"] .badge { background: #e0f2fe; color: #0369a1; border-c
 body[data-theme="arctic"] .badge.active { background: #0284c7; color: #fff; }
 body[data-theme="arctic"] .tts-toggle-btn { background: #e0f2fe; color: #0369a1; border-color: #7dd3fc; }
 body[data-theme="arctic"] .tts-toggle-btn.active { background: #22c55e; color: #fff; border-color: #16a34a; }
+body[data-theme="arctic"] .opt-btn { color: #0c4a6e; }
+body[data-theme="arctic"] .opt-btn.correct { color: #fff; }
+
+/* --- PŘÍBĚHY (DUOLINGO STORIES) --- */
+.story-chat-container {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 6px 4px 14px 4px;
+}
+.story-bubble {
+  background: var(--col-card);
+  border: 1px solid var(--col-card-border);
+  border-left: 4px solid var(--col-active-tab);
+  border-radius: 10px;
+  padding: 10px 12px;
+  cursor: pointer;
+  animation: fadeInBubble 0.25s ease-out;
+}
+.story-bubble.active-quiz {
+  border-color: var(--col-yellow);
+  border-left: 4px solid var(--col-yellow);
+}
+.story-speaker {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  font-weight: bold;
+  color: var(--col-active-tab);
+  margin-bottom: 4px;
+}
+.story-audio-icon {
+  font-size: 16px;
+  padding: 2px 6px;
+}
+.story-text {
+  font-size: 18px;
+  line-height: 1.35;
+}
+.story-translation {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--col-card-border);
+  font-size: 14px;
+  color: var(--col-yellow);
+}
+.story-quiz-box {
+  background: rgba(250, 204, 21, 0.1);
+  border: 2px solid var(--col-yellow);
+  border-radius: 10px;
+  padding: 12px;
+  text-align: center;
+}
+.story-controls {
+  padding-top: 8px;
+  border-top: 1px solid var(--col-card-border);
+}
+@keyframes fadeInBubble {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
