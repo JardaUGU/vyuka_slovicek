@@ -185,27 +185,33 @@ body[data-theme="cyberpunk"] {
   background-color: #08020f;
 }
 
-/* --- LEDOVÁ POLÁRNÍ ZÁŘE (Zcela nový světlý styl) --- */
+/* --- LEDOVÁ POLÁRNÍ ZÁŘE (Světlý styl) --- */
 body[data-theme="arctic"] {
   --col-bg: #e0f2fe;
   --col-card: #f0f9ff;
   --col-card-border: #7dd3fc;
   --col-active-tab: #0284c7;
   --col-text-muted: #0369a1;
-  --col-yellow: #d97706; /* oranžová pro lepší kontrast na světlém */
+  --col-yellow: #d97706; /* oranžová pro lepší kontrast na světlém pozadí */
   --col-green: #16a34a;
   background-color: #bae6fd;
   color: #0c4a6e;
 }
 body[data-theme="arctic"] .prompt-box, 
-body[data-theme="arctic"] .tile h2 { color: #0369a1; }
+body[data-theme="arctic"] .tile h2 { color: #0369a1; font-weight: bold; }
 body[data-theme="arctic"] .tile p { color: #075985; }
 body[data-theme="arctic"] .action-btn { color: #fff; }
-body[data-theme="arctic"] .letter-tile { color: #0284c7; background: #fff; }
-body[data-theme="arctic"] .letter-tile.used { background: #bae6fd; border-color: #7dd3fc; color: #38bdf8; }
-body[data-theme="arctic"] .pexeso-card.hidden { background: #bae6fd; color: #0284c7; }
-body[data-theme="arctic"] .pexeso-card { color: #0c4a6e; }
-body[data-theme="arctic"] header { border-bottom: 2px solid #7dd3fc; }
-body[data-theme="arctic"] footer { border-top: 1px solid #7dd3fc; color: #0284c7; }
+body[data-theme="arctic"] .letter-tile { color: #0284c7; background: #fff; border-color: #38bdf8; }
+body[data-theme="arctic"] .letter-tile.used { background: #bae6fd; border-color: #7dd3fc; color: #0ea5e9; }
+body[data-theme="arctic"] .pexeso-card.hidden { background: #bae6fd; color: #0284c7; border-color: #7dd3fc; }
+body[data-theme="arctic"] .pexeso-card { color: #0c4a6e; background: #fff; border-color: #0284c7; }
+body[data-theme="arctic"] .pexeso-card.matched { background: #dcfce7; border-color: #22c55e; color: #16a34a; }
+body[data-theme="arctic"] header { border-bottom: 2px solid #7dd3fc; background: #f0f9ff; }
+body[data-theme="arctic"] footer { border-top: 1px solid #7dd3fc; color: #0284c7; background: #f0f9ff; }
 body[data-theme="arctic"] .study-timer-box { background: #e0f2fe; color: #0284c7; border-color: #7dd3fc; }
 body[data-theme="arctic"] .study-timer-box.bonus { background: #fef3c7; border-color: #f59e0b; color: #d97706; }
+body[data-theme="arctic"] .nav-btn { color: #fff; border-color: #0284c7; }
+body[data-theme="arctic"] .badge { background: #e0f2fe; color: #0369a1; border-color: #7dd3fc; }
+body[data-theme="arctic"] .badge.active { background: #0284c7; color: #fff; }
+body[data-theme="arctic"] .tts-toggle-btn { background: #e0f2fe; color: #0369a1; border-color: #7dd3fc; }
+body[data-theme="arctic"] .tts-toggle-btn.active { background: #22c55e; color: #fff; border-color: #16a34a; }
