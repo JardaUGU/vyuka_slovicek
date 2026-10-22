@@ -678,4 +678,7 @@ function renderActiveGame() {
     }
     main.innerHTML = html;
   }
+  else if (selectedGame === "STORY") {
+  if (typeof renderStoryGame === "function") renderStoryGame(main, colorWhite);
+}
 }
