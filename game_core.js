@@ -135,7 +135,6 @@ function getGroupMasteryPercent(groupItems, subjName) {
   return Math.min(100, Math.round((points / (vList.length * 4)) * 100));
 }
 
-// ZDE JE KOMPLETNÍ OPRAVENÉ goBack()
 function goBack() {
   if (typeof stopArcadeLoop === "function") stopArcadeLoop();
   if (typeof stopSnakeLoop === "function") stopSnakeLoop();
@@ -169,7 +168,6 @@ function startGame(game) {
   setScreen("PLAYING"); 
 }
 
-// ZDE JE KOMPLETNÍ OBŘÍ renderActiveGame() VČETNĚ HADA
 function renderActiveGame() {
   const main = document.getElementById("main-content");
   if (!main) return;
@@ -299,7 +297,7 @@ function renderActiveGame() {
       } else {
           main.innerHTML = `
             <div style="text-align:center;padding:35px;">
-              <h2 style="color:var(--col-red);font-size:28px;">KONEC HRY! 💔</h2>
+              <h2 style="color:var(--col-red);font-size:28px;">GAME OVER! 💔</h2>
               <p style="font-size:20px;color:#fff;margin:10px 0;">Sestřeleno: <b>${arcadeScore} slov</b> (LVL ${arcadeLevel})</p>
               <div class="action-btn green" onclick="startArcadeGame()">HRÁT ZNOVU ➔</div>
               <div class="action-btn" onclick="setScreen('SELECT_GAME')">ZPĚT</div>
@@ -491,19 +489,19 @@ function renderActiveGame() {
     `;
   }
 
-  // --- ZDE JE PLNOHODNOTNÝ HAD ---
   else if (selectedGame === "SNAKE") {
     if (typeof snakeState === "undefined") {
       main.innerHTML = `<div style="text-align:center;padding:30px;color:var(--col-red);">Chyba: Soubor snake.js chybí nebo se nenačetl!</div>`;
       return;
     }
 
+    // --- ZDE JE OPRAVENÁ HLÁŠKA GAME OVER ---
     if (snakeState === "GAMEOVER") {
       if (isCampaignMinigame) {
         let bonusCoins = Math.floor(snakeScore / 2);
         main.innerHTML = `
           <div style="text-align:center;padding:35px;">
-            <h2 style="color:var(--col-green);font-size:28px;">TRÉNINK DOKONČEN! 🎉</h2>
+            <h2 style="color:var(--col-green);font-size:28px;">GAME OVER! (Trénink dokončen) 🎉</h2>
             <p style="font-size:20px;color:#fff;margin:10px 0;">Had poskládal: <b>${snakeScore} slov</b> (Bonus: +${bonusCoins} 💰)</p>
             <p style="font-size:24px;color:var(--col-yellow);margin-bottom:25px;">Celkem získáváš: +${campaignMinigameCoins + bonusCoins} 💰</p>
             <div class="action-btn green" onclick="finishCampaign(${campaignMinigameCoins + bonusCoins})">PŘIPSAT ZLAŤÁKY A ZPĚT</div>
@@ -512,7 +510,7 @@ function renderActiveGame() {
       } else {
         main.innerHTML = `
           <div style="text-align:center;padding:35px;">
-            <h2 style="color:var(--col-red);font-size:28px;">KONEC HRY! 💔</h2>
+            <h2 style="color:var(--col-red);font-size:32px;font-weight:bold;">GAME OVER! 💔</h2>
             <p style="font-size:20px;color:#fff;margin:12px 0;">Správně složeno: <b>${snakeScore} slov</b></p>
             <div class="action-btn green" onclick="if(typeof startSnakeGame === 'function') startSnakeGame()">HRÁT ZNOVU ➔</div>
             <div class="action-btn" onclick="setScreen('SELECT_GAME')">ZPĚT</div>
