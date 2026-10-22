@@ -36,6 +36,7 @@ window.buySnakeShieldInGame = function(e) {
     
     if (typeof renderActiveGame === "function") renderActiveGame();
     setTimeout(resizeSnakeCanvas, 10);
+    runSnakeLoop(); // <--- OPRAVA: Znovu spustí hru
   } else if (snakeLives <= 1) {
     alert("Nemůžeš obětovat své poslední srdíčko! ❤️");
   }
@@ -56,6 +57,7 @@ window.buySnakeShieldWithCoins = function(e) {
     
     if (typeof renderActiveGame === "function") renderActiveGame();
     setTimeout(resizeSnakeCanvas, 10);
+    runSnakeLoop(); // <--- OPRAVA: Znovu spustí hru
   } else {
     alert("Potřebuješ alespoň 15 zlaťáků! 💰");
   }
@@ -66,8 +68,10 @@ window.resumeSnakeWithoutShield = function(e) {
   isSnakeWaitingForInput = true;
   snakeState = "WAITING";
   snakeStatusMsg = "Hraješ bez štítu. Potáhni nebo stiskni šipku!";
+  
   if (typeof renderActiveGame === "function") renderActiveGame();
   setTimeout(resizeSnakeCanvas, 10);
+  runSnakeLoop(); // <--- OPRAVA: Znovu spustí hru
 };
 
 function stopSnakeLoop() {
@@ -314,7 +318,6 @@ function runSnakeLoop() {
     if (typeof currentScreen !== 'undefined' && currentScreen !== "PLAYING") return;
     if (typeof selectedGame !== 'undefined' && selectedGame !== "SNAKE") return;
     
-    // U her jako je Had ignorujeme globální isTimerPaused (protože hra běží nezávisle na časomíře)
     if (!isSnakeWaitingForInput && snakeState === "PLAYING") {
       updateSnake();
     }
@@ -328,7 +331,7 @@ function setSnakeDirection(dx, dy) {
   // Detekce pohybu proti směru hada
   if ((snakeDir.x !== 0 && snakeDir.x === -dx) || (snakeDir.y !== 0 && snakeDir.y === -dy)) {
       if (isSnakeWaitingForInput) {
-          // Vychytávka: Pokud hra ještě nezačala a hráč zmáčkne dozadu, prostě hada na plátně otočíme!
+          // Pokud hra stojí na začátku a dáš zpět, prostě celého hada vizuálně otočíme na druhou stranu
           snakeBody.reverse();
           snakeDir = { x: dx, y: dy };
       } else {
@@ -464,6 +467,7 @@ function handleSnakeDeath(reason) {
   
   if (snakeLives <= 0) {
     snakeState = "GAMEOVER";
+    stopSnakeLoop(); // <--- OPRAVA: Při GAME OVER úplně zastavíme hru
     if (typeof renderActiveGame === "function") renderActiveGame();
   } else {
     isSnakeWaitingForInput = true;
