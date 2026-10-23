@@ -1,8 +1,8 @@
 /**
- * PROCEDURÁLNÍ MATEMATIKA S VÝBĚREM OPERACÍ + PŘÍPRAVA NA SŠ (GYMNÁZIA)
+ * PROCEDURÁLNÍ MATEMATIKA A KROKOVÉ ROVNICE
  */
-let mathOperation = "MIX_G2";
-let mathTask = { q: "2 + 2 = ?", ans: 4, opts: [2, 3, 4, 5] };
+let mathOperation = "MIX";
+let mathTask = { type: "NORMAL", q: "2 + 2 = ?", ans: 4, opts: [2, 3, 4, 5] };
 let mathStreak = 0;
 let mathChosenAnswer = null;
 
@@ -15,36 +15,21 @@ function renderMathOpSelection() {
   const main = document.getElementById("main-content");
   const g = parseInt(currentUser.grade) || 2;
   
-  let ops = [];
-  
-  if (g <= 4) { // Mladší žáci
-      ops = [
-        { id: "ADD_SUB_20_NO", title: "+ a - do 20 bez přechodu", desc: "12 + 5, 17 - 4" },
-        { id: "ADD_SUB_20_YES", title: "+ a - do 20 s přechodem", desc: "8 + 7, 15 - 9" },
-        { id: "TENS_100", title: "Desítky do 100", desc: "30 + 40, 90 - 50" },
-        { id: "MUL_SMALL", title: "Malá násobilka (2, 3, 4, 5)", desc: "Základy násobení" }
-      ];
-  } else if (g >= 90 || g >= 8) { // Starší žáci a dospělí - Příprava na SŠ
-      ops = [
-        { id: "FRACTIONS", title: "Zlomky (Sčítání a odčítání)", desc: "Společný jmenovatel a úpravy" },
-        { id: "PERCENTAGES", title: "Procenta", desc: "Výpočet procentové části z celku" },
-        { id: "EQUATIONS", title: "Lineární rovnice", desc: "Rovnice o jedné neznámé" },
-        { id: "MUL_FULL", title: "Kompletní násobilka (1–10)", desc: "Pro rychlé počítání z hlavy" }
-      ];
-  } else { // Střední stupeň (5.-7. třída)
-      ops = [
-        { id: "MUL_FULL", title: "Kompletní násobilka (1–10)", desc: "7 · 8, 9 · 6" },
-        { id: "DIV_EXACT", title: "Dělení beze zbytku", desc: "56 : 7, 72 : 9" },
-        { id: "ADD_1000", title: "+ a - do 1 000", desc: "350 + 280, 500 - 120" }
-      ];
-  }
+  let ops = [
+    { id: "EQ_STEP", title: "Krokové rovnice (Novinka!)", desc: "Klikáním na operace postupně řeš rovnici oboustrannou úpravou." },
+    { id: "ADD_SUB_20_NO", title: "+ a - do 20 bez přechodu", desc: "12 + 5, 17 - 4" },
+    { id: "ADD_SUB_20_YES", title: "+ a - do 20 s přechodem", desc: "8 + 7, 15 - 9" },
+    { id: "MUL_SMALL", title: "Malá násobilka", desc: "Základy násobení" },
+    { id: "FRACTIONS", title: "Zlomky (+ a -)", desc: "Sčítání a odčítání zlomků" },
+    { id: "PERCENTAGES", title: "Procenta", desc: "Výpočet procentové části z celku" }
+  ];
 
   main.innerHTML = `
     <h2 style="font-size:18px;margin-bottom:12px;text-align:center;color:var(--col-yellow);">Vyber matematiku:</h2>
     <div style="display:flex;flex-direction:column;gap:8px;">
       ${ops.map(o => `
-        <div class="tile" style="flex-direction:row;justify-content:space-between;padding:12px;text-align:left;" onclick="startMathPractice('${o.id}', '${o.title}')">
-          <div><h2>${o.title}</h2><p>${o.desc}</p></div>
+        <div class="tile" style="flex-direction:row;justify-content:space-between;padding:12px;text-align:left; ${o.id==='EQ_STEP' ? 'border-color:var(--col-green); background:#112a1f;' : ''}" onclick="startMathPractice('${o.id}', '${o.title}')">
+          <div><h2 style="${o.id==='EQ_STEP' ? 'color:var(--col-green);' : ''}">${o.title}</h2><p>${o.desc}</p></div>
           <span style="color:var(--col-active-tab);font-weight:bold;font-size:20px;">➔</span>
         </div>
       `).join('')}
@@ -63,83 +48,118 @@ function startMathPractice(opId, opTitle) {
 
 function generateMathTask() {
   mathChosenAnswer = null;
-  let a, b, c, ans, qStr;
   
-  if (mathOperation === "FRACTIONS") {
-      // Zlomky se společným jmenovatelem
-      let denoms = [2, 3, 4, 5, 8, 10];
-      let d = denoms[Math.floor(Math.random() * denoms.length)];
-      a = Math.floor(Math.random() * d) + 1;
-      b = Math.floor(Math.random() * d) + 1;
-      let isAdd = Math.random() > 0.5;
-      
-      // Zabráníme záporným výsledkům u zlomků pro jednoduchost
-      if (!isAdd && a < b) { let t = a; a = b; b = t; } 
-      
-      ans = isAdd ? (a + b) : (a - b);
-      qStr = `${a}/${d} ${isAdd ? '+' : '-'} ${b}/${d} = ?`;
-      
-      let correctStr = `${ans}/${d}`;
-      if (ans === 0) correctStr = "0";
-      if (ans === d) correctStr = "1";
-      
-      let optSet = new Set([correctStr]);
-      while (optSet.size < 4) {
-         let fakeNum = ans + Math.floor(Math.random() * 5) - 2;
-         if (fakeNum < 0) fakeNum += 3;
-         let fStr = `${fakeNum}/${d}`;
-         if (fakeNum === 0) fStr = "0";
-         if (fakeNum === d) fStr = "1";
-         optSet.add(fStr);
-      }
-      mathTask = { q: qStr, ans: correctStr, opts: Array.from(optSet).sort(() => Math.random() - 0.5) };
-  } 
-  
-  else if (mathOperation === "PERCENTAGES") {
-      // Výpočet procent (např. 20% z 150)
-      let percents = [10, 20, 25, 30, 50, 75];
-      let p = percents[Math.floor(Math.random() * percents.length)];
-      let bases = [100, 200, 400, 50, 150, 500, 1000];
-      let base = bases[Math.floor(Math.random() * bases.length)];
-      ans = (p / 100) * base;
-      qStr = `${p}% z ${base} = ?`;
-      mathTask = { q: qStr, ans: ans, opts: makeNumOpts(ans, base > 100 ? 10 : 5) };
-  } 
-  
-  else if (mathOperation === "EQUATIONS") {
-      // Lineární rovnice: a*x + b = c => x = ans
-      a = Math.floor(Math.random() * 4) + 2; // Koeficient 2 až 5
-      ans = Math.floor(Math.random() * 10) + 1; // Neznámá x: 1 až 10
-      b = Math.floor(Math.random() * 10) + 1; // Absolutní člen: 1 až 10
-      c = (a * ans) + b;
-      qStr = `${a}x + ${b} = ${c}`;
-      mathTask = { q: qStr, ans: ans, opts: makeNumOpts(ans, 1) };
+  // --- NOVINKA: KROKOVÉ ROVNICE ---
+  if (mathOperation === "EQ_STEP") {
+      // Rovnice tvaru: ax + b = c
+      let a = Math.floor(Math.random() * 5) + 2; // Koeficient 2 až 6
+      let x = Math.floor(Math.random() * 9) + 1; // Neznámá x = 1 až 9
+      let b = (Math.floor(Math.random() * 15) + 1) * (Math.random() > 0.5 ? 1 : -1);
+      let c = (a * x) + b;
+
+      mathTask = {
+          type: "STEP_EQ",
+          a: a, b: b, c: c, ans: x,
+          stepPhase: 0, // 0 = odstranit b, 1 = izolovat x (vydělit a), 2 = hotovo
+          history: [{ eq: `${a}x ${b > 0 ? '+' : '-'} ${Math.abs(b)} = ${c}`, op: null }],
+          opts: []
+      };
+      generateEqStepOptions();
+      return;
   }
 
-  // Původní operace
-  else if (mathOperation === "ADD_SUB_20_NO") {
-    a = 10 + Math.floor(Math.random() * 8); b = Math.floor(Math.random() * (19 - a)) + 1;
-    mathTask = { q: `${a} + ${b} = ?`, ans: a + b, opts: makeNumOpts(a + b) };
-  } else if (mathOperation === "ADD_SUB_20_YES") {
-    a = Math.floor(Math.random() * 5) + 6; b = Math.floor(Math.random() * 5) + 5;
-    mathTask = { q: `${a} + ${b} = ?`, ans: a + b, opts: makeNumOpts(a + b) };
-  } else if (mathOperation === "TENS_100") {
-    a = (Math.floor(Math.random() * 7) + 1) * 10; b = (Math.floor(Math.random() * (9 - a/10)) + 1) * 10;
-    mathTask = { q: `${a} + ${b} = ?`, ans: a + b, opts: makeNumOpts(a + b, 10) };
-  } else if (mathOperation === "MUL_SMALL") {
-    a = Math.floor(Math.random() * 4) + 2; b = Math.floor(Math.random() * 10) + 1;
-    mathTask = { q: `${a} · ${b} = ?`, ans: a * b, opts: makeNumOpts(a * b) };
-  } else if (mathOperation === "COMPARE") {
-    a = Math.floor(Math.random() * 90) + 10; b = Math.floor(Math.random() * 90) + 10;
-    ans = a < b ? "<" : (a > b ? ">" : "=");
-    mathTask = { q: `${a}  ___  ${b}`, ans: ans, opts: ["<", "=", ">"] };
-  } else if (mathOperation === "DIV_EXACT") {
-    b = Math.floor(Math.random() * 8) + 2; ans = Math.floor(Math.random() * 9) + 2;
-    mathTask = { q: `${b * ans} : ${b} = ?`, ans: ans, opts: makeNumOpts(ans) };
+  // --- STANDARDNÍ MATEMATIKA ---
+  let a, b, qStr, ans;
+  if (mathOperation === "FRACTIONS") {
+      let d = [2, 3, 4, 5, 8][Math.floor(Math.random() * 5)];
+      a = Math.floor(Math.random() * d) + 1; b = Math.floor(Math.random() * d) + 1;
+      let isAdd = Math.random() > 0.5;
+      if (!isAdd && a < b) { let t = a; a = b; b = t; } 
+      ans = isAdd ? (a + b) : (a - b);
+      let cStr = `${ans}/${d}`; if (ans === 0) cStr = "0"; if (ans === d) cStr = "1";
+      
+      let optSet = new Set([cStr]);
+      while (optSet.size < 4) {
+         let fake = ans + Math.floor(Math.random() * 5) - 2;
+         if (fake < 0) fake += 3;
+         let fStr = `${fake}/${d}`; if (fake === 0) fStr = "0"; if (fake === d) fStr = "1";
+         optSet.add(fStr);
+      }
+      mathTask = { type: "NORMAL", q: `${a}/${d} ${isAdd ? '+' : '-'} ${b}/${d} = ?`, ans: cStr, opts: Array.from(optSet).sort(()=>Math.random()-0.5) };
+  } else if (mathOperation === "PERCENTAGES") {
+      let p = [10, 20, 25, 50, 75][Math.floor(Math.random() * 5)];
+      let base = [100, 200, 400, 50, 150][Math.floor(Math.random() * 5)];
+      ans = (p / 100) * base;
+      mathTask = { type: "NORMAL", q: `${p}% z ${base} = ?`, ans: ans, opts: makeNumOpts(ans, base > 100 ? 10 : 5) };
   } else {
-    a = Math.floor(Math.random() * 9) + 2; b = Math.floor(Math.random() * 9) + 2;
-    mathTask = { q: `${a} · ${b} = ?`, ans: a * b, opts: makeNumOpts(a * b) };
+      a = Math.floor(Math.random() * 9) + 2; b = Math.floor(Math.random() * 9) + 2;
+      mathTask = { type: "NORMAL", q: `${a} · ${b} = ?`, ans: a * b, opts: makeNumOpts(a * b) };
   }
+}
+
+// LOGIKA PRO GENEROVÁNÍ TLAČÍTEK ÚPRAV
+function generateEqStepOptions() {
+    let pool = new Set();
+    
+    if (mathTask.stepPhase === 0) {
+        // Cíl: Odstranit "b" převedením na druhou stranu
+        let correctOp = mathTask.b > 0 ? `- ${mathTask.b}` : `+ ${Math.abs(mathTask.b)}`;
+        mathTask.correctStep = correctOp;
+        pool.add(correctOp);
+        // Falešné možnosti
+        pool.add(mathTask.b > 0 ? `+ ${mathTask.b}` : `- ${Math.abs(mathTask.b)}`);
+        pool.add(`/ ${mathTask.a}`);
+        pool.add(`- ${mathTask.a}x`);
+    } else if (mathTask.stepPhase === 1) {
+        // Cíl: Získat "x" vydělením rovnice koeficientem "a"
+        let correctOp = `/ ${mathTask.a}`;
+        mathTask.correctStep = correctOp;
+        pool.add(correctOp);
+        // Falešné možnosti
+        pool.add(`* ${mathTask.a}`);
+        pool.add(`- ${mathTask.a}`);
+        pool.add(`+ ${mathTask.c}`); // c už je upravené
+    }
+    
+    // Doplnění poolu, pokud je málo možností
+    while(pool.size < 4) {
+       let r = Math.floor(Math.random()*10)+1;
+       pool.add((Math.random()>0.5?'+':'-') + ` ${r}`);
+    }
+    
+    mathTask.opts = Array.from(pool).sort(() => Math.random() - 0.5);
+}
+
+// ZPRACOVÁNÍ KLIKNUTÍ NA KROK U ROVNICE
+function handleEqStepChoice(opt) {
+    if (mathTask.stepPhase >= 2) return;
+    
+    if (opt === mathTask.correctStep) {
+        sndOk();
+        // Zapsání co hráč provedl k předchozí rovnici (ukáže se šipka vpravo)
+        mathTask.history[mathTask.history.length - 1].op = opt;
+        
+        // Aplikace úpravy na rovnici
+        if (mathTask.stepPhase === 0) {
+            // b bylo odstraněno
+            mathTask.c = mathTask.c - mathTask.b; 
+            mathTask.b = 0;
+            mathTask.history.push({ eq: `${mathTask.a}x = ${mathTask.c}`, op: null });
+            mathTask.stepPhase = 1;
+            generateEqStepOptions();
+        } else if (mathTask.stepPhase === 1) {
+            // a bylo vyděleno
+            mathTask.history.push({ eq: `x = ${mathTask.ans}`, op: null });
+            mathTask.stepPhase = 2; // Hotovo!
+            mathStreak++; 
+            addReward(2, "Matematika Rovnice"); // Bonus za těžší věc
+        }
+    } else {
+        sndErr();
+        mathStreak = 0;
+        alert("Tudy cesta nevede. Zkus to jinak!"); // Nebo jen zvuk chyby
+    }
+    renderActiveGame();
 }
 
 function makeNumOpts(correct, step = 1) {
@@ -157,8 +177,6 @@ function clickMathChoice(opt) {
   mathChosenAnswer = opt;
   if (String(opt) === String(mathTask.ans)) {
     sndOk(); mathStreak++; addReward(1, "Matematika");
-  } else {
-    sndErr(); mathStreak = 0;
-  }
+  } else { sndErr(); mathStreak = 0; }
   renderActiveGame();
 }
