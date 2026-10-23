@@ -1,19 +1,9 @@
 // ==========================================
-// HERNÍ MÓD: ARKÁDA (PADAJÍCÍ SLOVA)
+// HRA PADAJÍCÍ SLOVA (ARKÁDA)
 // ==========================================
-
 let arcadeMode = "";
 let arcadeCurrentOptions = [];
-let arcadeDeck = [];
-let arcadeCurrent = null;
-let arcadeLives = 3;
-let arcadeScore = 0;
-let arcadeLevel = 1;
-let arcadeY = 0;
-let arcadeX = 50;
-let arcadeSpeed = 0.8;
-let arcadeAnimId = null;
-let arcadeState = "PLAYING";
+let arcadeDeck = [], arcadeCurrent = null, arcadeLives = 3, arcadeScore = 0, arcadeLevel = 1, arcadeY = 0, arcadeX = 50, arcadeSpeed = 0.8, arcadeAnimId = null, arcadeState = "PLAYING";
 
 function stopArcadeLoop() {
   if (arcadeAnimId) { cancelAnimationFrame(arcadeAnimId); arcadeAnimId = null; }
@@ -65,7 +55,9 @@ function spawnArcadeWord() {
   }
   arcadeCurrent = arcadeDeck.pop();
   arcadeY = 5;
-  arcadeX = Math.floor(Math.random() * 64) + 18;
+  
+  // OPRAVA BUGU: Slovo už nevyletí mimo hranice. Bude se držet ve středních 40% obrazovky.
+  arcadeX = Math.floor(Math.random() * 40) + 30; 
   arcadeState = "PLAYING";
 
   if (arcadeMode === "TRANSLATE") {
@@ -80,21 +72,20 @@ function spawnArcadeWord() {
 function runArcadeLoop() {
   stopArcadeLoop();
   function step() {
-    if (currentScreen !== "PLAYING" || selectedGame !== "ARCADE" || arcadeState !== "PLAYING") return;
+    if (typeof currentScreen !== "undefined" && currentScreen !== "PLAYING") return;
+    if (typeof selectedGame !== "undefined" && selectedGame !== "ARCADE") return;
+    if (arcadeState !== "PLAYING") return;
     
-    // OPRAVA: Odstraněna kontrola isTimerPaused! 
-    // Arkáda nyní běží nezávisle na studijní časomíře.
-    arcadeY += arcadeSpeed;
-    const el = document.getElementById("arcade-falling-elem");
-    const playfield = document.getElementById("arcade-field");
-    
-    if (el && playfield && arcadeY >= playfield.clientHeight - el.clientHeight - 8) {
-      handleArcadeMiss();
-      return;
+    if (typeof isTimerPaused !== "undefined" && !isTimerPaused) {
+      arcadeY += arcadeSpeed;
+      const el = document.getElementById("arcade-falling-elem");
+      const playfield = document.getElementById("arcade-field");
+      if (el && playfield && arcadeY >= playfield.clientHeight - el.clientHeight - 8) {
+        handleArcadeMiss();
+        return;
+      }
+      if (el) el.style.top = arcadeY + "px";
     }
-    
-    if (el) el.style.top = arcadeY + "px";
-    
     arcadeAnimId = requestAnimationFrame(step);
   }
   arcadeAnimId = requestAnimationFrame(step);
@@ -132,6 +123,8 @@ function handleArcadeMiss() {
     const m = el.querySelector(".falling-main-word");
     if (m) m.innerText = arcadeCurrent.question;
   }
-  if (isAutoTTS && typeof speakWord === 'function') speakWord(arcadeCurrent.question, selectedSubject);
+  if (typeof isAutoTTS !== "undefined" && isAutoTTS && typeof speakWord === "function") {
+      speakWord(arcadeCurrent.question, selectedSubject);
+  }
   setTimeout(spawnArcadeWord, 1400);
 }
