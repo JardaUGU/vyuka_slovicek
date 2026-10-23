@@ -252,9 +252,34 @@ function nextStoryStep() {
   speakCurrentStoryLine();
 }
 
+// Spolehlivě zjistí, zda už byl příběh přečten (včera nebo dnes, na mobilu i PC)
+function isStoryCompleted(title, sItems) {
+  if (!currentUser || !title) return false;
+  const uKey = currentUser.name.toLowerCase().trim();
+  
+  // 1. Kontrola v localStorage
+  if (localStorage.getItem(`story_done_${uKey}_${title}`) === "1") return true;
+
+  // 2. Kontrola v tabulce Pokrok (Google Sheets) pod jakýmkoliv směrem
+  const userMap = (appData.progress && appData.progress[uKey]) ? appData.progress[uKey] : {};
+  for (let k in userMap) {
+    if (k.includes(title) && Number(userMap[k]) >= 1) return true;
+  }
+
+  // 3. Kontrola, zda už nejsou v Pokroku uložené samotné otázky z tohoto příběhu
+  if (sItems && sItems.length > 0) {
+    for (let it of sItems) {
+      if (getSavedMastery(it.question, "DIR_OUT") >= 1 || getSavedMastery(it.question, "STORY") >= 1) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 function finishStory() {
   const uKey = currentUser.name.toLowerCase().trim();
-  const alreadyDone = (typeof getSavedMastery === "function" && getSavedMastery(selectedGroupKey, "STORY") >= 2) || localStorage.getItem(`story_done_${uKey}_${selectedGroupKey}`) === "1";
+  const alreadyDone = isStoryCompleted(selectedGroupKey, storyList);
 
   if (!alreadyDone) {
     addCoins(currentUser.name, 10);
