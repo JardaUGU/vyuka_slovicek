@@ -444,23 +444,59 @@ function renderActiveGame() {
   }
 
   else if (selectedGame === "PROCEDURAL_MATH") {
-    const isAns = (typeof mathChosenAnswer !== "undefined" && mathChosenAnswer !== null);
-    main.innerHTML = `
-      <div class="bargraph-container">
-        <div class="bargraph-header">
-          <span>Série správně: ${typeof mathStreak !== "undefined" ? mathStreak : 0} 🔥</span>
-          <span style="color:var(--col-active-tab);">${selectedGroupKey}</span>
-        </div>
-        <div class="bargraph-track"><div class="bargraph-fill" style="width:${Math.min(100, (typeof mathStreak !== "undefined" ? mathStreak : 0) * 10)}%;"></div></div>
-      </div>
-      <div class="prompt-box" style="font-size:36px;color:#fff;margin:20px 0;">${typeof mathTask !== "undefined" ? mathTask.q : ""}</div>
-      <div class="grid-2">
-        ${(typeof mathTask !== "undefined" && mathTask.opts ? mathTask.opts : []).map(opt => `
-          <div class="opt-btn ${isAns ? (String(opt)===String(mathTask.ans)?'correct':(opt===mathChosenAnswer?'wrong':'')) : ''}" style="height:60px;font-size:26px;font-weight:bold;" onclick="clickMathChoice('${opt}')">${opt}</div>
-        `).join('')}
-      </div>
-      ${isAns ? `<div class="action-btn ${String(mathChosenAnswer)===String(mathTask.ans)?'green':'red'}" onclick="generateMathTask();renderActiveGame();">DALŠÍ PŘÍKLAD ➔</div>` : ''}
-    `;
+    // --- VYKRESLENÍ: KROKOVÉ ROVNICE ---
+    if (mathTask.type === "STEP_EQ") {
+        const isDone = mathTask.stepPhase === 2;
+        main.innerHTML = `
+          <div class="bargraph-container">
+            <div class="bargraph-header">
+              <span>Série správně: ${typeof mathStreak !== "undefined" ? mathStreak : 0} 🔥</span>
+              <span style="color:var(--col-active-tab);">${selectedGroupKey}</span>
+            </div>
+            <div class="bargraph-track"><div class="bargraph-fill" style="width:${Math.min(100, (typeof mathStreak !== "undefined" ? mathStreak : 0) * 10)}%;"></div></div>
+          </div>
+          
+          <div style="background:var(--col-card); border:1px solid var(--col-card-border); border-radius:10px; padding:20px; margin:15px 0; display:flex; flex-direction:column; gap:10px;">
+             ${mathTask.history.map((step, i) => `
+                <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:${i<mathTask.history.length-1 ? '1px solid #334155' : 'none'}; padding-bottom:${i<mathTask.history.length-1 ? '8px' : '0'};">
+                   <div style="font-size:26px; color:${i===mathTask.history.length-1 && isDone ? 'var(--col-green)' : '#fff'}; font-weight:bold;">${step.eq}</div>
+                   ${step.op ? `<div style="background:#1e293b; color:var(--col-yellow); padding:4px 10px; border-radius:6px; font-weight:bold;">| ${step.op}</div>` : ''}
+                </div>
+             `).join('')}
+          </div>
+
+          ${!isDone ? `
+             <p style="text-align:center; color:var(--col-text-muted); margin-bottom:8px;">Vyber operaci pro aplikaci na obě strany:</p>
+             <div class="grid-2">
+               ${mathTask.opts.map(opt => `
+                 <div class="opt-btn" style="height:55px; font-size:22px; font-weight:bold; font-family:monospace;" onclick="handleEqStepChoice('${opt}')">${opt}</div>
+               `).join('')}
+             </div>
+          ` : `
+             <div class="action-btn green" onclick="generateMathTask();renderActiveGame();">VÝBORNĚ! DALŠÍ ROVNICE ➔</div>
+          `}
+        `;
+    } 
+    // --- VYKRESLENÍ: STANDARDNÍ VÝPOČET (Zlomky, atd.) ---
+    else {
+        const isAns = (typeof mathChosenAnswer !== "undefined" && mathChosenAnswer !== null);
+        main.innerHTML = `
+          <div class="bargraph-container">
+            <div class="bargraph-header">
+              <span>Série správně: ${typeof mathStreak !== "undefined" ? mathStreak : 0} 🔥</span>
+              <span style="color:var(--col-active-tab);">${selectedGroupKey}</span>
+            </div>
+            <div class="bargraph-track"><div class="bargraph-fill" style="width:${Math.min(100, (typeof mathStreak !== "undefined" ? mathStreak : 0) * 10)}%;"></div></div>
+          </div>
+          <div class="prompt-box" style="font-size:36px; color:#fff; margin:20px 0; letter-spacing: 2px;">${mathTask.q}</div>
+          <div class="grid-2">
+            ${mathTask.opts.map(opt => `
+              <div class="opt-btn ${isAns ? (String(opt)===String(mathTask.ans)?'correct':(opt===mathChosenAnswer?'wrong':'')) : ''}" style="height:60px;font-size:26px;font-weight:bold;" onclick="clickMathChoice('${opt}')">${opt}</div>
+            `).join('')}
+          </div>
+          ${isAns ? `<div class="action-btn ${String(mathChosenAnswer)===String(mathTask.ans)?'green':'red'}" onclick="generateMathTask();renderActiveGame();">DALŠÍ PŘÍKLAD ➔</div>` : ''}
+        `;
+    }
   }
 
   else if (selectedGame === "SEQ") {
