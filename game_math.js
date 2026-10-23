@@ -117,7 +117,6 @@ function startMathPractice(opId, opTitle) {
 function generateMathTask() {
   mathChosenAnswer = null;
 
-  // NOVINKA: ZLOMKY NA PAPÍŘE (Hledání společného jmenovatele)
   if (mathOperation === "FRACTIONS_STEP") {
       let denoms = [2, 3, 4, 5, 6, 8, 10];
       let d1 = denoms[Math.floor(Math.random() * denoms.length)];
@@ -135,7 +134,7 @@ function generateMathTask() {
           q: `${renderSimpleFrac(a, d1)} ${isAdd ? '+' : '-'} ${renderSimpleFrac(b, d2)} &nbsp;=&nbsp; ?`,
           targetVal: targetVal,
           input: "", isDone: false,
-          history: [{ eq: `${a}/${d1} ${isAdd ? '+' : '-'} ${b}/${d2}`, op: null }]
+          history: [{ eq: `${renderSimpleFrac(a, d1)} ${isAdd ? '+' : '-'} ${renderSimpleFrac(b, d2)}`, op: null }]
       };
       return;
   }
@@ -198,23 +197,15 @@ function generateMathTask() {
   }
 }
 
-// LOGIKA KLÁVESNICE - Nyní aktualizuje přímo DOM bez poskakování obrazovky!
 window.clickMathKey = function(k) {
     if (mathTask.isDone) return;
+    if (k === '⌫') mathTask.input = (mathTask.input || "").slice(0, -1);
+    else mathTask.input = (mathTask.input || "") + k;
     
-    // Nové chování Backspace
-    if (k === '⌫') {
-        mathTask.input = (mathTask.input || "").slice(0, -1);
-    } else {
-        mathTask.input = (mathTask.input || "") + k;
-    }
-    
-    // Přímá aktualizace prvku (nepřekresluje se celá hra, takže obrazovka neskáče!)
     const inputEl = document.getElementById("math-keyboard-input");
     if (inputEl) {
-        if (mathTask.input) {
-            inputEl.innerHTML = mathTask.input;
-        } else {
+        if (mathTask.input) inputEl.innerHTML = mathTask.input;
+        else {
             let placeholder = "Zadej úpravu... např. /2, -3x";
             if (mathTask.type === "BUILD_EXPR") placeholder = "Zadej tvar... např. (x-5)*(x-5)";
             if (mathTask.type === "FRAC_STEP") placeholder = "Zadej mezikrok... např. 4/12+3/12";
@@ -239,14 +230,16 @@ window.handleEqStepChoice = function(opt) {
         
         if (val === null || isNaN(val) || !isFinite(val)) { 
             sndErr(); alert("Neplatný matematický zápis!"); 
-            // Očištění displeje pomocí renderActiveGame (zde je to žádoucí kvůli chybě)
             if (typeof renderActiveGame === 'function') renderActiveGame();
             return; 
         }
 
-        // Pokud je hodnota matematicky správně
+        // Magické zformátování uživatelského vstupu do krásných zlomků pro zobrazení v historii
+        let displayEq = cleanOpt.replace(/(\d+)\/(\d+)/g, (match, n, d) => {
+            return `<span style="display:inline-flex; flex-direction:column; text-align:center; vertical-align:middle; line-height:1.1; font-size:0.85em; margin: 0 4px;"><span style="border-bottom:2px solid currentColor; padding:0 3px;">${n}</span><span style="padding:0 3px;">${d}</span></span>`;
+        }).replace(/\+/g, ' + ').replace(/-/g, ' - ').replace(/^ \- /, '-');
+
         if (Math.abs(val - mathTask.targetVal) < 0.0001) {
-            // Kontrola, zda už to převedl na jediný zlomek v základním tvaru
             let finalMatch = cleanOpt.match(/^(-?\d+)(?:\/(\d+))?$/);
             if (finalMatch) {
                 let num = parseInt(finalMatch[1]);
@@ -254,20 +247,19 @@ window.handleEqStepChoice = function(opt) {
                 
                 if (gcd(Math.abs(num), Math.abs(den)) === 1) {
                     sndOk(); mathTask.isDone = true; mathStreak++; addReward(2, "Zlomky");
-                    mathTask.history.push({ eq: opt, op: "<span style='color:var(--col-green);'>✓ Hotovo</span>" });
+                    mathTask.history.push({ eq: displayEq, op: "<span style='color:var(--col-green);'>✓ Hotovo</span>" });
                 } else {
-                    sndErr(); alert("Hodnota je správně, ale zlomek není v základním tvaru! Zkrať ho.");
-                    if (typeof renderActiveGame === 'function') renderActiveGame();
-                    return;
+                    // Spočítáno správně, ale nezkráceno! Zapíšeme s varováním a ukážeme dítěti zlomek.
+                    playTone(500, 'sine', 0.05);
+                    mathTask.history.push({ eq: displayEq, op: "<span style='color:var(--col-orange);'>Zkrať na základní tvar!</span>" });
                 }
             } else {
                 playTone(500, 'sine', 0.05);
-                mathTask.history.push({ eq: opt, op: "✓ Správný mezikrok" });
+                mathTask.history.push({ eq: displayEq, op: "✓ Správný mezikrok" });
             }
         } else {
-            sndErr(); alert("Chyba ve výpočtu. Hodnota výrazu neodpovídá zadání!");
-            if (typeof renderActiveGame === 'function') renderActiveGame();
-            return;
+            sndErr(); // Špatný výpočet
+            mathTask.history.push({ eq: displayEq, op: "<span style='color:var(--col-red);'>Chyba ve výpočtu</span>" });
         }
         if (typeof renderActiveGame === 'function') renderActiveGame();
         return;
@@ -288,10 +280,11 @@ window.handleEqStepChoice = function(opt) {
                 mathTask.history.push({ eq: opt, op: "<span style='color:var(--col-green);'>✓ Hotovo</span>" });
             } else {
                 playTone(500, 'sine', 0.05);
-                mathTask.history.push({ eq: opt, op: "✓ Upravuj dál" });
+                mathTask.history.push({ eq: opt, op: "✓ Správný mezikrok" });
             }
         } else {
-            sndErr(); alert("Chyba ve výpočtu. Tento výraz není roven zadání!");
+            sndErr();
+            mathTask.history.push({ eq: opt, op: "<span style='color:var(--col-red);'>Není rovno zadání!</span>" });
         }
         if (typeof renderActiveGame === 'function') renderActiveGame();
         return;
