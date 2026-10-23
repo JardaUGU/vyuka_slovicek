@@ -142,31 +142,45 @@ function goBack() {
   if (typeof stopSnakeLoop === "function") stopSnakeLoop();
   if (typeof sendTimeHeartbeatToGoogle === "function") sendTimeHeartbeatToGoogle();
 
-  if (currentScreen === "PLAYING" && selectedGame === "PEXESO") setScreen("SELECT_PEXESO_SIZE");
-  else if (currentScreen === "PLAYING" && selectedGame === "SEQ" && getSeqItems().length > 1) setScreen("SELECT_SEQ_ITEM");
-  else if (currentScreen === "SELECT_PEXESO_SIZE" || currentScreen === "SELECT_SEQ_ITEM") setScreen("SELECT_GAME");
+  const isMinigame = (typeof isCampaignMinigame !== "undefined" && isCampaignMinigame);
+
+  if (currentScreen === "PLAYING" && (selectedGame === "CAMPAIGN" || selectedGame === "STORY" || isMinigame)) {
+    setScreen("CAMPAIGN_HUB");
+  }
+  else if (currentScreen === "PLAYING" && selectedGame === "PEXESO") {
+    setScreen("SELECT_PEXESO_SIZE");
+  }
+  else if (currentScreen === "PLAYING" && selectedGame === "SEQ" && getSeqItems().length > 1) {
+    setScreen("SELECT_SEQ_ITEM");
+  }
+  else if (currentScreen === "SELECT_PEXESO_SIZE" || currentScreen === "SELECT_SEQ_ITEM") {
+    setScreen("SELECT_GAME");
+  }
   else if (currentScreen === "PLAYING") {
-    if (selectedGame === "CAMPAIGN") setScreen("CAMPAIGN_HUB");
-    else if (selectedSubject === "Matematika") setScreen("SELECT_MATH_OP");
+    if (selectedSubject === "Matematika") setScreen("SELECT_MATH_OP");
     else setScreen("SELECT_GAME");
   }
   else if (currentScreen === "SHOP") {
     cancelPreview();
     setScreen("SELECT_SUBJECT");
   }
-  else if (currentScreen === "CAMPAIGN_HUB") setScreen("SELECT_SUBJECT"); 
-  else if (currentScreen === "SELECT_MATH_OP") setScreen("SELECT_SUBJECT");
+  else if (currentScreen === "CAMPAIGN_HUB" || currentScreen === "SELECT_MATH_OP") {
+    setScreen("SELECT_SUBJECT");
+  }
   else if (currentScreen === "SELECT_GAME") {
-    // Oprava: Pokud jsme se sem dostali z Příběhu na Cestě
     const sLow = (selectedSubject || "").toLowerCase();
     if (sLow.includes("cesta") || sLow.includes("postupn") || sLow.includes("inteligentn")) {
-        setScreen("CAMPAIGN_HUB");
+      setScreen("CAMPAIGN_HUB");
     } else {
-        setScreen("SELECT_GROUP");
+      setScreen("SELECT_GROUP");
     }
   }
-  else if (currentScreen === "SELECT_GROUP") setScreen("SELECT_SUBJECT");
-  else if (currentScreen === "SELECT_SUBJECT") setScreen("SELECT_USER");
+  else if (currentScreen === "SELECT_GROUP") {
+    setScreen("SELECT_SUBJECT");
+  }
+  else if (currentScreen === "SELECT_SUBJECT") {
+    setScreen("SELECT_USER");
+  }
 }
 
 function startGame(game) { 
@@ -717,7 +731,80 @@ function renderActiveGame() {
        setTimeout(() => { if(typeof attachSnakeTouchHandlers === 'function') attachSnakeTouchHandlers(); }, 50);
     }
   }
+  // PŘÍBĚHY (INTERAKTIVNÍ ČTENÍ)
+  else if (selectedGame === "STORY") {
+    if (storyStep >= storyList.length) {
+      const uKey = currentUser.name.toLowerCase().trim();
+      const alreadyDone = (typeof getSavedMastery === "function" && getSavedMastery(selectedGroupKey, "STORY") >= 2) || localStorage.getItem(`story_done_${uKey}_${selectedGroupKey}`) === "1";
+      
+      main.innerHTML = `
+        <div style="text-align:center;padding:30px;">
+          <h2 style="color:var(--col-green);font-size:28px;margin-bottom:10px;">PŘÍBĚH DOKONČEN! 🎉</h2>
+          <p style="font-size:18px;color:inherit;margin-bottom:20px;">Skvělá práce při čtení příběhu <b>${selectedGroupKey}</b>.</p>
+          ${!alreadyDone ? `
+            <p style="font-size:24px;color:var(--col-yellow);font-weight:bold;margin-bottom:25px;">Získáváš odměnu: +10 💰</p>
+          ` : `
+            <p style="font-size:16px;color:var(--col-text-muted);margin-bottom:25px;">Tento příběh už máš splněný (odměna již byla vyplacena).</p>
+          `}
+          <div class="action-btn green" onclick="finishStory()">${!alreadyDone ? 'VYinkasovat 10 💰 A ZPĚT' : 'ZPĚT NA CESTU'}</div>
+        </div>
+      `;
+      return;
+    }
 
+    const item = storyList[storyStep];
+    const pct = Math.round(((storyStep + 1) / storyList.length) * 100);
+    const hasOpts = item.options && item.options.length > 0;
+
+    let promptDisplay = formatPromptText(item.question);
+    if (hasOpts && storyAnswered && item.question.includes('___')) {
+      const fillHtml = `<span style="color:var(--col-green);font-weight:bold;text-decoration:underline;">${item.answer}</span>`;
+      promptDisplay = formatPromptText(item.question.replace(/___+/g, fillHtml));
+    }
+
+    const sentenceToRead = (item.question.includes('___') && (!hasOpts || storyAnswered))
+      ? item.question.replace(/___+/g, item.answer).replace(/[*_]/g, '').replace(/'/g, "\\'")
+      : item.question.replace(/[*_]/g, '').replace(/'/g, "\\'");
+
+    main.innerHTML = `
+      <div class="bargraph-container">
+        <div class="bargraph-header">
+          <span>📖 ${selectedGroupKey} (${storyStep + 1} / ${storyList.length})</span>
+          <span style="color:var(--col-active-tab);">${pct} %</span>
+        </div>
+        <div class="bargraph-track"><div class="bargraph-fill" style="width:${pct}%;"></div></div>
+      </div>
+
+      <div class="prompt-box" style="font-size:22px;color:inherit;margin:15px 0;line-height:1.5;padding:20px;">
+        ${promptDisplay}
+        <span class="audio-btn" onclick="speakWord('${sentenceToRead}', '${selectedSubject}')">🔊</span>
+      </div>
+
+      ${!hasOpts ? `
+        ${item.answer ? `
+          <div class="prompt-box" style="font-size:18px;color:var(--col-text-muted);cursor:pointer;" onclick="storyShowTrans=!storyShowTrans;renderActiveGame();">
+            ${storyShowTrans ? cleanCzechTranslation(item.answer) : '🇨🇿 Klikni pro zobrazení překladu'}
+          </div>
+        ` : ''}
+        <div class="action-btn green" style="margin-top:15px;" onclick="nextStoryStep()">POKRAČOVAT ➔</div>
+      ` : `
+        <div class="grid-2">
+          ${item.options.map((opt, idx) => {
+            let btnCls = "";
+            if (storyAnswered) {
+              if (opt === item.answer) btnCls = "correct";
+              else if (opt === storyChosenOpt) btnCls = "wrong";
+            }
+            return `<div class="opt-btn ${btnCls}" onclick="clickStoryOpt(${idx})">${opt}</div>`;
+          }).join('')}
+        </div>
+        ${storyAnswered ? `
+          ${item.help ? `<div style="text-align:center;color:var(--col-yellow);margin:12px 0;font-size:16px;font-weight:bold;">🇨🇿 ${item.help}</div>` : ''}
+          <div class="action-btn green" style="margin-top:15px;" onclick="nextStoryStep()">POKRAČOVAT ➔</div>
+        ` : ''}
+      `}
+    `;
+  }
   else if (selectedGame === "CAMPAIGN") {
     if (cmpIdx >= cmpQueue.length) {
       launchCampaignMinigame();
