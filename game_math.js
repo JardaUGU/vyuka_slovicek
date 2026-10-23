@@ -1,5 +1,5 @@
 /**
- * PROCEDURÁLNÍ MATEMATIKA A ALGEBRAICKÝ ENGINE (ROVNICE, VÝRAZY, ZLOMKY)
+ * PROCEDURÁLNÍ MATEMATIKA A ALGEBRAICKÝ ENGINE (ROVNICE, VÝRAZY, PRAVÉ ZLOMKY)
  */
 let mathOperation = "MIX";
 let mathTask = { type: "NORMAL", q: "2 + 2 = ?", ans: 4, opts: [2, 3, 4, 5] };
@@ -20,56 +20,53 @@ function fSub(a, b) { return frac(a.n * b.d - b.n * a.d, a.d * b.d); }
 function fMul(a, b) { return frac(a.n * b.n, a.d * b.d); }
 function fDiv(a, b) { return frac(a.n * b.d, a.d * b.n); }
 
+// Nádherné formátování zlomků do pravého HTML tvaru (čitatel nad jmenovatelem)
 function formatFrac(f, isX, isFirst) {
     if (f.n === 0) return "";
-    let s = "";
     let absN = Math.abs(f.n);
-    let numStr = (f.d === 1) ? `${absN}` : `${absN}/${f.d}`;
-    if (isX) {
-        if (numStr === "1") numStr = "x";
-        else numStr += "x";
+    let signStr = f.n < 0 ? (isFirst ? "-" : " - ") : (isFirst ? "" : " + ");
+    
+    if (f.d === 1) {
+        let numStr = (absN === 1 && isX) ? "" : `${absN}`;
+        return signStr + numStr + (isX ? "x" : "");
+    } else {
+        let xStr = isX ? `<span style="margin-left:3px; font-size:1.1em;">x</span>` : "";
+        let numStr = (isX && absN === 1) ? "1" : absN;
+        let fracHtml = `<span style="display:inline-flex; align-items:center; vertical-align:middle; line-height:1.1; margin: 0 2px;">
+                          <span style="display:inline-flex; flex-direction:column; text-align:center; font-size:0.75em;">
+                             <span style="border-bottom:2px solid currentColor; padding:0 3px;">${numStr}</span>
+                             <span style="padding:0 3px;">${f.d}</span>
+                          </span>
+                          ${xStr}
+                        </span>`;
+        return signStr + fracHtml;
     }
-    if (f.n < 0) { s = isFirst ? `-${numStr}` : `- ${numStr}`; } 
-    else { s = isFirst ? `${numStr}` : `+ ${numStr}`; }
-    return s;
+}
+
+function renderSimpleFrac(n, d) {
+    return `<span style="display:inline-flex; flex-direction:column; text-align:center; vertical-align:middle; line-height:1.1; font-size:0.75em; margin: 0 4px;">
+               <span style="border-bottom:2px solid currentColor; padding:0 3px;">${n}</span>
+               <span style="padding:0 3px;">${d}</span>
+            </span>`;
 }
 
 function formatSide(fx, fn) {
     if (fx.n === 0 && fn.n === 0) return "0";
-    let res = [];
-    if (fx.n !== 0) {
-        res.push(formatFrac(fx, true, true));
-        if (fn.n !== 0) res.push(formatFrac(fn, false, false));
-    } else {
-        res.push(formatFrac(fn, false, true));
-    }
-    return res.join(" ");
+    let res = "";
+    let hasFirst = false;
+    if (fx.n !== 0) { res += formatFrac(fx, true, true); hasFirst = true; }
+    if (fn.n !== 0) { res += formatFrac(fn, false, !hasFirst); }
+    return res;
 }
 
 function formatEq(state) {
-    return `${formatSide(state.lx, state.ln)} = ${formatSide(state.rx, state.rn)}`;
+    return `${formatSide(state.lx, state.ln)} &nbsp;=&nbsp; ${formatSide(state.rx, state.rn)}`;
 }
 
-// Zobrazení pro "skládání výrazů" (např. x² + 6x + 9)
-function formatExprState(s) {
-    let parts = [];
-    if (s.x2 !== 0) {
-        if (s.x2 === 1) parts.push("x²");
-        else if (s.x2 === -1) parts.push("-x²");
-        else parts.push(`${s.x2}x²`);
-    }
-    if (s.x !== 0) {
-        let absX = Math.abs(s.x);
-        let xStr = (absX === 1) ? "x" : `${absX}x`;
-        if (parts.length > 0) parts.push(s.x > 0 ? `+ ${xStr}` : `- ${xStr}`);
-        else parts.push(s.x > 0 ? `${xStr}` : `-${xStr}`);
-    }
-    if (s.n !== 0) {
-        if (parts.length > 0) parts.push(s.n > 0 ? `+ ${s.n}` : `- ${Math.abs(s.n)}`);
-        else parts.push(`${s.n}`);
-    }
-    if (parts.length === 0) return "0";
-    return parts.join(" ");
+// Inteligentní vyhodnocení výrazu pro Algebraické Výrazy
+function evalExpr(str, xVal) {
+    let s = str.replace(/x²/g, `(${xVal}*${xVal})`).replace(/(\d)x/g, `$1*${xVal}`).replace(/x/g, `(${xVal})`);
+    try { return new Function('return ' + s)(); } catch(e) { return null; }
 }
 
 // --- HLAVNÍ LOGIKA ---
@@ -77,14 +74,13 @@ function openMathOperationSelect() { selectedSubject = "Matematika"; setScreen("
 
 function renderMathOpSelection() {
   const main = document.getElementById("main-content");
-  
   let ops = [
-    { id: "EQ_KEYBOARD", title: "Krokové rovnice 🔥", desc: "Řeš oboustrannými úpravami pomocí klávesnice." },
-    { id: "EQ_FRACTIONS", title: "Rovnice se zlomky", desc: "Nácvik odstranění zlomku z rovnice." },
-    { id: "EXPR_QUADRATIC", title: "Algebraické výrazy", desc: "Roznásobování výrazů (x+a)² z klávesnice." },
-    { id: "EQ_STEP", title: "Rovnice (Nácvik)", desc: "Jednodušší mód s nabídkou 4 možností úprav." },
-    { id: "FRACTIONS", title: "Zlomky (+ a -)", desc: "Sčítání a odčítání zlomků" },
-    { id: "PERCENTAGES", title: "Procenta", desc: "Výpočet procentové části z celku" }
+    { id: "EXPR_QUADRATIC", title: "Algebraické výrazy", desc: "Zadávej libovolné mezikroky roznásobení (x+a)²." },
+    { id: "EQ_KEYBOARD", title: "Rovnice (Klávesnice)", desc: "Upravuj libovolně obě strany rovnice přes klávesnici." },
+    { id: "EQ_FRACTIONS", title: "Rovnice se zlomky", desc: "Zkus si vynásobit rovnici jmenovatelem." },
+    { id: "FRACTIONS", title: "Sčítání zlomků", desc: "Klasické operace se zlomky" },
+    { id: "ADD_SUB_20_NO", title: "+ a - do 20", desc: "12 + 5, 17 - 4" },
+    { id: "MUL_SMALL", title: "Malá násobilka", desc: "Základy násobení" }
   ];
 
   main.innerHTML = `
@@ -101,29 +97,25 @@ function renderMathOpSelection() {
 }
 
 function startMathPractice(opId, opTitle) {
-  mathOperation = opId;
-  selectedGroupKey = opTitle;
-  selectedGame = "PROCEDURAL_MATH";
-  mathStreak = 0;
-  generateMathTask();
-  setScreen("PLAYING");
+  mathOperation = opId; selectedGroupKey = opTitle; selectedGame = "PROCEDURAL_MATH"; mathStreak = 0; generateMathTask(); setScreen("PLAYING");
 }
 
 function generateMathTask() {
   mathChosenAnswer = null;
   
   if (mathOperation === "EXPR_QUADRATIC") {
-      let a = Math.floor(Math.random() * 5) + 1; 
+      let a = Math.floor(Math.random() * 6) + 1; 
       let isPlus = Math.random() > 0.5;
-      let signStr = isPlus ? '+' : '-';
+      let b = isPlus ? 2*a : -2*a;
+      let c = a*a;
+      let targetCanonical = `x²${b>0?'+':''}${b}x+${c}`;
+      
       mathTask = {
           type: "BUILD_EXPR",
-          q: `(x ${signStr} ${a})² = ?`,
-          ans: { x2: 1, x: isPlus ? 2*a : -2*a, n: a*a },
-          state: { x2: 0, x: 0, n: 0 },
-          input: "",
-          isDone: false,
-          history: [{ eq: "0", op: null }]
+          q: `(x ${isPlus ? '+' : '-'} ${a})² &nbsp;=&nbsp; ?`,
+          target: targetCanonical.replace(/\s+/g, ''),
+          input: "", isDone: false,
+          history: [{ eq: `(x ${isPlus ? '+' : '-'} ${a})²`, op: null }]
       };
       return;
   }
@@ -134,41 +126,31 @@ function generateMathTask() {
       let d2 = denoms[Math.floor(Math.random()*denoms.length)];
       let xAns = Math.floor(Math.random()*6)+1; 
       let lx = frac(1, d1);
-      let ln = frac(Math.floor(Math.random()*d2)+1, d2);
-      if (Math.random() > 0.5) ln.n *= -1;
-      
-      let xFrac = frac(xAns, 1);
-      let term1 = fMul(lx, xFrac);
-      let rn = fAdd(term1, ln);
+      let ln = frac(Math.floor(Math.random()*d2)+1, d2); if (Math.random() > 0.5) ln.n *= -1;
+      let rn = fAdd(fMul(lx, frac(xAns)), ln);
       
       mathTask = {
           type: "STEP_EQ", mode: "KEYBOARD", input: "", ans: xAns, isDone: false,
-          eqState: { lx: lx, ln: ln, rx: frac(0), rn: rn },
-          history: [], opts: []
+          eqState: { lx: lx, ln: ln, rx: frac(0), rn: rn }, history: [], opts: []
       };
       mathTask.history.push({ eq: formatEq(mathTask.eqState), op: null });
       return;
   }
 
-  if (mathOperation === "EQ_STEP" || mathOperation === "EQ_KEYBOARD") {
+  if (mathOperation === "EQ_KEYBOARD") {
       let a = Math.floor(Math.random() * 5) + 2; 
       let x = Math.floor(Math.random() * 9) + 1; 
       let b = (Math.floor(Math.random() * 15) + 1) * (Math.random() > 0.5 ? 1 : -1);
-      let c = (a * x) + b;
-
+      
       mathTask = {
-          type: "STEP_EQ",
-          mode: mathOperation === "EQ_KEYBOARD" ? "KEYBOARD" : "CHOICE",
-          input: "", ans: x, isDone: false,
-          eqState: { lx: frac(a), ln: frac(b), rx: frac(0), rn: frac(c) },
-          history: [], opts: []
+          type: "STEP_EQ", mode: "KEYBOARD", input: "", ans: x, isDone: false,
+          eqState: { lx: frac(a), ln: frac(b), rx: frac(0), rn: frac((a * x) + b) }, history: [], opts: []
       };
       mathTask.history.push({ eq: formatEq(mathTask.eqState), op: null });
-      if (mathTask.mode === "CHOICE") generateEqStepOptions();
       return;
   }
 
-  // BĚŽNÁ MATEMATIKA (Zlomky, procenta...)
+  // STANDARD MATEMATIKA S HEZKÝMI ZLOMKY
   let a, b, ans;
   if (mathOperation === "FRACTIONS") {
       let d = [2, 3, 4, 5, 8][Math.floor(Math.random() * 5)];
@@ -180,53 +162,18 @@ function generateMathTask() {
       
       let optSet = new Set([cStr]);
       while (optSet.size < 4) {
-         let fake = ans + Math.floor(Math.random() * 5) - 2;
-         if (fake < 0) fake += 3;
+         let fake = ans + Math.floor(Math.random() * 5) - 2; if (fake < 0) fake += 3;
          let fStr = `${fake}/${d}`; if (fake === 0) fStr = "0"; if (fake === d) fStr = "1";
          optSet.add(fStr);
       }
-      mathTask = { type: "NORMAL", q: `${a}/${d} ${isAdd ? '+' : '-'} ${b}/${d} = ?`, ans: cStr, opts: Array.from(optSet).sort(()=>Math.random()-0.5) };
-  } else if (mathOperation === "PERCENTAGES") {
-      let p = [10, 20, 25, 50, 75][Math.floor(Math.random() * 5)];
-      let base = [100, 200, 400, 50, 150][Math.floor(Math.random() * 5)];
-      ans = (p / 100) * base;
-      mathTask = { type: "NORMAL", q: `${p}% z ${base} = ?`, ans: ans, opts: makeNumOpts(ans, base > 100 ? 10 : 5) };
+      mathTask = { type: "NORMAL", q: `${renderSimpleFrac(a,d)} ${isAdd ? '+' : '-'} ${renderSimpleFrac(b,d)} &nbsp;=&nbsp; ?`, ans: cStr, opts: Array.from(optSet).sort(()=>Math.random()-0.5) };
+  } else {
+      a = Math.floor(Math.random() * 9) + 2; b = Math.floor(Math.random() * 9) + 2;
+      mathTask = { type: "NORMAL", q: `${a} · ${b} = ?`, ans: a * b, opts: makeNumOpts(a * b) };
   }
 }
 
-function generateEqStepOptions() {
-    let pool = new Set();
-    let s = mathTask.eqState;
-    let optimalOp = "";
-    
-    let fracToOpStr = (f, isX, invert) => {
-        let n = f.n; if (invert) n = -n;
-        let sign = n < 0 ? "- " : "+ ";
-        n = Math.abs(n);
-        let dStr = (f.d === 1) ? `${n}` : `${n}/${f.d}`;
-        if (isX) dStr = (dStr === "1" ? "x" : dStr + "x");
-        return sign + dStr;
-    };
-
-    if (s.rx.n !== 0) optimalOp = fracToOpStr(s.rx, true, true);
-    else if (s.ln.n !== 0) optimalOp = fracToOpStr(s.ln, false, true);
-    else if (s.lx.n !== 0 && (s.lx.n !== s.lx.d)) {
-        let n = Math.abs(s.lx.n); let d = s.lx.d;
-        let valStr = d === 1 ? `${n}` : `${n}/${d}`;
-        optimalOp = (s.lx.n * s.lx.d < 0 ? "/ -" : "/ ") + valStr;
-    } else if (s.lx.n === 0 && s.rx.n === 0) optimalOp = "+ 1x"; 
-    
-    if (optimalOp) pool.add(optimalOp);
-    let operators = ['+', '-', '*', '/'];
-    while (pool.size < 4) {
-        let op = operators[Math.floor(Math.random() * 4)];
-        let v = Math.floor(Math.random() * 9) + 1;
-        let isX = (op === '+' || op === '-') && Math.random() > 0.5;
-        pool.add(`${op} ${v}${isX ? 'x' : ''}`);
-    }
-    mathTask.opts = Array.from(pool).sort(() => Math.random() - 0.5);
-}
-
+// LOGIKA KLÁVESNICE
 window.clickMathKey = function(k) {
     if (mathTask.isDone) return;
     if (k === 'C') mathTask.input = "";
@@ -236,64 +183,48 @@ window.clickMathKey = function(k) {
 
 window.submitMathKey = function() {
     if (!mathTask.input) return;
-    let opt = mathTask.input;
-    mathTask.input = "";
-    handleEqStepChoice(opt);
+    let opt = mathTask.input; mathTask.input = ""; handleEqStepChoice(opt);
 };
 
 window.handleEqStepChoice = function(opt) {
     if (mathTask.isDone) return;
     let cleanOpt = opt.replace(/\s+/g, '');
     
-    // ZPRACOVÁNÍ VÝRAZŮ (x² + 6x + 9)
+    // ZPRACOVÁNÍ VÝRAZŮ (Nová svobodná algebra!)
     if (mathTask.type === "BUILD_EXPR") {
-        let match = cleanOpt.match(/^([+\-])?(\d*)(x²|x2|x)?$/i);
-        if (match) {
-            let op = match[1] || '+';
-            let numStr = match[2];
-            let typeStr = (match[3] || '').toLowerCase();
-            let num = 1;
-            if (numStr) num = parseInt(numStr);
-            else if (!typeStr) { sndErr(); alert("Neplatný zápis! Zadej např. +x²"); return; }
-            if (op === '-') num *= -1;
-            
-            let s = { ...mathTask.state };
-            if (typeStr === 'x²' || typeStr === 'x2') s.x2 += num;
-            else if (typeStr === 'x') s.x += num;
-            else s.n += num;
-            
-            let opDisplay = `${op} ${numStr}${typeStr === 'x2' ? 'x²' : typeStr}`;
-            mathTask.history[mathTask.history.length - 1].op = opDisplay;
-            mathTask.state = s;
-            mathTask.history.push({ eq: formatExprState(s), op: null });
-            
-            if (s.x2 === mathTask.ans.x2 && s.x === mathTask.ans.x && s.n === mathTask.ans.n) {
+        let val10 = evalExpr(cleanOpt, 10);
+        let valM7 = evalExpr(cleanOpt, -7);
+        if (val10 === null) { sndErr(); alert("Neplatný matematický zápis! Zkus to jinak."); return; }
+        
+        let target10 = evalExpr(mathTask.target, 10);
+        let targetM7 = evalExpr(mathTask.target, -7);
+        
+        if (Math.abs(val10 - target10) < 0.001 && Math.abs(valM7 - targetM7) < 0.001) {
+            if (cleanOpt === mathTask.target) {
                 sndOk(); mathTask.isDone = true; mathStreak++; addReward(2, "Výrazy");
-            } else { playTone(500, 'sine', 0.05); }
-            if (typeof renderActiveGame === 'function') renderActiveGame();
-            return;
+                mathTask.history.push({ eq: opt, op: "<span style='color:var(--col-green);'>✓ Hotovo</span>" });
+            } else {
+                playTone(500, 'sine', 0.05);
+                mathTask.history.push({ eq: opt, op: "✓ Upravuj dál" });
+            }
         } else {
-            sndErr(); alert("Zadej platný člen (např. +x², -6x, +9)"); return;
+            sndErr(); alert("Chyba ve výpočtu. Tento výraz není roven zadání!");
         }
+        if (typeof renderActiveGame === 'function') renderActiveGame();
+        return;
     }
 
     // ZPRACOVÁNÍ ROVNIC
     let match = cleanOpt.match(/^([+\-*/])(-?)(\d*)(\/\d+)?(x?)$/i);
     if (match) {
-        let op = match[1];
-        let isNeg = match[2] === '-';
-        let numStr = match[3];
-        let denStr = match[4];
-        let isX = match[5].toLowerCase() === 'x';
-        
+        let op = match[1]; let isNeg = match[2] === '-'; let numStr = match[3]; let denStr = match[4]; let isX = match[5].toLowerCase() === 'x';
         let num = 1;
-        if (numStr) num = parseInt(numStr);
-        else if (!isX) { sndErr(); alert("Zadej znaménko a číslo (např. +5, /2)"); return; }
+        if (numStr) num = parseInt(numStr); else if (!isX) { sndErr(); alert("Zadej znaménko a číslo (např. +5, /2)"); return; }
         num *= (isNeg ? -1 : 1);
         let den = denStr ? parseInt(denStr.substring(1)) : 1;
         let valF = frac(num, den);
         
-        if ((op === '*' || op === '/') && isX) { sndErr(); alert("Násobení/dělení neznámou 'x' zatím není podporováno."); return; }
+        if ((op === '*' || op === '/') && isX) { sndErr(); alert("Násobení/dělení neznámou 'x' zatím není povoleno."); return; }
         if (op === '/' && valF.n === 0) { sndErr(); alert("Nulou nelze dělit!"); return; }
 
         let opDisplay = `${op} ${isNeg?'-':''}${numStr}${denStr||''}${isX?'x':''}`;
@@ -301,17 +232,13 @@ window.handleEqStepChoice = function(opt) {
         
         let s = mathTask.eqState;
         if (op === '+') {
-            if (isX) { s.lx = fAdd(s.lx, valF); s.rx = fAdd(s.rx, valF); }
-            else     { s.ln = fAdd(s.ln, valF); s.rn = fAdd(s.rn, valF); }
+            if (isX) { s.lx = fAdd(s.lx, valF); s.rx = fAdd(s.rx, valF); } else { s.ln = fAdd(s.ln, valF); s.rn = fAdd(s.rn, valF); }
         } else if (op === '-') {
-            if (isX) { s.lx = fSub(s.lx, valF); s.rx = fSub(s.rx, valF); }
-            else     { s.ln = fSub(s.ln, valF); s.rn = fSub(s.rn, valF); }
+            if (isX) { s.lx = fSub(s.lx, valF); s.rx = fSub(s.rx, valF); } else { s.ln = fSub(s.ln, valF); s.rn = fSub(s.rn, valF); }
         } else if (op === '*') {
-            s.lx = fMul(s.lx, valF); s.ln = fMul(s.ln, valF);
-            s.rx = fMul(s.rx, valF); s.rn = fMul(s.rn, valF);
+            s.lx = fMul(s.lx, valF); s.ln = fMul(s.ln, valF); s.rx = fMul(s.rx, valF); s.rn = fMul(s.rn, valF);
         } else if (op === '/') {
-            s.lx = fDiv(s.lx, valF); s.ln = fDiv(s.ln, valF);
-            s.rx = fDiv(s.rx, valF); s.rn = fDiv(s.rn, valF);
+            s.lx = fDiv(s.lx, valF); s.ln = fDiv(s.ln, valF); s.rx = fDiv(s.rx, valF); s.rn = fDiv(s.rn, valF);
         }
         
         let isXLeft = (s.lx.n === s.lx.d && s.lx.n !== 0 && s.ln.n === 0 && s.rx.n === 0);
@@ -319,16 +246,10 @@ window.handleEqStepChoice = function(opt) {
         
         mathTask.history.push({ eq: formatEq(s), op: null });
         
-        if (isXLeft || isXRight) {
-            sndOk(); mathTask.isDone = true; mathStreak++; addReward(2, "Rovnice"); 
-        } else {
-            playTone(500, 'sine', 0.05); 
-            if (mathTask.mode === "CHOICE") generateEqStepOptions();
-        }
+        if (isXLeft || isXRight) { sndOk(); mathTask.isDone = true; mathStreak++; addReward(2, "Rovnice"); } 
+        else { playTone(500, 'sine', 0.05); }
         if(typeof renderActiveGame === 'function') renderActiveGame();
-    } else {
-        sndErr(); alert("Nerozumím zápisu. (Zkus např. +5, /2, -3x, +x²)");
-    }
+    } else { sndErr(); alert("Nerozumím zápisu. (Zkus např. +5, /2, -3x)"); }
 };
 
 function makeNumOpts(correct, step = 1) {
@@ -344,8 +265,7 @@ function makeNumOpts(correct, step = 1) {
 function clickMathChoice(opt) {
   if (mathChosenAnswer !== null) return;
   mathChosenAnswer = opt;
-  if (String(opt) === String(mathTask.ans)) {
-    sndOk(); mathStreak++; addReward(1, "Matematika");
-  } else { sndErr(); mathStreak = 0; }
+  if (String(opt) === String(mathTask.ans)) { sndOk(); mathStreak++; addReward(1, "Matematika"); } 
+  else { sndErr(); mathStreak = 0; }
   renderActiveGame();
 }
