@@ -233,14 +233,16 @@ function clickStoryOpt(optIdx) {
     sndErr();
   }
 
-  // Přečtení celé doplněné věty
+  // OPRAVA: Přečte větu POUZE tehdy, pokud je to doplňovačka anglického textu (obsahuje '___')
+  // Pokud tam '___' není, jde o českou kontrolní otázku, takže TTS mlčí.
   if (typeof isAutoTTS !== "undefined" && isAutoTTS) {
-    let fullSentence = item.question.includes('___') 
-      ? item.question.replace(/___+/g, item.answer) 
-      : item.question;
-    speakWord(fullSentence.replace(/[*_]/g, ''), selectedSubject);
+    if (item.question.includes('___')) {
+      let fullSentence = item.question.replace(/___+/g, item.answer);
+      speakWord(fullSentence.replace(/[*_]/g, ''), selectedSubject);
+    }
   }
-  renderActiveGame();
+  
+  if (typeof renderActiveGame === 'function') renderActiveGame();
 }
 
 function nextStoryStep() {
