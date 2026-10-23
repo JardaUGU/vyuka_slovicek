@@ -741,7 +741,7 @@ function renderActiveGame() {
   else if (selectedGame === "STORY") {
     if (storyStep >= storyList.length) {
       const uKey = currentUser.name.toLowerCase().trim();
-      const alreadyDone = (typeof getSavedMastery === "function" && getSavedMastery(selectedGroupKey, "STORY") >= 2) || localStorage.getItem(`story_done_${uKey}_${selectedGroupKey}`) === "1";
+      const alreadyDone = (typeof isStoryCompleted === "function") && isStoryCompleted(selectedGroupKey, storyList);
       
       main.innerHTML = `
         <div style="text-align:center;padding:30px;">
