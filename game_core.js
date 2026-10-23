@@ -1,6 +1,3 @@
-/**
- * SDÍLENÉ HERNÍ JÁDRO: VÝSLOVNOST (TTS), ZVUKY, UKLÁDÁNÍ POSTUPU A VYKRESLOVÁNÍ HER
- */
 let isAutoTTS = localStorage.getItem("auto_tts") !== "false";
 let cachedVoices = [];
 
@@ -33,7 +30,8 @@ function speakWord(text, subjectName) {
   window.speechSynthesis.cancel();
   
   setTimeout(() => {
-    let toSpeak = text.replace(/\s*\([^)]*\)/gi, '').trim();
+    // Odstranil jsem stripování závorek - závorky budou zachovány
+    let toSpeak = text.trim();
     toSpeak = toSpeak.replace(/ליהוה/g, 'לַאדֹנָי').replace(/יהוה/g, 'אֲדֹנָי').replace(/L'?(Jahve|Jahveh|Yahweh|Yahwe|Jehova|JHVH|YHWH|JVHV)/gi, "L'Adonaj");
     if (/read\s*-\s*read\s*-\s*read/i.test(toSpeak)) toSpeak = "read, red, red";
     else toSpeak = toSpeak.replace(/\//g, ' or ').replace(/\s*-\s*/g, ', ');
@@ -143,14 +141,11 @@ function goBack() {
   if (typeof stopSnakeLoop === "function") stopSnakeLoop();
   if (typeof sendTimeHeartbeatToGoogle === "function") sendTimeHeartbeatToGoogle();
 
-  const sLow = (selectedSubject || "").toLowerCase();
-  const isCesta = sLow.includes("cesta") || sLow.includes("postupn") || sLow.includes("inteligentn");
-
-  if (currentScreen === "PLAYING" && selectedGame === "PEXESO" && !isCampaignMinigame) setScreen("SELECT_PEXESO_SIZE");
+  if (currentScreen === "PLAYING" && selectedGame === "PEXESO") setScreen("SELECT_PEXESO_SIZE");
   else if (currentScreen === "PLAYING" && selectedGame === "SEQ" && getSeqItems().length > 1) setScreen("SELECT_SEQ_ITEM");
   else if (currentScreen === "SELECT_PEXESO_SIZE" || currentScreen === "SELECT_SEQ_ITEM") setScreen("SELECT_GAME");
   else if (currentScreen === "PLAYING") {
-    if (selectedGame === "CAMPAIGN" || isCesta) setScreen("CAMPAIGN_HUB");
+    if (selectedGame === "CAMPAIGN") setScreen("CAMPAIGN_HUB");
     else if (selectedSubject === "Matematika") setScreen("SELECT_MATH_OP");
     else setScreen("SELECT_GAME");
   }
@@ -174,19 +169,12 @@ function startGame(game) {
   setScreen("PLAYING"); 
 }
 
-// ==========================================
-// HLAVNÍ VYKRESLOVÁNÍ AKTIVNÍCH HER
-// ==========================================
 function renderActiveGame() {
   const main = document.getElementById("main-content");
   if (!main) return;
   const isHebrew = (selectedSubject || '').toLowerCase().includes('hebr') || selectedSubject === 'HE';
   const vItems = getVocabItems();
   const sItems = getSeqItems();
-
-  // Dynamická barva pro světlý Arktický vzhled
-  const activeTheme = document.body.getAttribute('data-theme') || 'default';
-  const colorWhite = (activeTheme === 'arctic') ? '#0c4a6e' : '#fff';
 
   if (selectedGame === "CARDS") {
     const w = vItems[vCardIdx];
@@ -202,7 +190,7 @@ function renderActiveGame() {
       <div class="prompt-box ${isHebrew ? 'hebrew-text' : ''}">
         ${w.question} <span class="audio-btn" onclick="speakCurrentCard()">🔊</span>
       </div>
-      <div class="prompt-box" style="color:${colorWhite};">${cleanCzechTranslation(w.answer)}</div>
+      <div class="prompt-box" style="color:#fff;">${cleanCzechTranslation(w.answer)}</div>
       ${w.help ? `<div style="text-align:center;color:var(--col-active-tab);font-size:18px;margin-bottom:12px;font-weight:bold;">[ ${w.help} ]</div>` : ''}
       <div class="grid-2">
         <div class="action-btn" onclick="vCardPrev()">Předchozí</div>
@@ -220,7 +208,7 @@ function renderActiveGame() {
       main.innerHTML = `
         <div style="text-align:center;padding:30px;">
           <h2 style="color:var(--col-green);margin-bottom:10px;">${isAdaptiveBatchMode ? 'BLOK 15 SLOV ZVLÁDNUT! 🎉' : 'KOMPLETNĚ ZVLÁDNUTO! 🎉'}</h2>
-          <p style="color:${colorWhite};margin-bottom:15px;">Všech ${stats.totalWords} položek bloku umíš na 2 ★!</p>
+          <p style="color:#fff;margin-bottom:15px;">Všech ${stats.totalWords} položek bloku umíš na 2 ★!</p>
           <div class="action-btn" onclick="startScrambleFromAdaptiveBatch()">SKLÁDAT TĚCHTO ${stats.totalWords} SLOV 🧩</div>
           ${isAdaptiveBatchMode ? `<div class="action-btn green" onclick="initGameState();renderActiveGame();">DALŠÍ BLOK (15 SLOV) ➔</div>` : ''}
           <div class="action-btn" onclick="toggleTestingDirection()">PŘEPNOUT SMĚR (${isDirOut ? 'Cizí ➔ 🇨🇿' : '🇨🇿 ➔ Cizí'}) ⇄</div>
@@ -243,7 +231,7 @@ function renderActiveGame() {
         <span>Slovo: ${vMastery[vCurrentWord]||0}/2 ★</span>
         <button class="toggle-btn on" onclick="toggleTestingDirection()">${isDirOut?'🇨🇿 ➔ Cizí':'Cizí ➔ 🇨🇿'}</button>
       </div>
-      <div class="prompt-box" style="color:${colorWhite};">
+      <div class="prompt-box" style="color:#fff;">
         ${isDirOut ? cleanCzechTranslation(w.answer) : w.question}
         ${!isDirOut ? `<span class="audio-btn" onclick="speakAdaptiveCurrent()">🔊</span>` : ''}
       </div>
@@ -263,16 +251,20 @@ function renderActiveGame() {
 
   else if (selectedGame === "SCRAMBLE") {
     const w = vItems[vCurrentWord];
-    const pct = Math.min(100, Math.round((scrambleSolvedCount / vItems.length) * 100));
+    
+    // Zde je oprava bugu, aby ukazatel počítal jen se zvolenými slovy (např. s těmi 15, co jsme právě zkoušeli)
+    const totalWords = (isAdaptiveBatchMode && adaptiveBatchIndices && adaptiveBatchIndices.length > 0) ? adaptiveBatchIndices.length : vItems.length;
+    const pct = Math.min(100, Math.round((scrambleSolvedCount / totalWords) * 100));
+
     main.innerHTML = `
       <div class="bargraph-container">
         <div class="bargraph-header">
-          <span>Složeno: ${scrambleSolvedCount} z ${vItems.length}</span>
+          <span>Složeno: ${scrambleSolvedCount} z ${totalWords}</span>
           <span style="color:var(--col-yellow);">${pct} %</span>
         </div>
         <div class="bargraph-track"><div class="bargraph-fill" style="width:${pct}%;"></div></div>
       </div>
-      <div class="prompt-box">Slož: <b style="color:${colorWhite};">${cleanCzechTranslation(w.answer)}</b></div>
+      <div class="prompt-box">Slož: <b>${cleanCzechTranslation(w.answer)}</b></div>
       <div class="slots-row ${isHebrew ? 'hebrew-text' : ''}">
         ${scrambleTiles.map((t, i) => `<div class="letter-slot ${scrambleIsWordMode?'word-slot':''} ${i<scramblePlaced.length?'filled':''}">${i<scramblePlaced.length?scramblePlaced[i]:'_'}</div>`).join('')}
       </div>
@@ -302,7 +294,7 @@ function renderActiveGame() {
           main.innerHTML = `
             <div style="text-align:center;padding:35px;">
               <h2 style="color:var(--col-green);font-size:28px;">TRÉNINK DOKONČEN! 🎉</h2>
-              <p style="font-size:20px;color:${colorWhite};margin:10px 0;">Sestřeleno: <b>${arcadeScore} slov</b> (Bonus: +${bonusCoins} 💰)</p>
+              <p style="font-size:20px;color:#fff;margin:10px 0;">Sestřeleno: <b>${arcadeScore} slov</b> (Bonus: +${bonusCoins} 💰)</p>
               <p style="font-size:24px;color:var(--col-yellow);margin-bottom:25px;">Celkem získáváš: +${campaignMinigameCoins + bonusCoins} 💰</p>
               <div class="action-btn green" onclick="finishCampaign(${campaignMinigameCoins + bonusCoins})">PŘIPSAT ZLAŤÁKY A ZPĚT</div>
             </div>
@@ -311,8 +303,8 @@ function renderActiveGame() {
           main.innerHTML = `
             <div style="text-align:center;padding:35px;">
               <h2 style="color:var(--col-red);font-size:32px;font-weight:bold;">GAME OVER! 💔</h2>
-              <p style="font-size:20px;color:${colorWhite};margin:10px 0;">Sestřeleno: <b>${arcadeScore} slov</b> (LVL ${arcadeLevel})</p>
-              <div class="action-btn green" onclick="startArcadeGame()">HRÁT ZNOVU ➔</div>
+              <p style="font-size:20px;color:#fff;margin:10px 0;">Sestřeleno: <b>${arcadeScore} slov</b> (LVL ${arcadeLevel})</p>
+              <div class="action-btn green" onclick="if(typeof startArcadeGame==='function') startArcadeGame()">HRÁT ZNOVU ➔</div>
               <div class="action-btn" onclick="setScreen('SELECT_GAME')">ZPĚT</div>
             </div>
           `;
@@ -342,7 +334,7 @@ function renderActiveGame() {
         </div>
         <div class="arcade-playfield" id="arcade-field">
           ${arcadeCurrent ? `
-            <div id="arcade-falling-elem" class="falling-item" style="top:${arcadeY}px; left:${arcadeX}%;">
+            <div id="arcade-falling-elem" class="falling-item" style="top:${arcadeY}px; left:${arcadeX}%; max-width:90vw; white-space:pre-wrap; word-break:break-word;">
               <div class="falling-main-word">${disp}</div>
               ${subDisp ? `<div class="falling-sub-word">${subDisp}</div>` : ''}
             </div>
@@ -378,7 +370,7 @@ function renderActiveGame() {
       ` : (isCampaignMinigame ? `
         <div style="text-align:center;padding:30px;">
           <h2 style="color:var(--col-green);">TRÉNINK DOKONČEN! 🎉</h2>
-          <p style="font-size:18px;color:${colorWhite};margin:10px 0;">Pexeso zvládnuto za <b>${pexesoAttempts} pokusů</b>.</p>
+          <p style="font-size:18px;color:#fff;margin:10px 0;">Pexeso zvládnuto za <b>${pexesoAttempts} pokusů</b>.</p>
           <p style="font-size:24px;color:var(--col-yellow);margin-bottom:25px;">Celkem získáváš: +${campaignMinigameCoins + (pexesoAttempts <= 12 ? 3 : (pexesoAttempts <= 16 ? 2 : 1))} 💰</p>
           <div class="action-btn green" onclick="finishCampaign(${campaignMinigameCoins + (pexesoAttempts <= 12 ? 3 : (pexesoAttempts <= 16 ? 2 : 1))})">PŘIPSAT ZLAŤÁKY A ZPĚT</div>
         </div>
@@ -402,7 +394,7 @@ function renderActiveGame() {
       main.innerHTML = `
         <div style="text-align:center;padding:30px;">
           <h2 style="color:var(--col-green);margin-bottom:10px;">KVÍZ DOKONČEN! 🎉</h2>
-          <p style="color:${colorWhite};margin-bottom:15px;">Zvládl jsi všech ${qActiveList.length} otázek!</p>
+          <p style="color:#fff;margin-bottom:15px;">Zvládl jsi všech ${qActiveList.length} otázek!</p>
           <div class="action-btn green" onclick="setScreen('SELECT_GAME')">ZPĚT DO MENU</div>
         </div>
       `;
@@ -430,7 +422,7 @@ function renderActiveGame() {
         </div>
         <div class="bargraph-track"><div class="bargraph-fill" style="width:${pct}%;"></div></div>
       </div>
-      <div class="prompt-box" style="font-size:22px;color:${colorWhite};margin:15px 0;">
+      <div class="prompt-box" style="font-size:22px;color:#fff;margin:15px 0;">
         ${promptDisplay}
         ${(qAnswered && getTargetLang(selectedSubject) !== 'cs-CZ') ? `<span class="audio-btn" onclick="speakWord('${(q.question.includes('___') ? q.question.replace(/___+/g, q.answer) : q.question + ' ' + q.answer).replace(/[*_]/g, '')}', '${selectedSubject}')">🔊</span>` : ''}
       </div>
@@ -461,7 +453,7 @@ function renderActiveGame() {
         </div>
         <div class="bargraph-track"><div class="bargraph-fill" style="width:${Math.min(100, (typeof mathStreak !== "undefined" ? mathStreak : 0) * 10)}%;"></div></div>
       </div>
-      <div class="prompt-box" style="font-size:36px;color:${colorWhite};margin:20px 0;">${typeof mathTask !== "undefined" ? mathTask.q : ""}</div>
+      <div class="prompt-box" style="font-size:36px;color:#fff;margin:20px 0;">${typeof mathTask !== "undefined" ? mathTask.q : ""}</div>
       <div class="grid-2">
         ${(typeof mathTask !== "undefined" && mathTask.opts ? mathTask.opts : []).map(opt => `
           <div class="opt-btn ${isAns ? (String(opt)===String(mathTask.ans)?'correct':(opt===mathChosenAnswer?'wrong':'')) : ''}" style="height:60px;font-size:26px;font-weight:bold;" onclick="clickMathChoice('${opt}')">${opt}</div>
@@ -487,7 +479,7 @@ function renderActiveGame() {
         </div>
         <div class="bargraph-track"><div class="bargraph-fill" style="width:${pct}%;"></div></div>
       </div>
-      <div class="prompt-box ${isHebrew ? 'hebrew-text' : ''}" style="margin:8px 0;min-height:56px;color:${colorWhite};font-size:22px;">
+      <div class="prompt-box ${isHebrew ? 'hebrew-text' : ''}" style="margin:8px 0;min-height:56px;color:#fff;font-size:22px;">
         ${itemsList.slice(0, seqTargetIdx).join(' ')} 
         <span style="color:var(--col-yellow);">${seqHintActive ? `[ ${targetWord}! ]` : '[ ??? ]'}</span>
       </div>
@@ -502,22 +494,47 @@ function renderActiveGame() {
     `;
   }
 
+  // --- ZDE JE OPRAVENÝ HAD (FUNKČNÍ TLAČÍTKA PO SMRTI) ---
   else if (selectedGame === "SNAKE") {
     if (typeof snakeState === "undefined") {
-      main.innerHTML = `<div style="text-align:center;padding:30px;color:var(--col-red);">Chyba: Soubor game_snake.js chybí nebo se nenačetl!</div>`;
+      main.innerHTML = `<div style="text-align:center;padding:30px;color:var(--col-red);">Chyba: Soubor snake.js chybí nebo se nenačetl!</div>`;
+      return;
+    }
+
+    if (snakeState === "GAMEOVER") {
+      if (isCampaignMinigame) {
+        let bonusCoins = Math.floor(snakeScore / 2);
+        main.innerHTML = `
+          <div style="text-align:center;padding:35px;">
+            <h2 style="color:var(--col-green);font-size:28px;">GAME OVER! (Trénink dokončen) 🎉</h2>
+            <p style="font-size:20px;color:#fff;margin:10px 0;">Had poskládal: <b>${snakeScore} slov</b> (Bonus: +${bonusCoins} 💰)</p>
+            <p style="font-size:24px;color:var(--col-yellow);margin-bottom:25px;">Celkem získáváš: +${campaignMinigameCoins + bonusCoins} 💰</p>
+            <div class="action-btn green" ontouchstart="if(typeof finishCampaign === 'function') finishCampaign(${campaignMinigameCoins + bonusCoins})" onclick="if(typeof finishCampaign === 'function') finishCampaign(${campaignMinigameCoins + bonusCoins})">PŘIPSAT ZLAŤÁKY A ZPĚT</div>
+          </div>
+        `;
+      } else {
+        main.innerHTML = `
+          <div style="text-align:center;padding:35px;">
+            <h2 style="color:var(--col-red);font-size:32px;font-weight:bold;">GAME OVER! 💔</h2>
+            <p style="font-size:20px;color:#fff;margin:12px 0;">Správně složeno: <b>${snakeScore} slov</b></p>
+            <div class="action-btn green" ontouchstart="if(typeof startSnakeGame === 'function') startSnakeGame()" onclick="if(typeof startSnakeGame === 'function') startSnakeGame()">HRÁT ZNOVU ➔</div>
+            <div class="action-btn" ontouchstart="if(typeof setScreen === 'function') setScreen('SELECT_GAME')" onclick="if(typeof setScreen === 'function') setScreen('SELECT_GAME')">ZPĚT</div>
+          </div>
+        `;
+      }
       return;
     }
 
     const canBuyShield = snakeLives > 1 && snakeShieldLetters <= 0;
     const coins = typeof currentUser !== 'undefined' && currentUser ? getUserCoins(currentUser.name) : 0;
     const canBuyShieldCoins = snakeLives === 1 && snakeShieldLetters <= 0 && coins >= 15;
-    let bonusCoins = Math.floor(snakeScore / 2);
+    let targetLetterChar = (typeof snakeTargetLetters !== "undefined" && snakeTargetLetters && snakeTargetLetters[snakeCurrentIdx]) ? snakeTargetLetters[snakeCurrentIdx] : '';
 
     main.innerHTML = `
       <div class="snake-container">
         <div class="snake-header-box">
           <div class="snake-stats">
-            <span>${snakeLives > 0 ? "❤️".repeat(snakeLives) : "💀"}</span>
+            <span>${"❤️".repeat(snakeLives)}</span>
             
             ${snakeShieldLetters > 0 ? `
               <span id="snake-shield-indicator" class="snake-shield-btn active">🛡️ Štít: ${snakeShieldLetters} p.</span>
@@ -554,25 +571,6 @@ function renderActiveGame() {
 
         <div class="snake-canvas-wrap">
           <canvas id="snake-canvas" width="340" height="340"></canvas>
-
-          <!-- PŘEKRYVNÝ GAME OVER (HRÁČ VIDÍ HADA POD NÍM) -->
-          ${snakeState === "GAMEOVER" ? `
-            <div class="snake-overlay" style="background: rgba(8, 16, 30, 0.78);">
-              ${isCampaignMinigame ? `
-                <h2 style="color:var(--col-green);font-size:26px;margin-bottom:6px;">GAME OVER! 🎉</h2>
-                <p style="font-size:14px;color:#cbd5e1;margin-bottom:8px;">${snakeStatusMsg}</p>
-                <p style="font-size:18px;color:#fff;margin:6px 0;">Složeno: <b>${snakeScore} slov</b> (+${bonusCoins} 💰)</p>
-                <p style="font-size:22px;color:var(--col-yellow);margin-bottom:16px;">Celkem: +${campaignMinigameCoins + bonusCoins} 💰</p>
-                <div class="action-btn green" style="width:100%;max-width:250px;" onclick="finishCampaign(${campaignMinigameCoins + bonusCoins})">PŘIPSAT ZLAŤÁKY A ZPĚT</div>
-              ` : `
-                <h2 style="color:var(--col-red);font-size:30px;font-weight:bold;margin-bottom:6px;">GAME OVER! 💔</h2>
-                <p style="font-size:14px;color:var(--col-yellow);margin-bottom:10px;">${snakeStatusMsg}</p>
-                <p style="font-size:18px;color:#fff;margin-bottom:18px;">Správně složeno: <b>${snakeScore} slov</b></p>
-                <div class="action-btn green" style="width:100%;max-width:240px;margin-bottom:8px;" onclick="if(typeof startSnakeGame === 'function') startSnakeGame()">HRÁT ZNOVU ➔</div>
-                <div class="action-btn" style="width:100%;max-width:240px;" onclick="setScreen('SELECT_GAME')">ZPĚT DO MENU</div>
-              `}
-            </div>
-          ` : ''}
 
           <!-- DIALOG PŘI VYPRŠENÍ ŠTÍTU -->
           ${snakeState === "SHIELD_EXPIRED_PAUSE" ? `
@@ -617,6 +615,7 @@ function renderActiveGame() {
     }
   }
 
+  // KAMPAŇ (SPIRÁLA)
   else if (selectedGame === "CAMPAIGN") {
     if (cmpIdx >= cmpQueue.length) {
       launchCampaignMinigame();
@@ -650,7 +649,7 @@ function renderActiveGame() {
         }
       }
 
-      html += `<div class="prompt-box" style="font-size:24px;color:${colorWhite};margin:20px 0;">
+      html += `<div class="prompt-box" style="font-size:24px;color:#fff;margin:20px 0;">
                  ${promptDisplay}
                  ${(isEval && getTargetLang(selectedSubject) !== 'cs-CZ' && task.type !== 'QUIZ_IN') ? `<span class="audio-btn" onclick="speakWord('${(task.type==='KVIZ' && task.data.question.includes('___') ? task.data.question.replace(/___+/g, task.data.answer) : task.data.question).replace(/[*_]/g, '')}', '${selectedSubject}')">🔊</span>` : ''}
                </div>`;
@@ -673,9 +672,9 @@ function renderActiveGame() {
     }
     else if (task.type === 'SCRAMBLE') {
       html += `
-        <div class="prompt-box">Slož: <b style="color:${colorWhite};">${cleanCzechTranslation(task.data.answer)}</b></div>
+        <div class="prompt-box">Slož: <b>${cleanCzechTranslation(task.data.answer)}</b></div>
         <div class="slots-row ${isHebrew ? 'hebrew-text' : ''}">
-          ${task.tiles.map((t, i) => `<div class="letter-slot ${task.isWordMode?'word-slot':''} ${i<task.placed.length?'filled':''}">${i<scramblePlaced.length?scramblePlaced[i]:'_'}</div>`).join('')}
+          ${task.tiles.map((t, i) => `<div class="letter-slot ${task.isWordMode?'word-slot':''} ${i<task.placed.length?'filled':''}">${i<task.placed.length?task.placed[i]:'_'}</div>`).join('')}
         </div>
       `;
       if (cmpState !== 'EVAL') {
@@ -686,14 +685,5 @@ function renderActiveGame() {
       }
     }
     main.innerHTML = html;
-  }
-
-  // --- PŘÍBĚHY (DUOLINGO STORIES) ---
-  else if (selectedGame === "STORY") {
-    if (typeof renderStoryGame === "function") {
-      renderStoryGame(main, colorWhite);
-    } else {
-      main.innerHTML = `<div style="text-align:center;padding:30px;color:var(--col-red);">Chyba: Soubor game_story.js chybí nebo se nenačetl!</div>`;
-    }
   }
 }
