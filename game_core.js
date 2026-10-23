@@ -30,8 +30,14 @@ function speakWord(text, subjectName) {
   window.speechSynthesis.cancel();
   
   setTimeout(() => {
-    // Odstranil jsem stripování závorek - závorky budou zachovány
     let toSpeak = text.trim();
+
+    // 1. Pokud jde o dialog (např. "👧 Lucy: Hello!"), odřízneme ze čtení jméno postavy před dvojtečkou
+    toSpeak = toSpeak.replace(/^[^:]{1,30}:\s*/, '');
+
+    // 2. Odstraníme všechny emotikony a smajlíky, aby je syntezátor nečetl slovy ("Girl", "Boy" atd.)
+    toSpeak = toSpeak.replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, '').trim();
+
     toSpeak = toSpeak.replace(/ליהוה/g, 'לַאדֹנָי').replace(/יהוה/g, 'אֲדֹנָי').replace(/L'?(Jahve|Jahveh|Yahweh|Yahwe|Jehova|JHVH|YHWH|JVHV)/gi, "L'Adonaj");
     if (/read\s*-\s*read\s*-\s*read/i.test(toSpeak)) toSpeak = "read, red, red";
     else toSpeak = toSpeak.replace(/\//g, ' or ').replace(/\s*-\s*/g, ', ');
