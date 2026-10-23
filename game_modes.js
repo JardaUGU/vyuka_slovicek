@@ -10,7 +10,9 @@ let isAdaptiveBatchMode = false;
 
 let scrambleDeck = [], scramblePlaced = [], scrambleTiles = [], scrambleIsWordMode = false, scrambleHadMistake = false, scrambleDone = false, scrambleSolvedCount = 0;
 let qCurStep = 0, qAnswered = false, qChosenOpt = null, qActiveList = [];
-let seqTargetIdx = 0, seqSlots = [], seqStartTime = 0, seqTimerInterval = null, seqHintActive = false, seqInactivityTimer = null;
+
+// Přidána proměnná seqHighestDeployed, která řeší bug s duplikováním!
+let seqTargetIdx = 0, seqHighestDeployed = 0, seqSlots = [], seqStartTime = 0, seqTimerInterval = null, seqHintActive = false, seqInactivityTimer = null;
 
 
 // --- POMOCNÉ FUNKCE ---
@@ -27,16 +29,16 @@ function vCardNext() {
   const vItems = getVocabItems();
   if (vItems.length === 0) return;
   vCardIdx = (vCardIdx + 1) % vItems.length;
-  renderActiveGame();
-  if (isAutoTTS && vItems.length > 0) speakWord(vItems[vCardIdx].question, selectedSubject);
+  if(typeof renderActiveGame === 'function') renderActiveGame();
+  if (typeof isAutoTTS !== "undefined" && isAutoTTS && vItems.length > 0) speakWord(vItems[vCardIdx].question, selectedSubject);
 }
 
 function vCardPrev() {
   const vItems = getVocabItems();
   if (vItems.length === 0) return;
   vCardIdx = (vCardIdx + vItems.length - 1) % vItems.length;
-  renderActiveGame();
-  if (isAutoTTS && vItems.length > 0) speakWord(vItems[vCardIdx].question, selectedSubject);
+  if(typeof renderActiveGame === 'function') renderActiveGame();
+  if (typeof isAutoTTS !== "undefined" && isAutoTTS && vItems.length > 0) speakWord(vItems[vCardIdx].question, selectedSubject);
 }
 
 function speakCurrentCard() {
@@ -46,7 +48,7 @@ function speakCurrentCard() {
 
 
 // ==========================================
-// 2. ZKOUŠENÍ Z HLAVY (ADAPTIVE) + INITIALIZACE HER
+// 2. ZKOUŠENÍ Z HLAVY (ADAPTIVE)
 // ==========================================
 function initGameState() {
   const vItems = getVocabItems();
@@ -85,7 +87,7 @@ function initGameState() {
     vLastWord = -1; 
     vCardIdx = 0;
 
-    if (selectedGame === "CARDS" && isAutoTTS) speakWord(vItems[0].question, selectedSubject);
+    if (selectedGame === "CARDS" && typeof isAutoTTS !== "undefined" && isAutoTTS) speakWord(vItems[0].question, selectedSubject);
     if (selectedGame === "ADAPTIVE") pickNextAdaptiveWord();
     if (selectedGame === "SCRAMBLE") { scrambleDeck = []; scrambleSolvedCount = 0; initScramble(); }
   }
@@ -129,15 +131,15 @@ function pickNextAdaptiveWord() {
     
   vLastWord = vCurrentWord;
 
-  if (testingDirection === "DIR_IN" && isAutoTTS && vCurrentWord !== -1) {
+  if (typeof testingDirection !== 'undefined' && testingDirection === "DIR_IN" && typeof isAutoTTS !== "undefined" && isAutoTTS && vCurrentWord !== -1) {
     speakWord(vItems[vCurrentWord].question, selectedSubject);
   }
 }
 
 function revealAdaptiveQuiz() {
   vQuizRevealed = true;
-  renderActiveGame();
-  if (isAutoTTS && vCurrentWord !== -1) speakWord(getVocabItems()[vCurrentWord].question, selectedSubject);
+  if(typeof renderActiveGame === 'function') renderActiveGame();
+  if (typeof isAutoTTS !== "undefined" && isAutoTTS && vCurrentWord !== -1) speakWord(getVocabItems()[vCurrentWord].question, selectedSubject);
 }
 
 function speakAdaptiveCurrent() {
@@ -149,7 +151,7 @@ function answerAdaptive(known) {
   const vItems = getVocabItems();
   const w = vItems[vCurrentWord];
   if (known) {
-    sndOk(); addReward(1, selectedGroupKey);
+    sndOk(); addReward(1, typeof selectedGroupKey !== 'undefined' ? selectedGroupKey : "");
     vMastery[vCurrentWord] = Math.min(2, (vMastery[vCurrentWord] || 0) + 1);
     saveWordMasteryToGoogle(w.question, vMastery[vCurrentWord], testingDirection);
   } else {
@@ -157,7 +159,7 @@ function answerAdaptive(known) {
     saveWordMasteryToGoogle(w.question, 0, testingDirection);
   }
   pickNextAdaptiveWord();
-  renderActiveGame();
+  if(typeof renderActiveGame === 'function') renderActiveGame();
 }
 
 
@@ -205,11 +207,11 @@ function clickScrambleTile(idx) {
     sndOk(); item.used = true; scramblePlaced.push(item.text);
     if (scramblePlaced.length === target.length) {
       scrambleDone = true; scrambleSolvedCount++;
-      if (!scrambleHadMistake) { addReward(1, selectedGroupKey); sndFanfare(); }
-      if (isAutoTTS) speakWord(w.question, selectedSubject);
+      if (!scrambleHadMistake) { addReward(1, typeof selectedGroupKey !== 'undefined' ? selectedGroupKey : ""); sndFanfare(); }
+      if (typeof isAutoTTS !== "undefined" && isAutoTTS) speakWord(w.question, selectedSubject);
     }
   } else { sndErr(); scrambleHadMistake = true; }
-  renderActiveGame();
+  if(typeof renderActiveGame === 'function') renderActiveGame();
 }
 
 
@@ -222,32 +224,41 @@ function clickQuizOpt(optIdx) {
   const chosen = q.options[optIdx];
   qAnswered = true; qChosenOpt = chosen;
 
-  if (chosen === q.answer) { sndOk(); addReward(1, selectedGroupKey); } else sndErr();
-  renderActiveGame();
+  if (chosen === q.answer) { sndOk(); addReward(1, typeof selectedGroupKey !== 'undefined' ? selectedGroupKey : ""); } else sndErr();
+  if(typeof renderActiveGame === 'function') renderActiveGame();
 }
 
 function nextQuizStep() {
-  qCurStep++; qAnswered = false; qChosenOpt = null; renderActiveGame();
+  qCurStep++; qAnswered = false; qChosenOpt = null; 
+  if(typeof renderActiveGame === 'function') renderActiveGame();
 }
 
 
 // ==========================================
-// 5. ŘADA NA ČAS (SEQUENCE)
+// 5. ŘADA NA ČAS (SEQUENCE) - OPRAVENÁ
 // ==========================================
 function resetInactivityTimer() {
   if (seqInactivityTimer) clearTimeout(seqInactivityTimer);
-  seqInactivityTimer = setTimeout(() => { seqHintActive = true; renderActiveGame(); }, 3000);
+  seqInactivityTimer = setTimeout(() => { seqHintActive = true; if(typeof renderActiveGame === 'function') renderActiveGame(); }, 3000);
 }
 
 function initSequence() {
   const sItems = getSeqItems();
   if (sItems.length === 0) return;
-  const seqConfig = sItems[selectedSeqIndex] || sItems[0];
+  const seqConfig = sItems[typeof selectedSeqIndex !== 'undefined' ? selectedSeqIndex : 0] || sItems[0];
   const itemsList = seqConfig.answer.split('|').map(s => s.trim()).filter(Boolean);
 
   seqTargetIdx = 0; seqHintActive = false; seqSlots = [-1, -1, -1, -1];
-  seqSlots[0] = 0; if (itemsList.length > 1) seqSlots[1] = 1;
-  for (let s = 2; s < Math.min(4, itemsList.length); s++) seqSlots[s] = s;
+
+  // Naplníme první 4 políčka (nebo méně, pokud je řada kratší)
+  let initialCount = Math.min(4, itemsList.length);
+  for (let s = 0; s < initialCount; s++) {
+      seqSlots[s] = s;
+  }
+  // Poznamenáme si, jaký je aktuálně nejvyšší vyložený index
+  seqHighestDeployed = initialCount - 1;
+
+  // Vizuálně zamícháme tlačítka
   seqSlots.sort(() => Math.random() - 0.5);
 
   seqStartTime = Date.now();
@@ -261,24 +272,35 @@ function initSequence() {
 
 function clickSeqSlot(slot) {
   const sItems = getSeqItems();
-  const seqConfig = sItems[selectedSeqIndex] || sItems[0];
+  const seqConfig = sItems[typeof selectedSeqIndex !== 'undefined' ? selectedSeqIndex : 0] || sItems[0];
   const itemsList = seqConfig.answer.split('|').map(s => s.trim()).filter(Boolean);
   const btnEl = document.getElementById(`seq-btn-${slot}`);
 
   if (seqSlots[slot] === seqTargetIdx) {
-    sndOk(); seqTargetIdx++; seqHintActive = false;
+    sndOk();
+    
+    // TTS: Přečte slovo v momentě, kdy ho dítě úspěšně klikne
+    if (typeof isAutoTTS !== "undefined" && isAutoTTS && typeof speakWord === "function") {
+        speakWord(itemsList[seqTargetIdx], typeof selectedSubject !== "undefined" ? selectedSubject : "");
+    }
+
+    seqTargetIdx++; 
+    seqHintActive = false;
+    
     if (seqTargetIdx >= itemsList.length) {
       clearInterval(seqTimerInterval); if (seqInactivityTimer) clearTimeout(seqInactivityTimer);
-      sndFanfare(); addReward(3, selectedGroupKey);
+      sndFanfare(); addReward(3, typeof selectedGroupKey !== 'undefined' ? selectedGroupKey : "Řada");
     } else {
-      const next = seqTargetIdx + 1;
-      seqSlots[slot] = next < itemsList.length ? next : -1;
+      // OPRAVA DUPLIKÁTŮ: Do uvolněného tlačítka pošleme další dosud neviděné slovo ze zásoby
+      seqHighestDeployed++;
+      seqSlots[slot] = seqHighestDeployed < itemsList.length ? seqHighestDeployed : -1;
       resetInactivityTimer();
     }
-    renderActiveGame();
+    if(typeof renderActiveGame === 'function') renderActiveGame();
   } else {
     sndErr();
     if (btnEl) { btnEl.classList.add("wrong"); setTimeout(() => { if (btnEl) btnEl.classList.remove("wrong"); }, 250); }
-    seqHintActive = true; resetInactivityTimer(); renderActiveGame();
+    seqHintActive = true; resetInactivityTimer(); 
+    if(typeof renderActiveGame === 'function') renderActiveGame();
   }
 }
