@@ -143,7 +143,7 @@ function setUserPIN() {
 function forceHardReload() { const newUrl = window.location.origin + window.location.pathname + '?v=' + Date.now(); window.location.replace(newUrl); }
 function cleanCzechTranslation(text) { return text ? text.trim() : ""; }
 function getVocabItems() { return (activeItems || []).filter(it => it.type === "SLOVO"); }
-function getQuizItems()  { return (activeItems || []).filter(it => it.type === "KVIZ" || it.type.includes("PRIBEH")); }
+function getQuizItems() { return (activeItems || []).filter(it => it.type === "KVIZ"); }
 function getSeqItems()   { return (activeItems || []).filter(it => it.type === "RADA"); }
 function getAdaptiveWindowSize(grade) { const g = parseInt(grade) || 2; return g >= 90 ? 12 : (g >= 10 ? 10 : Math.max(3, g)); }
 function getGraphemes(str) {
@@ -442,12 +442,11 @@ function toggleTestingDirection() {
   renderScreen();
 }
 
-// SPUTĚNÍ PŘÍBĚHU PŘÍMO Z KAMPANĚ
+// SPUŠTĚNÍ PŘÍBĚHU PŘÍMO DO ČTEČKY
 window.startStory = function(topicName) {
-    selectedGroupKey = topicName;
-    const userG = parseInt(currentUser.grade) || 2;
-    activeItems = (appData.items || []).filter(it => it.subject === selectedSubject && isItemAllowedForGrade(it, userG) && it.topic === topicName);
-    setScreen("SELECT_GAME");
+  if (typeof launchStoryMode === "function") {
+    launchStoryMode(topicName);
+  }
 };
 
 function renderScreen() {
@@ -680,7 +679,7 @@ function renderScreen() {
          `;
       }
 
-      // --- ZNOVU PŘIDANÉ PŘÍBĚHY ---
+      // --- PŘÍBĚHY S KONTROLOU DOKONČENÍ A ODMĚNOU ---
       let storiesGroups = {};
       const userG = parseInt(currentUser.grade) || 2;
       let allSubjectItems = (appData.items || []).filter(it => it.subject === selectedSubject && isItemAllowedForGrade(it, userG));
@@ -696,18 +695,25 @@ function renderScreen() {
       let storiesHtml = "";
       let storyKeys = Object.keys(storiesGroups);
       if (storyKeys.length > 0) {
+          const uKey = currentUser.name.toLowerCase().trim();
           storiesHtml += `<div style="margin-top:25px; text-align:left;">`;
           storiesHtml += `<h3 style="color:var(--col-active-tab); font-size:18px; margin-bottom:10px;">📚 Příběhy k přečtení</h3>`;
           storiesHtml += `<div style="display:flex; flex-direction:column; gap:8px;">`;
           storyKeys.forEach(title => {
               let sItems = storiesGroups[title];
+              let isDone = (typeof getSavedMastery === "function" && getSavedMastery(title, "STORY") >= 2) || localStorage.getItem(`story_done_${uKey}_${title}`) === "1";
+              let borderCol = isDone ? "var(--col-green)" : "var(--col-yellow)";
+              let badgeText = isDone ? `<span style="color:var(--col-green); font-weight:bold; font-size:14px;">✅ Přečteno</span>` : `<span style="color:var(--col-yellow); font-weight:bold; font-size:15px;">🎁 +10 💰</span>`;
+
               storiesHtml += `
-                <div class="tile" style="flex-direction:row; justify-content:space-between; padding:12px; background:var(--col-card); border-color:var(--col-active-tab);" onclick="startStory('${title.replace(/'/g, "\\'")}')">
+                <div class="tile" style="flex-direction:row; justify-content:space-between; padding:12px 14px; background:var(--col-card); border-color:${borderCol};" onclick="startStory('${title.replace(/'/g, "\\'")}')">
                   <div style="text-align:left;">
-                      <h3 style="color:inherit; font-size:16px;">${title}</h3>
-                      <p style="color:var(--col-text-muted); font-size:12px; margin-top:2px;">${sItems.length} úloh</p>
+                      <h3 style="color:inherit; font-size:16px;">${isDone ? '📖 ' : '✨ '}${title}</h3>
+                      <p style="color:var(--col-text-muted); font-size:12px; margin-top:2px;">${sItems.length} částí příběhu</p>
                   </div>
-                  <span style="color:var(--col-active-tab); font-size:20px;">➔</span>
+                  <div style="text-align:right;">
+                      ${badgeText}
+                  </div>
                 </div>
               `;
           });
