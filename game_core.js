@@ -444,9 +444,59 @@ function renderActiveGame() {
   }
 
   else if (selectedGame === "PROCEDURAL_MATH") {
+    
     // --- VYKRESLENÍ: KROKOVÉ ROVNICE ---
     if (mathTask.type === "STEP_EQ") {
-        const isDone = mathTask.stepPhase === 2;
+        const isDone = mathTask.isDone === true; // Zde byla ta chyba! Nyní funguje správně.
+        
+        let controlsHtml = "";
+        if (!isDone) {
+            if (mathTask.mode === "KEYBOARD") {
+                // UI KLÁVESNICE
+                controlsHtml = `
+                  <div style="background:var(--col-card); border:1px solid var(--col-card-border); border-radius:10px; padding:10px; margin-bottom:15px; text-align:center; font-size:26px; font-family:monospace; color:var(--col-yellow); min-height:55px; display:flex; align-items:center; justify-content:center; letter-spacing:2px;">
+                      ${mathTask.input ? mathTask.input : '<span style="color:var(--col-text-muted); font-size:16px; letter-spacing:normal;">Zadej operaci... (např. /2, -3x)</span>'}
+                  </div>
+                  <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:8px; max-width:400px; margin: 0 auto;">
+                      <div class="opt-btn" onclick="clickMathKey('+')">+</div>
+                      <div class="opt-btn" onclick="clickMathKey('-')">-</div>
+                      <div class="opt-btn" onclick="clickMathKey('*')">*</div>
+                      <div class="opt-btn" onclick="clickMathKey('/')">/</div>
+
+                      <div class="opt-btn" onclick="clickMathKey('7')">7</div>
+                      <div class="opt-btn" onclick="clickMathKey('8')">8</div>
+                      <div class="opt-btn" onclick="clickMathKey('9')">9</div>
+                      <div class="opt-btn" style="background:#1e293b; color:#38bdf8;" onclick="clickMathKey('x')">x</div>
+
+                      <div class="opt-btn" onclick="clickMathKey('4')">4</div>
+                      <div class="opt-btn" onclick="clickMathKey('5')">5</div>
+                      <div class="opt-btn" onclick="clickMathKey('6')">6</div>
+                      <div class="opt-btn" style="background:var(--col-red);" onclick="clickMathKey('C')">C</div>
+
+                      <div class="opt-btn" onclick="clickMathKey('1')">1</div>
+                      <div class="opt-btn" onclick="clickMathKey('2')">2</div>
+                      <div class="opt-btn" onclick="clickMathKey('3')">3</div>
+                      <div class="opt-btn green" style="grid-row: span 2; display:flex; align-items:center; justify-content:center;" onclick="submitMathKey()">OK</div>
+
+                      <div class="opt-btn" style="grid-column: span 3;" onclick="clickMathKey('0')">0</div>
+                  </div>
+                `;
+            } else {
+                // UI VÝBĚRU (4 MOŽNOSTI)
+                controlsHtml = `
+                  <p style="text-align:center; color:var(--col-text-muted); margin-bottom:8px;">Vyber operaci pro aplikaci na obě strany:</p>
+                  <div class="grid-2">
+                     ${mathTask.opts.map(opt => `
+                       <div class="opt-btn" style="height:55px; font-size:22px; font-weight:bold; font-family:monospace;" onclick="handleEqStepChoice('${opt}')">${opt}</div>
+                     `).join('')}
+                  </div>
+                `;
+            }
+        } else {
+            // HOTOVO TLAČÍTKO
+            controlsHtml = `<div class="action-btn green" onclick="generateMathTask();renderActiveGame();">VÝBORNĚ! DALŠÍ ROVNICE ➔</div>`;
+        }
+
         main.innerHTML = `
           <div class="bargraph-container">
             <div class="bargraph-header">
@@ -460,24 +510,16 @@ function renderActiveGame() {
              ${mathTask.history.map((step, i) => `
                 <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:${i<mathTask.history.length-1 ? '1px solid #334155' : 'none'}; padding-bottom:${i<mathTask.history.length-1 ? '8px' : '0'};">
                    <div style="font-size:26px; color:${i===mathTask.history.length-1 && isDone ? 'var(--col-green)' : '#fff'}; font-weight:bold;">${step.eq}</div>
-                   ${step.op ? `<div style="background:#1e293b; color:var(--col-yellow); padding:4px 10px; border-radius:6px; font-weight:bold;">| ${step.op}</div>` : ''}
+                   ${step.op ? `<div style="background:#1e293b; color:var(--col-yellow); padding:4px 10px; border-radius:6px; font-weight:bold; font-family:monospace;">| ${step.op}</div>` : ''}
                 </div>
              `).join('')}
           </div>
-
-          ${!isDone ? `
-             <p style="text-align:center; color:var(--col-text-muted); margin-bottom:8px;">Vyber operaci pro aplikaci na obě strany:</p>
-             <div class="grid-2">
-               ${mathTask.opts.map(opt => `
-                 <div class="opt-btn" style="height:55px; font-size:22px; font-weight:bold; font-family:monospace;" onclick="handleEqStepChoice('${opt}')">${opt}</div>
-               `).join('')}
-             </div>
-          ` : `
-             <div class="action-btn green" onclick="generateMathTask();renderActiveGame();">VÝBORNĚ! DALŠÍ ROVNICE ➔</div>
-          `}
+          
+          ${controlsHtml}
         `;
     } 
-    // --- VYKRESLENÍ: STANDARDNÍ VÝPOČET (Zlomky, atd.) ---
+    
+    // --- VYKRESLENÍ: STANDARDNÍ VÝPOČET (Zlomky, Násobilka atd.) ---
     else {
         const isAns = (typeof mathChosenAnswer !== "undefined" && mathChosenAnswer !== null);
         main.innerHTML = `
