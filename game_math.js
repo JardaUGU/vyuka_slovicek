@@ -1,5 +1,5 @@
 /**
- * PROCEDURÁLNÍ MATEMATIKA A ALGEBRAICKÝ ENGINE (ROVNICE, VÝRAZY, PRAVÉ ZLOMKY)
+ * PROCEDURÁLNÍ MATEMATIKA A ALGEBRAICKÝ ENGINE (ROVNICE, VÝRAZY, KROKOVÉ ZLOMKY)
  */
 let mathOperation = "MIX";
 let mathTask = { type: "NORMAL", q: "2 + 2 = ?", ans: 4, opts: [2, 3, 4, 5] };
@@ -20,7 +20,6 @@ function fSub(a, b) { return frac(a.n * b.d - b.n * a.d, a.d * b.d); }
 function fMul(a, b) { return frac(a.n * b.n, a.d * b.d); }
 function fDiv(a, b) { return frac(a.n * b.d, a.d * b.n); }
 
-// Nádherné formátování zlomků do pravého HTML tvaru (čitatel nad jmenovatelem)
 function formatFrac(f, isX, isFirst) {
     if (f.n === 0) return "";
     let absN = Math.abs(f.n);
@@ -63,7 +62,22 @@ function formatEq(state) {
     return `${formatSide(state.lx, state.ln)} &nbsp;=&nbsp; ${formatSide(state.rx, state.rn)}`;
 }
 
-// Inteligentní vyhodnocení výrazu pro Algebraické Výrazy
+function formatExprState(s) {
+    let parts = [];
+    if (s.x2 !== 0) {
+        if (s.x2 === 1) parts.push("x²"); else if (s.x2 === -1) parts.push("-x²"); else parts.push(`${s.x2}x²`);
+    }
+    if (s.x !== 0) {
+        let absX = Math.abs(s.x); let xStr = (absX === 1) ? "x" : `${absX}x`;
+        if (parts.length > 0) parts.push(s.x > 0 ? `+ ${xStr}` : `- ${xStr}`); else parts.push(s.x > 0 ? `${xStr}` : `-${xStr}`);
+    }
+    if (s.n !== 0) {
+        if (parts.length > 0) parts.push(s.n > 0 ? `+ ${s.n}` : `- ${Math.abs(s.n)}`); else parts.push(`${s.n}`);
+    }
+    if (parts.length === 0) return "0";
+    return parts.join(" ");
+}
+
 function evalExpr(str, xVal) {
     let s = str.replace(/x²/g, `(${xVal}*${xVal})`).replace(/(\d)x/g, `$1*${xVal}`).replace(/x/g, `(${xVal})`);
     try { return new Function('return ' + s)(); } catch(e) { return null; }
@@ -75,10 +89,10 @@ function openMathOperationSelect() { selectedSubject = "Matematika"; setScreen("
 function renderMathOpSelection() {
   const main = document.getElementById("main-content");
   let ops = [
+    { id: "FRACTIONS_STEP", title: "Zlomky (Krokově)", desc: "Sčítání a odčítání formou řešení na papíře." },
     { id: "EXPR_QUADRATIC", title: "Algebraické výrazy", desc: "Zadávej libovolné mezikroky roznásobení (x+a)²." },
     { id: "EQ_KEYBOARD", title: "Rovnice (Klávesnice)", desc: "Upravuj libovolně obě strany rovnice přes klávesnici." },
-    { id: "EQ_FRACTIONS", title: "Rovnice se zlomky", desc: "Zkus si vynásobit rovnici jmenovatelem." },
-    { id: "FRACTIONS", title: "Sčítání zlomků", desc: "Klasické operace se zlomky" },
+    { id: "EQ_FRACTIONS", title: "Rovnice se zlomky", desc: "Nácvik odstranění zlomku z rovnice." },
     { id: "ADD_SUB_20_NO", title: "+ a - do 20", desc: "12 + 5, 17 - 4" },
     { id: "MUL_SMALL", title: "Malá násobilka", desc: "Základy násobení" }
   ];
@@ -87,8 +101,8 @@ function renderMathOpSelection() {
     <h2 style="font-size:18px;margin-bottom:12px;text-align:center;color:var(--col-yellow);">Vyber matematiku:</h2>
     <div style="display:flex;flex-direction:column;gap:8px;">
       ${ops.map(o => `
-        <div class="tile" style="flex-direction:row;justify-content:space-between;padding:12px;text-align:left; ${o.id.startsWith('EQ_')||o.id==='EXPR_QUADRATIC' ? 'border-color:var(--col-green); background:#112a1f;' : ''}" onclick="startMathPractice('${o.id}', '${o.title}')">
-          <div><h2 style="${o.id.startsWith('EQ_')||o.id==='EXPR_QUADRATIC' ? 'color:var(--col-green);' : ''}">${o.title}</h2><p>${o.desc}</p></div>
+        <div class="tile" style="flex-direction:row;justify-content:space-between;padding:12px;text-align:left; ${o.id.startsWith('EQ_')||o.id==='EXPR_QUADRATIC'||o.id==='FRACTIONS_STEP' ? 'border-color:var(--col-green); background:#112a1f;' : ''}" onclick="startMathPractice('${o.id}', '${o.title}')">
+          <div><h2 style="${o.id.startsWith('EQ_')||o.id==='EXPR_QUADRATIC'||o.id==='FRACTIONS_STEP' ? 'color:var(--col-green);' : ''}">${o.title}</h2><p>${o.desc}</p></div>
           <span style="color:var(--col-active-tab);font-weight:bold;font-size:20px;">➔</span>
         </div>
       `).join('')}
@@ -102,6 +116,29 @@ function startMathPractice(opId, opTitle) {
 
 function generateMathTask() {
   mathChosenAnswer = null;
+
+  // NOVINKA: ZLOMKY NA PAPÍŘE (Hledání společného jmenovatele)
+  if (mathOperation === "FRACTIONS_STEP") {
+      let denoms = [2, 3, 4, 5, 6, 8, 10];
+      let d1 = denoms[Math.floor(Math.random() * denoms.length)];
+      let d2;
+      do { d2 = denoms[Math.floor(Math.random() * denoms.length)]; } while (d1 === d2);
+      
+      let a = Math.floor(Math.random() * (d1 - 1)) + 1;
+      let b = Math.floor(Math.random() * (d2 - 1)) + 1;
+      let isAdd = Math.random() > 0.5;
+      
+      let targetVal = isAdd ? (a/d1 + b/d2) : (a/d1 - b/d2);
+      
+      mathTask = {
+          type: "FRAC_STEP",
+          q: `${renderSimpleFrac(a, d1)} ${isAdd ? '+' : '-'} ${renderSimpleFrac(b, d2)} &nbsp;=&nbsp; ?`,
+          targetVal: targetVal,
+          input: "", isDone: false,
+          history: [{ eq: `${a}/${d1} ${isAdd ? '+' : '-'} ${b}/${d2}`, op: null }]
+      };
+      return;
+  }
   
   if (mathOperation === "EXPR_QUADRATIC") {
       let a = Math.floor(Math.random() * 6) + 1; 
@@ -150,35 +187,40 @@ function generateMathTask() {
       return;
   }
 
-  // STANDARD MATEMATIKA S HEZKÝMI ZLOMKY
+  // STANDARD MATEMATIKA
   let a, b, ans;
-  if (mathOperation === "FRACTIONS") {
-      let d = [2, 3, 4, 5, 8][Math.floor(Math.random() * 5)];
-      a = Math.floor(Math.random() * d) + 1; b = Math.floor(Math.random() * d) + 1;
-      let isAdd = Math.random() > 0.5;
-      if (!isAdd && a < b) { let t = a; a = b; b = t; } 
-      ans = isAdd ? (a + b) : (a - b);
-      let cStr = `${ans}/${d}`; if (ans === 0) cStr = "0"; if (ans === d) cStr = "1";
-      
-      let optSet = new Set([cStr]);
-      while (optSet.size < 4) {
-         let fake = ans + Math.floor(Math.random() * 5) - 2; if (fake < 0) fake += 3;
-         let fStr = `${fake}/${d}`; if (fake === 0) fStr = "0"; if (fake === d) fStr = "1";
-         optSet.add(fStr);
-      }
-      mathTask = { type: "NORMAL", q: `${renderSimpleFrac(a,d)} ${isAdd ? '+' : '-'} ${renderSimpleFrac(b,d)} &nbsp;=&nbsp; ?`, ans: cStr, opts: Array.from(optSet).sort(()=>Math.random()-0.5) };
+  if (mathOperation === "ADD_SUB_20_NO") {
+      a = 10 + Math.floor(Math.random() * 8); b = Math.floor(Math.random() * (19 - a)) + 1;
+      mathTask = { type: "NORMAL", q: `${a} + ${b} = ?`, ans: a + b, opts: makeNumOpts(a + b) };
   } else {
       a = Math.floor(Math.random() * 9) + 2; b = Math.floor(Math.random() * 9) + 2;
       mathTask = { type: "NORMAL", q: `${a} · ${b} = ?`, ans: a * b, opts: makeNumOpts(a * b) };
   }
 }
 
-// LOGIKA KLÁVESNICE
+// LOGIKA KLÁVESNICE - Nyní aktualizuje přímo DOM bez poskakování obrazovky!
 window.clickMathKey = function(k) {
     if (mathTask.isDone) return;
-    if (k === 'C') mathTask.input = "";
-    else mathTask.input = (mathTask.input || "") + k;
-    if (typeof renderActiveGame === 'function') renderActiveGame();
+    
+    // Nové chování Backspace
+    if (k === '⌫') {
+        mathTask.input = (mathTask.input || "").slice(0, -1);
+    } else {
+        mathTask.input = (mathTask.input || "") + k;
+    }
+    
+    // Přímá aktualizace prvku (nepřekresluje se celá hra, takže obrazovka neskáče!)
+    const inputEl = document.getElementById("math-keyboard-input");
+    if (inputEl) {
+        if (mathTask.input) {
+            inputEl.innerHTML = mathTask.input;
+        } else {
+            let placeholder = "Zadej úpravu... např. /2, -3x";
+            if (mathTask.type === "BUILD_EXPR") placeholder = "Zadej tvar... např. (x-5)*(x-5)";
+            if (mathTask.type === "FRAC_STEP") placeholder = "Zadej mezikrok... např. 4/12+3/12";
+            inputEl.innerHTML = `<span style="color:var(--col-text-muted); font-size:14px; letter-spacing:normal;">${placeholder}</span>`;
+        }
+    }
 };
 
 window.submitMathKey = function() {
@@ -190,11 +232,52 @@ window.handleEqStepChoice = function(opt) {
     if (mathTask.isDone) return;
     let cleanOpt = opt.replace(/\s+/g, '');
     
-    // ZPRACOVÁNÍ VÝRAZŮ (Nová svobodná algebra!)
+    // --- 1. ZPRACOVÁNÍ: ZLOMKY NA PAPÍŘE ---
+    if (mathTask.type === "FRAC_STEP") {
+        let val = null;
+        try { val = new Function('return ' + cleanOpt)(); } catch(e) {}
+        
+        if (val === null || isNaN(val) || !isFinite(val)) { 
+            sndErr(); alert("Neplatný matematický zápis!"); 
+            // Očištění displeje pomocí renderActiveGame (zde je to žádoucí kvůli chybě)
+            if (typeof renderActiveGame === 'function') renderActiveGame();
+            return; 
+        }
+
+        // Pokud je hodnota matematicky správně
+        if (Math.abs(val - mathTask.targetVal) < 0.0001) {
+            // Kontrola, zda už to převedl na jediný zlomek v základním tvaru
+            let finalMatch = cleanOpt.match(/^(-?\d+)(?:\/(\d+))?$/);
+            if (finalMatch) {
+                let num = parseInt(finalMatch[1]);
+                let den = finalMatch[2] ? parseInt(finalMatch[2]) : 1;
+                
+                if (gcd(Math.abs(num), Math.abs(den)) === 1) {
+                    sndOk(); mathTask.isDone = true; mathStreak++; addReward(2, "Zlomky");
+                    mathTask.history.push({ eq: opt, op: "<span style='color:var(--col-green);'>✓ Hotovo</span>" });
+                } else {
+                    sndErr(); alert("Hodnota je správně, ale zlomek není v základním tvaru! Zkrať ho.");
+                    if (typeof renderActiveGame === 'function') renderActiveGame();
+                    return;
+                }
+            } else {
+                playTone(500, 'sine', 0.05);
+                mathTask.history.push({ eq: opt, op: "✓ Správný mezikrok" });
+            }
+        } else {
+            sndErr(); alert("Chyba ve výpočtu. Hodnota výrazu neodpovídá zadání!");
+            if (typeof renderActiveGame === 'function') renderActiveGame();
+            return;
+        }
+        if (typeof renderActiveGame === 'function') renderActiveGame();
+        return;
+    }
+    
+    // --- 2. ZPRACOVÁNÍ: ALGEBRAICKÉ VÝRAZY ---
     if (mathTask.type === "BUILD_EXPR") {
         let val10 = evalExpr(cleanOpt, 10);
         let valM7 = evalExpr(cleanOpt, -7);
-        if (val10 === null) { sndErr(); alert("Neplatný matematický zápis! Zkus to jinak."); return; }
+        if (val10 === null) { sndErr(); alert("Neplatný matematický zápis! Zkus to jinak."); if (typeof renderActiveGame === 'function') renderActiveGame(); return; }
         
         let target10 = evalExpr(mathTask.target, 10);
         let targetM7 = evalExpr(mathTask.target, -7);
@@ -214,18 +297,18 @@ window.handleEqStepChoice = function(opt) {
         return;
     }
 
-    // ZPRACOVÁNÍ ROVNIC
+    // --- 3. ZPRACOVÁNÍ: KROKOVÉ ROVNICE ---
     let match = cleanOpt.match(/^([+\-*/])(-?)(\d*)(\/\d+)?(x?)$/i);
     if (match) {
         let op = match[1]; let isNeg = match[2] === '-'; let numStr = match[3]; let denStr = match[4]; let isX = match[5].toLowerCase() === 'x';
         let num = 1;
-        if (numStr) num = parseInt(numStr); else if (!isX) { sndErr(); alert("Zadej znaménko a číslo (např. +5, /2)"); return; }
+        if (numStr) num = parseInt(numStr); else if (!isX) { sndErr(); alert("Zadej znaménko a číslo (např. +5, /2)"); if(typeof renderActiveGame==='function') renderActiveGame(); return; }
         num *= (isNeg ? -1 : 1);
         let den = denStr ? parseInt(denStr.substring(1)) : 1;
         let valF = frac(num, den);
         
-        if ((op === '*' || op === '/') && isX) { sndErr(); alert("Násobení/dělení neznámou 'x' zatím není povoleno."); return; }
-        if (op === '/' && valF.n === 0) { sndErr(); alert("Nulou nelze dělit!"); return; }
+        if ((op === '*' || op === '/') && isX) { sndErr(); alert("Násobení/dělení neznámou 'x' zatím není povoleno."); if(typeof renderActiveGame==='function') renderActiveGame(); return; }
+        if (op === '/' && valF.n === 0) { sndErr(); alert("Nulou nelze dělit!"); if(typeof renderActiveGame==='function') renderActiveGame(); return; }
 
         let opDisplay = `${op} ${isNeg?'-':''}${numStr}${denStr||''}${isX?'x':''}`;
         mathTask.history[mathTask.history.length - 1].op = opDisplay;
@@ -249,7 +332,7 @@ window.handleEqStepChoice = function(opt) {
         if (isXLeft || isXRight) { sndOk(); mathTask.isDone = true; mathStreak++; addReward(2, "Rovnice"); } 
         else { playTone(500, 'sine', 0.05); }
         if(typeof renderActiveGame === 'function') renderActiveGame();
-    } else { sndErr(); alert("Nerozumím zápisu. (Zkus např. +5, /2, -3x)"); }
+    } else { sndErr(); alert("Nerozumím zápisu. (Zkus např. +5, /2, -3x)"); if(typeof renderActiveGame==='function') renderActiveGame(); }
 };
 
 function makeNumOpts(correct, step = 1) {
