@@ -443,42 +443,42 @@ function renderActiveGame() {
     `;
   }
 
-  else if (selectedGame === "PROCEDURAL_MATH") {
+ else if (selectedGame === "PROCEDURAL_MATH") {
     
-    // --- VYKRESLENÍ: KROKOVÉ ROVNICE ---
+    // --- VYKRESLENÍ: KROKOVÉ ROVNICE (ALGEBRA) ---
     if (mathTask.type === "STEP_EQ") {
-        const isDone = mathTask.isDone === true; // Zde byla ta chyba! Nyní funguje správně.
+        const isDone = mathTask.isDone === true;
         
         let controlsHtml = "";
         if (!isDone) {
             if (mathTask.mode === "KEYBOARD") {
-                // UI KLÁVESNICE
+                // UI KLÁVESNICE - Zvětšené tlačítka pro mobily
                 controlsHtml = `
-                  <div style="background:var(--col-card); border:1px solid var(--col-card-border); border-radius:10px; padding:10px; margin-bottom:15px; text-align:center; font-size:26px; font-family:monospace; color:var(--col-yellow); min-height:55px; display:flex; align-items:center; justify-content:center; letter-spacing:2px;">
+                  <div style="background:var(--col-card); border:1px solid var(--col-card-border); border-radius:10px; padding:10px; margin-bottom:12px; text-align:center; font-size:32px; font-family:monospace; color:var(--col-yellow); min-height:65px; display:flex; align-items:center; justify-content:center; letter-spacing:2px; box-shadow: inset 0 2px 5px rgba(0,0,0,0.2);">
                       ${mathTask.input ? mathTask.input : '<span style="color:var(--col-text-muted); font-size:16px; letter-spacing:normal;">Zadej operaci... (např. /2, -3x)</span>'}
                   </div>
-                  <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:8px; max-width:400px; margin: 0 auto;">
-                      <div class="opt-btn" onclick="clickMathKey('+')">+</div>
-                      <div class="opt-btn" onclick="clickMathKey('-')">-</div>
-                      <div class="opt-btn" onclick="clickMathKey('*')">*</div>
-                      <div class="opt-btn" onclick="clickMathKey('/')">/</div>
+                  <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:8px; max-width:450px; margin: 0 auto;">
+                      <div class="opt-btn" style="height:65px; font-size:28px;" onclick="clickMathKey('+')">+</div>
+                      <div class="opt-btn" style="height:65px; font-size:28px;" onclick="clickMathKey('-')">-</div>
+                      <div class="opt-btn" style="height:65px; font-size:28px;" onclick="clickMathKey('*')">*</div>
+                      <div class="opt-btn" style="height:65px; font-size:28px;" onclick="clickMathKey('/')">/</div>
 
-                      <div class="opt-btn" onclick="clickMathKey('7')">7</div>
-                      <div class="opt-btn" onclick="clickMathKey('8')">8</div>
-                      <div class="opt-btn" onclick="clickMathKey('9')">9</div>
-                      <div class="opt-btn" style="background:#1e293b; color:#38bdf8;" onclick="clickMathKey('x')">x</div>
+                      <div class="opt-btn" style="height:65px; font-size:28px;" onclick="clickMathKey('7')">7</div>
+                      <div class="opt-btn" style="height:65px; font-size:28px;" onclick="clickMathKey('8')">8</div>
+                      <div class="opt-btn" style="height:65px; font-size:28px;" onclick="clickMathKey('9')">9</div>
+                      <div class="opt-btn" style="height:65px; font-size:28px; background:#1e293b; color:#38bdf8; border-color:#0284c7;" onclick="clickMathKey('x')">x</div>
 
-                      <div class="opt-btn" onclick="clickMathKey('4')">4</div>
-                      <div class="opt-btn" onclick="clickMathKey('5')">5</div>
-                      <div class="opt-btn" onclick="clickMathKey('6')">6</div>
-                      <div class="opt-btn" style="background:var(--col-red);" onclick="clickMathKey('C')">C</div>
+                      <div class="opt-btn" style="height:65px; font-size:28px;" onclick="clickMathKey('4')">4</div>
+                      <div class="opt-btn" style="height:65px; font-size:28px;" onclick="clickMathKey('5')">5</div>
+                      <div class="opt-btn" style="height:65px; font-size:28px;" onclick="clickMathKey('6')">6</div>
+                      <div class="opt-btn" style="height:65px; font-size:28px; background:var(--col-red); border-color:#f87171;" onclick="clickMathKey('C')">C</div>
 
-                      <div class="opt-btn" onclick="clickMathKey('1')">1</div>
-                      <div class="opt-btn" onclick="clickMathKey('2')">2</div>
-                      <div class="opt-btn" onclick="clickMathKey('3')">3</div>
-                      <div class="opt-btn green" style="grid-row: span 2; display:flex; align-items:center; justify-content:center;" onclick="submitMathKey()">OK</div>
+                      <div class="opt-btn" style="height:65px; font-size:28px;" onclick="clickMathKey('1')">1</div>
+                      <div class="opt-btn" style="height:65px; font-size:28px;" onclick="clickMathKey('2')">2</div>
+                      <div class="opt-btn" style="height:65px; font-size:28px;" onclick="clickMathKey('3')">3</div>
+                      <div class="opt-btn green" style="grid-row: span 2; display:flex; align-items:center; justify-content:center; font-size:24px;" onclick="submitMathKey()">OK</div>
 
-                      <div class="opt-btn" style="grid-column: span 3;" onclick="clickMathKey('0')">0</div>
+                      <div class="opt-btn" style="grid-column: span 3; height:65px; font-size:28px;" onclick="clickMathKey('0')">0</div>
                   </div>
                 `;
             } else {
@@ -487,39 +487,57 @@ function renderActiveGame() {
                   <p style="text-align:center; color:var(--col-text-muted); margin-bottom:8px;">Vyber operaci pro aplikaci na obě strany:</p>
                   <div class="grid-2">
                      ${mathTask.opts.map(opt => `
-                       <div class="opt-btn" style="height:55px; font-size:22px; font-weight:bold; font-family:monospace;" onclick="handleEqStepChoice('${opt}')">${opt}</div>
+                       <div class="opt-btn" style="height:65px; font-size:24px; font-weight:bold; font-family:monospace;" onclick="handleEqStepChoice('${opt}')">${opt}</div>
                      `).join('')}
                   </div>
                 `;
             }
         } else {
             // HOTOVO TLAČÍTKO
-            controlsHtml = `<div class="action-btn green" onclick="generateMathTask();renderActiveGame();">VÝBORNĚ! DALŠÍ ROVNICE ➔</div>`;
+            controlsHtml = `<div class="action-btn green" style="padding:18px; font-size:22px; width:100%;" onclick="generateMathTask();renderActiveGame();">VÝBORNĚ! DALŠÍ ➔</div>`;
         }
 
+        // --- KOMPLETNÍ HTML STRUKTURA S FIXNÍ KLÁVESNICÍ A SCROLLOVACÍ HISTORIÍ ---
         main.innerHTML = `
-          <div class="bargraph-container">
-            <div class="bargraph-header">
-              <span>Série správně: ${typeof mathStreak !== "undefined" ? mathStreak : 0} 🔥</span>
-              <span style="color:var(--col-active-tab);">${selectedGroupKey}</span>
-            </div>
-            <div class="bargraph-track"><div class="bargraph-fill" style="width:${Math.min(100, (typeof mathStreak !== "undefined" ? mathStreak : 0) * 10)}%;"></div></div>
-          </div>
-          
-          <div style="background:var(--col-card); border:1px solid var(--col-card-border); border-radius:10px; padding:20px; margin:15px 0; display:flex; flex-direction:column; gap:10px;">
-             ${mathTask.history.map((step, i) => `
-                <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:${i<mathTask.history.length-1 ? '1px solid #334155' : 'none'}; padding-bottom:${i<mathTask.history.length-1 ? '8px' : '0'};">
-                   <div style="font-size:26px; color:${i===mathTask.history.length-1 && isDone ? 'var(--col-green)' : '#fff'}; font-weight:bold;">${step.eq}</div>
-                   ${step.op ? `<div style="background:#1e293b; color:var(--col-yellow); padding:4px 10px; border-radius:6px; font-weight:bold; font-family:monospace;">| ${step.op}</div>` : ''}
+          <div style="display:flex; flex-direction:column; min-height:100%; position:relative;">
+              <div class="bargraph-container" style="flex-shrink:0;">
+                <div class="bargraph-header">
+                  <span>Série správně: ${typeof mathStreak !== "undefined" ? mathStreak : 0} 🔥</span>
+                  <span style="color:var(--col-active-tab);">${selectedGroupKey}</span>
                 </div>
-             `).join('')}
+                <div class="bargraph-track"><div class="bargraph-fill" style="width:${Math.min(100, (typeof mathStreak !== "undefined" ? mathStreak : 0) * 10)}%;"></div></div>
+              </div>
+              
+              <!-- SCROLLOVACÍ HISTORIE (Barva inherit opravuje chybu u Arctic skinu) -->
+              <div id="eq-history-container" style="background:var(--col-card); border:1px solid var(--col-card-border); border-radius:10px; padding:15px; margin:15px 0; max-height:45vh; overflow-y:auto; flex-shrink:0;">
+                 ${mathTask.history.map((step, i) => `
+                    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:${i<mathTask.history.length-1 ? '1px solid var(--col-card-border)' : 'none'}; padding-bottom:${i<mathTask.history.length-1 ? '10px' : '0'}; margin-bottom:${i<mathTask.history.length-1 ? '10px' : '0'};">
+                       <div style="font-size:28px; color:${i===mathTask.history.length-1 && isDone ? 'var(--col-green)' : 'inherit'}; font-weight:bold;">${step.eq}</div>
+                       ${step.op ? `<div style="background:var(--col-bg); color:var(--col-yellow); padding:6px 12px; border-radius:6px; font-weight:bold; font-family:monospace; font-size:18px; border: 1px solid var(--col-card-border);">| ${step.op}</div>` : ''}
+                    </div>
+                 `).join('')}
+              </div>
+              
+              <div style="flex:1;"></div> <!-- Mezera, aby to případně odtlačilo klávesnici -->
+              
+              <!-- ZUKOTVENÁ KLÁVESNICE DOLE (Sticky) -->
+              <div style="position:sticky; bottom:-12px; background:var(--col-bg); margin:0 -12px; padding:10px 12px 12px 12px; border-top:2px solid var(--col-card-border); z-index:10;">
+                ${controlsHtml}
+              </div>
           </div>
-          
-          ${controlsHtml}
         `;
+
+        // Automatický odscroll úplně dolů po zobrazení nového kroku
+        setTimeout(() => {
+            const histEl = document.getElementById("eq-history-container");
+            if (histEl) histEl.scrollTop = histEl.scrollHeight;
+            const mainEl = document.getElementById("main-content");
+            if (mainEl) mainEl.scrollTop = mainEl.scrollHeight;
+        }, 50);
+
     } 
     
-    // --- VYKRESLENÍ: STANDARDNÍ VÝPOČET (Zlomky, Násobilka atd.) ---
+    // --- VYKRESLENÍ: STANDARDNÍ VÝPOČTY (Zlomky, Procenta, atd.) ---
     else {
         const isAns = (typeof mathChosenAnswer !== "undefined" && mathChosenAnswer !== null);
         main.innerHTML = `
@@ -530,7 +548,8 @@ function renderActiveGame() {
             </div>
             <div class="bargraph-track"><div class="bargraph-fill" style="width:${Math.min(100, (typeof mathStreak !== "undefined" ? mathStreak : 0) * 10)}%;"></div></div>
           </div>
-          <div class="prompt-box" style="font-size:36px; color:#fff; margin:20px 0; letter-spacing: 2px;">${mathTask.q}</div>
+          <!-- Zde je také opraveno color:inherit pro světlý skin -->
+          <div class="prompt-box" style="font-size:36px; color:inherit; margin:20px 0; letter-spacing: 2px;">${mathTask.q}</div>
           <div class="grid-2">
             ${mathTask.opts.map(opt => `
               <div class="opt-btn ${isAns ? (String(opt)===String(mathTask.ans)?'correct':(opt===mathChosenAnswer?'wrong':'')) : ''}" style="height:60px;font-size:26px;font-weight:bold;" onclick="clickMathChoice('${opt}')">${opt}</div>
@@ -539,229 +558,5 @@ function renderActiveGame() {
           ${isAns ? `<div class="action-btn ${String(mathChosenAnswer)===String(mathTask.ans)?'green':'red'}" onclick="generateMathTask();renderActiveGame();">DALŠÍ PŘÍKLAD ➔</div>` : ''}
         `;
     }
-  }
-
-  else if (selectedGame === "SEQ") {
-    if (sItems.length === 0) return;
-    const seqConfig = sItems[selectedSeqIndex] || sItems[0];
-    const itemsList = seqConfig.answer.split('|').map(s => s.trim()).filter(Boolean);
-    const isFinished = seqTargetIdx >= itemsList.length;
-    const targetWord = itemsList[seqTargetIdx];
-    const pct = Math.round((seqTargetIdx / itemsList.length) * 100);
-
-    main.innerHTML = `
-      <div class="bargraph-container">
-        <div class="bargraph-header">
-          <span>Položka ${Math.min(seqTargetIdx + 1, itemsList.length)} z ${itemsList.length} ${seqHintActive ? '<b style="color:var(--col-yellow);">[NÁPOVĚDA]</b>' : ''}</span>
-          <span id="seq-timer" style="color:var(--col-yellow);font-weight:bold;">0.0 s</span>
-        </div>
-        <div class="bargraph-track"><div class="bargraph-fill" style="width:${pct}%;"></div></div>
-      </div>
-      <div class="prompt-box ${isHebrew ? 'hebrew-text' : ''}" style="margin:8px 0;min-height:56px;color:#fff;font-size:22px;">
-        ${itemsList.slice(0, seqTargetIdx).join(' ')} 
-        <span style="color:var(--col-yellow);">${seqHintActive ? `[ ${targetWord}! ]` : '[ ??? ]'}</span>
-      </div>
-      ${!isFinished ? `
-        <div class="grid-2">
-          ${seqSlots.map((itemIdx, slot) => {
-            const isHintSlot = (seqHintActive && itemIdx === seqTargetIdx);
-            return `<div id="seq-btn-${slot}" class="opt-btn ${isHebrew ? 'hebrew' : ''} ${isHintSlot ? 'hint' : ''}" onclick="clickSeqSlot(${slot})">${itemIdx !== -1 ? itemsList[itemIdx] : ''}</div>`;
-          }).join('')}
-        </div>
-      ` : `<div class="action-btn green" onclick="initSequence();renderActiveGame();">DOKONČENO! HRÁT ZNOVU</div>`}
-    `;
-  }
-
-  // --- ZDE JE OPRAVENÝ HAD (FUNKČNÍ TLAČÍTKA PO SMRTI) ---
-  else if (selectedGame === "SNAKE") {
-    if (typeof snakeState === "undefined") {
-      main.innerHTML = `<div style="text-align:center;padding:30px;color:var(--col-red);">Chyba: Soubor snake.js chybí nebo se nenačetl!</div>`;
-      return;
-    }
-
-    if (snakeState === "GAMEOVER") {
-      if (isCampaignMinigame) {
-        let bonusCoins = Math.floor(snakeScore / 2);
-        main.innerHTML = `
-          <div style="text-align:center;padding:35px;">
-            <h2 style="color:var(--col-green);font-size:28px;">GAME OVER! (Trénink dokončen) 🎉</h2>
-            <p style="font-size:20px;color:#fff;margin:10px 0;">Had poskládal: <b>${snakeScore} slov</b> (Bonus: +${bonusCoins} 💰)</p>
-            <p style="font-size:24px;color:var(--col-yellow);margin-bottom:25px;">Celkem získáváš: +${campaignMinigameCoins + bonusCoins} 💰</p>
-            <div class="action-btn green" ontouchstart="if(typeof finishCampaign === 'function') finishCampaign(${campaignMinigameCoins + bonusCoins})" onclick="if(typeof finishCampaign === 'function') finishCampaign(${campaignMinigameCoins + bonusCoins})">PŘIPSAT ZLAŤÁKY A ZPĚT</div>
-          </div>
-        `;
-      } else {
-        main.innerHTML = `
-          <div style="text-align:center;padding:35px;">
-            <h2 style="color:var(--col-red);font-size:32px;font-weight:bold;">GAME OVER! 💔</h2>
-            <p style="font-size:20px;color:#fff;margin:12px 0;">Správně složeno: <b>${snakeScore} slov</b></p>
-            <div class="action-btn green" ontouchstart="if(typeof startSnakeGame === 'function') startSnakeGame()" onclick="if(typeof startSnakeGame === 'function') startSnakeGame()">HRÁT ZNOVU ➔</div>
-            <div class="action-btn" ontouchstart="if(typeof setScreen === 'function') setScreen('SELECT_GAME')" onclick="if(typeof setScreen === 'function') setScreen('SELECT_GAME')">ZPĚT</div>
-          </div>
-        `;
-      }
-      return;
-    }
-
-    const canBuyShield = snakeLives > 1 && snakeShieldLetters <= 0;
-    const coins = typeof currentUser !== 'undefined' && currentUser ? getUserCoins(currentUser.name) : 0;
-    const canBuyShieldCoins = snakeLives === 1 && snakeShieldLetters <= 0 && coins >= 15;
-    let targetLetterChar = (typeof snakeTargetLetters !== "undefined" && snakeTargetLetters && snakeTargetLetters[snakeCurrentIdx]) ? snakeTargetLetters[snakeCurrentIdx] : '';
-
-    main.innerHTML = `
-      <div class="snake-container">
-        <div class="snake-header-box">
-          <div class="snake-stats">
-            <span>${"❤️".repeat(snakeLives)}</span>
-            
-            ${snakeShieldLetters > 0 ? `
-              <span id="snake-shield-indicator" class="snake-shield-btn active">🛡️ Štít: ${snakeShieldLetters} p.</span>
-            ` : (canBuyShield ? `
-              <button class="snake-shield-btn" ontouchstart="if(typeof buySnakeShieldInGame === 'function') buySnakeShieldInGame(event)" onclick="if(typeof buySnakeShieldInGame === 'function') buySnakeShieldInGame(event)">
-                🛡️ Koupit štít (-1 ❤️)
-              </button>
-            ` : (canBuyShieldCoins ? `
-              <button class="snake-shield-btn" style="border-color:var(--col-yellow);color:var(--col-yellow);" ontouchstart="if(typeof buySnakeShieldWithCoins === 'function') buySnakeShieldWithCoins(event)" onclick="if(typeof buySnakeShieldWithCoins === 'function') buySnakeShieldWithCoins(event)">
-                🛡️ Štít (15 💰)
-              </button>
-            ` : `
-              <span class="snake-shield-btn" style="opacity:0.4;">🛡️ Štít</span>
-            `))}
-
-            <span style="color:var(--col-active-tab);">Body: ${snakeScore}</span>
-          </div>
-
-          ${snakeCurrentWord ? `
-            <div class="snake-prompt-cz">${snakeCurrentWord.czech}</div>
-            <div id="snake-slots-wrap" class="snake-slots-row">
-              ${snakeTargetLetters.map((ch, idx) => `
-                <div class="snake-slot ${idx < snakeCurrentIdx ? 'done' : (idx === snakeCurrentIdx ? 'active' : '')}">
-                  ${idx < snakeCurrentIdx ? ch : (idx === snakeCurrentIdx ? ch : '_')}
-                </div>
-              `).join('')}
-            </div>
-          ` : ''}
-
-          <div class="snake-status-bar" style="color:${(snakeState==='PAUSED_SHIELD' || snakeState==='WAITING')?'var(--col-yellow)':'var(--col-red)'};">
-            ${snakeStatusMsg}
-          </div>
-        </div>
-
-        <div class="snake-canvas-wrap">
-          <canvas id="snake-canvas" width="340" height="340"></canvas>
-
-          <!-- DIALOG PŘI VYPRŠENÍ ŠTÍTU -->
-          ${snakeState === "SHIELD_EXPIRED_PAUSE" ? `
-            <div class="snake-overlay">
-              <h3 style="color:var(--col-yellow);font-size:22px;margin-bottom:6px;">🛡️ ŠTÍT VYPRŠEL!</h3>
-              <p style="font-size:13px;color:#fff;margin-bottom:14px;">Dál už tě zdi ani tvůj ocas neochrání.</p>
-              ${canBuyShield ? `
-                <button class="action-btn" style="background:#4338ca;border-color:#818cf8;width:100%;max-width:250px;margin-bottom:8px;padding:9px;font-size:14px;" 
-                        ontouchstart="if(typeof buySnakeShieldInGame === 'function') buySnakeShieldInGame(event)" onclick="if(typeof buySnakeShieldInGame === 'function') buySnakeShieldInGame(event)">
-                  Koupit další štít (-1 ❤️ / 20 p.)
-                </button>
-              ` : (canBuyShieldCoins ? `
-                <button class="action-btn" style="background:#2d2605;border-color:var(--col-yellow);color:var(--col-yellow);width:100%;max-width:250px;margin-bottom:8px;padding:9px;font-size:14px;" 
-                        ontouchstart="if(typeof buySnakeShieldWithCoins === 'function') buySnakeShieldWithCoins(event)" onclick="if(typeof buySnakeShieldWithCoins === 'function') buySnakeShieldWithCoins(event)">
-                  Koupit štít za 15 💰 (20 p.)
-                </button>
-              ` : '')}
-              <button class="action-btn green" style="width:100%;max-width:250px;padding:9px;font-size:14px;" 
-                      ontouchstart="if(typeof resumeSnakeWithoutShield === 'function') resumeSnakeWithoutShield(event)" onclick="if(typeof resumeSnakeWithoutShield === 'function') resumeSnakeWithoutShield(event)">
-                Pokračovat bez štítu ▶️
-              </button>
-            </div>
-          ` : ''}
-        </div>
-
-        <div class="snake-dpad">
-          <div class="dpad-row">
-            <button class="dpad-btn" ontouchstart="event.preventDefault(); if(typeof setSnakeDirection === 'function') setSnakeDirection(0, -1);" onclick="if(typeof setSnakeDirection === 'function') setSnakeDirection(0, -1)">▲</button>
-          </div>
-          <div class="dpad-row">
-            <button class="dpad-btn" ontouchstart="event.preventDefault(); if(typeof setSnakeDirection === 'function') setSnakeDirection(-1, 0);" onclick="if(typeof setSnakeDirection === 'function') setSnakeDirection(-1, 0)">◄</button>
-            <button class="dpad-btn" ontouchstart="event.preventDefault(); if(typeof setSnakeDirection === 'function') setSnakeDirection(0, 1);" onclick="if(typeof setSnakeDirection === 'function') setSnakeDirection(0, 1)">▼</button>
-            <button class="dpad-btn" ontouchstart="event.preventDefault(); if(typeof setSnakeDirection === 'function') setSnakeDirection(1, 0);" onclick="if(typeof setSnakeDirection === 'function') setSnakeDirection(1, 0)">►</button>
-          </div>
-        </div>
-      </div>
-    `;
-    
-    if (typeof drawSnake === "function") {
-       drawSnake();
-       setTimeout(() => { if(typeof attachSnakeTouchHandlers === 'function') attachSnakeTouchHandlers(); }, 50);
-    }
-  }
-
-  // KAMPAŇ (SPIRÁLA)
-  else if (selectedGame === "CAMPAIGN") {
-    if (cmpIdx >= cmpQueue.length) {
-      launchCampaignMinigame();
-      return;
-    }
-
-    const task = cmpQueue[cmpIdx];
-    const pct = Math.round((cmpIdx / cmpQueue.length) * 100);
-    const heartsHtml = "❤️".repeat(cmpHearts) + "🖤".repeat(5 - cmpHearts);
-
-    let html = `
-      <div class="bargraph-container">
-        <div class="bargraph-header">
-          <span>Trénink: Úkol ${cmpIdx + 1} z ${cmpQueue.length}</span>
-          <span style="font-size:14px;">${heartsHtml}</span>
-        </div>
-        <div class="bargraph-track"><div class="bargraph-fill" style="width:${pct}%;"></div></div>
-      </div>
-    `;
-
-    if (task.type === 'KVIZ' || task.type.startsWith('QUIZ')) {
-      const isEval = cmpState === 'EVAL';
-      let promptDisplay = task.prompt;
-
-      if (isEval && task.type === 'KVIZ') {
-        const fillHtml = `<span style="color:var(--col-green);font-weight:bold;text-decoration:underline;">${task.correctAns}</span>`;
-        if (task.data.question.includes('___')) {
-          promptDisplay = formatPromptText(task.data.question.replace(/___+/g, fillHtml));
-        } else {
-          promptDisplay = formatPromptText(task.data.question) + " " + fillHtml;
-        }
-      }
-
-      html += `<div class="prompt-box" style="font-size:24px;color:#fff;margin:20px 0;">
-                 ${promptDisplay}
-                 ${(isEval && getTargetLang(selectedSubject) !== 'cs-CZ' && task.type !== 'QUIZ_IN') ? `<span class="audio-btn" onclick="speakWord('${(task.type==='KVIZ' && task.data.question.includes('___') ? task.data.question.replace(/___+/g, task.data.answer) : task.data.question).replace(/[*_]/g, '')}', '${selectedSubject}')">🔊</span>` : ''}
-               </div>`;
-      
-      html += `<div class="grid-2">`;
-      task.opts.forEach(opt => {
-        let btnCls = "";
-        if (isEval) {
-          if (opt === task.correctAns) btnCls = "correct";
-          else if (opt === cmpChosenOpt) btnCls = "wrong";
-        }
-        html += `<div class="opt-btn ${btnCls}" onclick="clickCmpQuizOpt('${opt.replace(/'/g, "\\'")}')">${opt}</div>`;
-      });
-      html += `</div>`;
-
-      if (isEval) {
-        if (task.data.help) html += `<div style="text-align:center;color:var(--col-yellow);margin:12px 0;font-weight:bold;">[ ${task.data.help} ]</div>`;
-        html += `<div class="action-btn green" style="margin-top:15px;" onclick="nextCmpTask()">DALŠÍ ➔</div>`;
-      }
-    }
-    else if (task.type === 'SCRAMBLE') {
-      html += `
-        <div class="prompt-box">Slož: <b>${cleanCzechTranslation(task.data.answer)}</b></div>
-        <div class="slots-row ${isHebrew ? 'hebrew-text' : ''}">
-          ${task.tiles.map((t, i) => `<div class="letter-slot ${task.isWordMode?'word-slot':''} ${i<task.placed.length?'filled':''}">${i<task.placed.length?task.placed[i]:'_'}</div>`).join('')}
-        </div>
-      `;
-      if (cmpState !== 'EVAL') {
-        html += `<div class="letters-row">${task.tiles.map((t, i) => `<div class="letter-tile ${task.isWordMode?'word-tile':''} ${isHebrew ? 'hebrew' : ''} ${t.used?'used':''}" onclick="clickCmpScrambleTile(${i})">${t.text}</div>`).join('')}</div>`;
-      } else {
-        if (task.data.help) html += `<div style="text-align:center;color:var(--col-active-tab);font-weight:bold;margin:10px 0;">[ ${task.data.help} ]</div>`;
-        html += `<div class="action-btn green" onclick="nextCmpTask()">DALŠÍ ➔</div>`;
-      }
-    }
-    main.innerHTML = html;
   }
 }
