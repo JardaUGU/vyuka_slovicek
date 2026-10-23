@@ -2,6 +2,7 @@
  * HLAVNÍ JÁDRO APLIKACE (Data, Uživatelé, Obchod, Menu, Časomíra)
  */
 const API_URL = "https://script.google.com/macros/s/AKfycbxaxBIXP-ECpWstcqRDw8RuT_ds6UwcplU_3pZ9_-ksELN5FVeGt5EHjjexkJVmx1FR_w/exec";
+const APP_VERSION = "7.4";
 
 let appData = { users: [], progress: {}, items: [], syncDate: "" };
 let currentUser = JSON.parse(localStorage.getItem("cur_user") || 'null');
@@ -16,12 +17,10 @@ let selectedGame = "";
 let selectedSeqIndex = 0;
 let testingDirection = localStorage.getItem("testing_dir") || "DIR_OUT";
 
-// Časomíra
 let todaySecondsStudied = 0;
 let lastUserActivityTime = Date.now();
 let isTimerPaused = false;
 let lastCloudSyncSec = 0;
-
 let previewingSkin = null;
 
 const APP_SKINS = [
@@ -123,35 +122,28 @@ function equipSkin(skinId) {
   renderScreen();
 }
 
-// NASTAVENÍ PIN HESLA
 function setUserPIN() {
   if (!currentUser) return;
   const newPin = prompt("Zadej nový číselný PIN (např. 1234). Pokud chceš PIN zrušit, nevyplňuj nic a dej OK:");
   if (newPin !== null) {
      const pinStr = newPin.trim();
      const uKey = currentUser.name.toLowerCase().trim();
-     
      const u = (appData.users || []).find(x => x.name.toLowerCase().trim() === uKey);
      if (u) u.pin = pinStr;
      localStorage.setItem(`user_pin_${uKey}`, pinStr);
-     
      try {
-       const fd = new URLSearchParams();
-       fd.append("action", "set_pin");
-       fd.append("user", currentUser.name);
-       fd.append("pin", pinStr);
+       const fd = new URLSearchParams(); fd.append("action", "set_pin"); fd.append("user", currentUser.name); fd.append("pin", pinStr);
        fetch(API_URL, { method: "POST", mode: "no-cors", body: fd });
      } catch(e) {}
-     
      alert(pinStr ? `Skvělé! Tvé heslo bylo nastaveno na: ${pinStr}` : "Heslo bylo zrušeno. Přístup je volný.");
      renderScreen();
   }
 }
 
-function forceHardReload() { window.location.href = window.location.origin + window.location.pathname + '?reload=' + Date.now(); }
+function forceHardReload() { const newUrl = window.location.origin + window.location.pathname + '?v=' + Date.now(); window.location.replace(newUrl); }
 function cleanCzechTranslation(text) { return text ? text.trim() : ""; }
 function getVocabItems() { return (activeItems || []).filter(it => it.type === "SLOVO"); }
-function getQuizItems()  { return (activeItems || []).filter(it => it.type === "KVIZ"); }
+function getQuizItems() { return (activeItems || []).filter(it => it.type === "KVIZ"); }
 function getSeqItems()   { return (activeItems || []).filter(it => it.type === "RADA"); }
 function getAdaptiveWindowSize(grade) { const g = parseInt(grade) || 2; return g >= 90 ? 12 : (g >= 10 ? 10 : Math.max(3, g)); }
 function getGraphemes(str) {
@@ -175,7 +167,6 @@ function isItemAllowedForGrade(it, userG) {
   return (parseInt(it.minGrade) || 2) === userG;
 }
 
-// EKONOMIKA A INVENTÁŘ
 function getUserCoins(userName) {
   if (!userName) return 0;
   const u = (appData.users || []).find(x => x.name.toLowerCase().trim() === userName.toLowerCase().trim());
@@ -196,8 +187,7 @@ function addCoins(userName, amount) {
   const u = (appData.users || []).find(x => x.name.toLowerCase().trim() === userName.toLowerCase().trim());
   if (u) u.coins = Math.max(0, (u.coins || 0) + amount);
   try {
-    const fd = new URLSearchParams();
-    fd.append("action", "add_coins"); fd.append("user", userName); fd.append("amount", amount);
+    const fd = new URLSearchParams(); fd.append("action", "add_coins"); fd.append("user", userName); fd.append("amount", amount);
     fetch(API_URL, { method: "POST", mode: "no-cors", body: fd });
   } catch(e) {}
 }
@@ -212,21 +202,16 @@ function buyShopItem(itemKey, cost) {
     let curCount = Number(localStorage.getItem(`item_${itemKey}_${uKey}`) || 0);
     localStorage.setItem(`item_${itemKey}_${uKey}`, curCount + 1);
     addCoins(currentUser.name, -cost);
-    
     try {
-      const fd = new URLSearchParams();
-      fd.append("action", "buy_item"); fd.append("user", currentUser.name);
-      fd.append("itemKey", itemKey); fd.append("cost", cost);
+      const fd = new URLSearchParams(); fd.append("action", "buy_item"); fd.append("user", currentUser.name); fd.append("itemKey", itemKey); fd.append("cost", cost);
       fetch(API_URL, { method: "POST", mode: "no-cors", body: fd });
     } catch(e) {}
-    
     alert(`Úspěšně zakoupeno! 🛒\nPoložka ${itemKey} byla přidána.`);
     renderScreen();
   } else { alert("Nemáš dostatek zlaťáků! 💰"); }
 }
 window.buyFreeze = function() { buyShopItem("Zmrazeni", 20); };
 
-// ČASOVAČ, STREAK A HLÍDÁNÍ PŮLNOCI
 function getTodayDateStr() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
 let activeDateStr = getTodayDateStr();
 
@@ -241,7 +226,7 @@ function checkDateRollover() {
 
 function updateFooter() {
   const fUser = document.getElementById("footer-user"); if (fUser) fUser.innerText = currentUser ? `Žák: ${currentUser.name}` : "Žák: --";
-  const statusEl = document.getElementById("footer-status"); if (statusEl && statusEl.innerText.includes("Restart")) statusEl.innerText = "v7.3 (OK)";
+  const statusEl = document.getElementById("footer-status"); if (statusEl && statusEl.innerText.includes("Restart")) statusEl.innerText = `v${APP_VERSION} (OK)`;
 }
 
 function getStudyTimeKey(userName) { return `study_sec_${getTodayDateStr()}_${(userName || 'user').toLowerCase().trim()}`; }
@@ -281,9 +266,7 @@ function updateUserStreak(userName, targetMinutes) {
         alert("Tvá denní série byla přerušena, protože jsi neměl dostatek zmrazení na všechny vynechané dny.");
       }
     }
-  } else {
-    streak = 1;
-  }
+  } else { streak = 1; }
 
   localStorage.setItem(`streak_${uKey}`, streak);
   localStorage.setItem(`streak_last_date_${uKey}`, todayStr);
@@ -300,8 +283,6 @@ window.addEventListener('keydown', registerUserAction, true);
 
 setInterval(() => {
   checkDateRollover();
-  
-  // Had a Arkáda se nezapočítávají do času studia!
   const isJustGame = (currentScreen === "PLAYING" && (selectedGame === "SNAKE" || selectedGame === "ARCADE"));
   
   if (currentScreen === "PLAYING" && currentUser && !isJustGame) {
@@ -341,30 +322,14 @@ function updateStudyTimerUI() {
   }
 }
 
-function sendTimeHeartbeatToGoogle() {
-  if (!currentUser) return;
-  try {
-    const fd = new URLSearchParams(); fd.append("action", "log_activity"); fd.append("user", currentUser.name);
-    fd.append("subject", selectedSubject || "Výuka"); fd.append("section", "Časomíra");
-    fd.append("stars", 0); fd.append("minutes", (todaySecondsStudied / 60).toFixed(1));
-    fetch(API_URL, { method: "POST", mode: "no-cors", body: fd });
-  } catch(e) {}
-}
+function sendTimeHeartbeatToGoogle() {}
 
-// RYCHLÉ NAČÍTÁNÍ
 async function loadData() {
   checkDateRollover();
   if (currentUser) todaySecondsStudied = loadUserStudyTime(currentUser.name);
-  
   const cached = localStorage.getItem("app_data");
-  if (cached) {
-    try {
-      appData = JSON.parse(cached);
-      if (!appData.items) appData.items = []; 
-      renderScreen();
-    } catch(e) { renderScreen(); }
-  } else { renderScreen(); }
-  
+  if (cached) { try { appData = JSON.parse(cached); if (!appData.items) appData.items = []; renderScreen(); } catch(e) { renderScreen(); } } 
+  else { renderScreen(); }
   syncDataQuietly();
 }
 
@@ -372,9 +337,10 @@ async function syncDataQuietly() {
   try {
     const res = await fetch(API_URL + '?t=' + Date.now() + '&clientDate=' + getTodayDateStr());
     const json = await res.json();
+    if (json.appVersion && String(json.appVersion) !== String(APP_VERSION)) { forceHardReload(); return; }
+    
     if (json && json.items) {
       json.syncDate = getTodayDateStr(); appData = json; localStorage.setItem("app_data", JSON.stringify(json));
-      
       if (currentUser && appData.users) {
         const foundU = appData.users.find(u => u.name.toLowerCase().trim() === currentUser.name.toLowerCase().trim());
         if (foundU) {
@@ -391,6 +357,34 @@ async function syncDataQuietly() {
       renderScreen();
     } else { renderScreen(); }
   } catch(e) { console.log("Offline mód aktivní"); renderScreen(); }
+}
+
+async function syncData() {
+  const statusEl = document.getElementById("footer-status");
+  if (statusEl) statusEl.innerText = "Stahuji...";
+  try {
+    const fetchUrl = API_URL + '?t=' + Date.now() + '&clientDate=' + getTodayDateStr();
+    const res = await fetch(fetchUrl);
+    const json = await res.json();
+
+    if (json.appVersion && String(json.appVersion) !== String(APP_VERSION)) { forceHardReload(); return; }
+
+    if (json && json.items) {
+      json.syncDate = getTodayDateStr(); appData = json; localStorage.setItem("app_data", JSON.stringify(json));
+      if (statusEl) statusEl.innerText = `OK: ${appData.items.length} úloh`;
+
+      if (currentUser && appData.users) {
+        const foundU = appData.users.find(u => u.name.toLowerCase().trim() === currentUser.name.toLowerCase().trim());
+        if (foundU) {
+          currentUser.coins = Number(foundU.coins || 0); currentUser.inventory = foundU.inventory || {};
+          let mergedThemes = getUserUnlockedThemes(currentUser.name); saveUserUnlockedThemes(currentUser.name, mergedThemes);
+          currentUser.unlockedThemes = mergedThemes; currentUser.activeTheme = getUserActiveTheme(currentUser.name);
+          localStorage.setItem("cur_user", JSON.stringify(currentUser)); applyAppSkin(currentUser.activeTheme);
+        }
+      }
+    }
+  } catch(e) { if (statusEl) statusEl.innerText = (appData && appData.items && appData.items.length > 0) ? `OK: ${appData.items.length} úloh` : "Offline"; }
+  renderScreen();
 }
 
 function setScreen(scr) { 
@@ -447,6 +441,13 @@ function toggleTestingDirection() {
   if (typeof initGameState === "function") initGameState();
   renderScreen();
 }
+
+// SPUŠTĚNÍ PŘÍBĚHU PŘÍMO DO ČTEČKY
+window.startStory = function(topicName) {
+  if (typeof launchStoryMode === "function") {
+    launchStoryMode(topicName);
+  }
+};
 
 function renderScreen() {
   try {
@@ -632,7 +633,7 @@ function renderScreen() {
       `;
     }
 
-    // 6. KAMPAŇ HUB (S PŘIDANÝM UKAZATELEM CEFR PRO ANGLIČTINU)
+    // 6. KAMPAŇ HUB (S PŘÍBĚHY A CEFR)
     else if (currentScreen === "CAMPAIGN_HUB") {
       bSubj.style.display = "flex"; bSubj.innerText = selectedSubject; bGroup.style.display = "none";
       const coins = getUserCoins(currentUser.name); const vItems = getVocabItems();
@@ -654,6 +655,7 @@ function renderScreen() {
       selectedGroupKey = currentLesson; let curItems = vItems.filter(it => it.lesson === currentLesson);
       let currentPct = (typeof getGroupMasteryPercent === "function") ? getGroupMasteryPercent(curItems, selectedSubject) : 0;
 
+      // CEFR Ukazatel
       let cefrHtml = "";
       if (subjNorm.includes("angli")) {
          const curIndex = lessons.indexOf(currentLesson);
@@ -677,6 +679,47 @@ function renderScreen() {
          `;
       }
 
+      // --- PŘÍBĚHY S KONTROLOU DOKONČENÍ A ODMĚNOU ---
+      let storiesGroups = {};
+      const userG = parseInt(currentUser.grade) || 2;
+      let allSubjectItems = (appData.items || []).filter(it => it.subject === selectedSubject && isItemAllowedForGrade(it, userG));
+      
+      allSubjectItems.forEach(it => {
+          if (it.type && it.type.toUpperCase().includes('PRIBEH')) {
+              let t = it.topic || 'Neznámý příběh';
+              if (!storiesGroups[t]) storiesGroups[t] = [];
+              storiesGroups[t].push(it);
+          }
+      });
+
+      let storiesHtml = "";
+      let storyKeys = Object.keys(storiesGroups);
+      if (storyKeys.length > 0) {
+          const uKey = currentUser.name.toLowerCase().trim();
+          storiesHtml += `<div style="margin-top:25px; text-align:left;">`;
+          storiesHtml += `<h3 style="color:var(--col-active-tab); font-size:18px; margin-bottom:10px;">📚 Příběhy k přečtení</h3>`;
+          storiesHtml += `<div style="display:flex; flex-direction:column; gap:8px;">`;
+          storyKeys.forEach(title => {
+              let sItems = storiesGroups[title];
+              let isDone = (typeof isStoryCompleted === "function") && isStoryCompleted(title, sItems);
+              let borderCol = isDone ? "var(--col-green)" : "var(--col-yellow)";
+              let badgeText = isDone ? `<span style="color:var(--col-green); font-weight:bold; font-size:14px;">✅ Přečteno</span>` : `<span style="color:var(--col-yellow); font-weight:bold; font-size:15px;">🎁 +10 💰</span>`;
+
+              storiesHtml += `
+                <div class="tile" style="flex-direction:row; justify-content:space-between; padding:12px 14px; background:var(--col-card); border-color:${borderCol};" onclick="startStory('${title.replace(/'/g, "\\'")}')">
+                  <div style="text-align:left;">
+                      <h3 style="color:inherit; font-size:16px;">${isDone ? '📖 ' : '✨ '}${title}</h3>
+                      <p style="color:var(--col-text-muted); font-size:12px; margin-top:2px;">${sItems.length} částí příběhu</p>
+                  </div>
+                  <div style="text-align:right;">
+                      ${badgeText}
+                  </div>
+                </div>
+              `;
+          });
+          storiesHtml += `</div></div>`;
+      }
+
       main.innerHTML = `
         <div style="text-align:center;padding:15px 10px;">
           <h2 style="color:var(--col-active-tab);font-size:26px;margin-bottom:12px;">Spirálová výuka</h2>
@@ -694,6 +737,7 @@ function renderScreen() {
           <p style="font-size:13px;color:var(--col-text-muted);margin-top:12px;">Udrž všech 5 ❤️ srdíček pro zisk zlaťáků!</p>
 
           ${cefrHtml}
+          ${storiesHtml}
 
           <div class="tile" style="border-color:var(--col-yellow);background:#1f1905;margin-top:20px;padding:12px;cursor:pointer;" onclick="setScreen('SHOP')">
             <div style="display:flex;justify-content:space-between;align-items:center;width:100%;">
