@@ -11,8 +11,8 @@ let isAdaptiveBatchMode = false;
 let scrambleDeck = [], scramblePlaced = [], scrambleTiles = [], scrambleIsWordMode = false, scrambleHadMistake = false, scrambleDone = false, scrambleSolvedCount = 0;
 let qCurStep = 0, qAnswered = false, qChosenOpt = null, qActiveList = [];
 
-// Přidána proměnná seqHighestDeployed, která řeší bug s duplikováním!
-let seqTargetIdx = 0, seqHighestDeployed = 0, seqSlots = [], seqStartTime = 0, seqTimerInterval = null, seqHintActive = false, seqInactivityTimer = null;
+// Proměnné pro Řadu na čas
+let seqTargetIdx = 0, seqSlots = [], seqStartTime = 0, seqTimerInterval = null, seqHintActive = false, seqInactivityTimer = null;
 
 
 // --- POMOCNÉ FUNKCE ---
@@ -235,7 +235,7 @@ function nextQuizStep() {
 
 
 // ==========================================
-// 5. ŘADA NA ČAS (SEQUENCE) - OPRAVENÁ
+// 5. ŘADA NA ČAS (SEQUENCE) - ANTI-FIFO ENGINE
 // ==========================================
 function resetInactivityTimer() {
   if (seqInactivityTimer) clearTimeout(seqInactivityTimer);
@@ -248,17 +248,29 @@ function initSequence() {
   const seqConfig = sItems[typeof selectedSeqIndex !== 'undefined' ? selectedSeqIndex : 0] || sItems[0];
   const itemsList = seqConfig.answer.split('|').map(s => s.trim()).filter(Boolean);
 
-  seqTargetIdx = 0; seqHintActive = false; seqSlots = [-1, -1, -1, -1];
+  seqTargetIdx = 0; 
+  seqHintActive = false; 
+  seqSlots = [-1, -1, -1, -1];
 
-  // Naplníme první 4 políčka (nebo méně, pokud je řada kratší)
   let initialCount = Math.min(4, itemsList.length);
-  for (let s = 0; s < initialCount; s++) {
-      seqSlots[s] = s;
-  }
-  // Poznamenáme si, jaký je aktuálně nejvyšší vyložený index
-  seqHighestDeployed = initialCount - 1;
+  
+  // GÉNIUS ANTI-FIFO: Nasadíme na začátek nulu a pár náhodných slov z budoucnosti
+  // Tím vytvoříme časovou "díru", která úplně zničí předvídatelnost tlačítek
+  let pool = [];
+  let poolSize = Math.min(itemsList.length - 1, 6); // Z kolika budoucích slov vybíráme
+  for (let i = 1; i <= poolSize; i++) pool.push(i);
+  pool.sort(() => Math.random() - 0.5); // Zamícháme budoucí měsíce
 
-  // Vizuálně zamícháme tlačítka
+  let startItems = [0]; // Nula (např. Leden) tam musí být vždy, aby mohl hráč začít
+  for (let i = 0; i < initialCount - 1; i++) {
+     startItems.push(pool[i]);
+  }
+
+  // Nasázíme do slotů a vizuálně zamícháme
+  for (let i = 0; i < startItems.length; i++) {
+      seqSlots[i] = startItems[i];
+  }
+  // Zamícháme tlačítka JEN POPRVÉ na začátku
   seqSlots.sort(() => Math.random() - 0.5);
 
   seqStartTime = Date.now();
@@ -288,16 +300,27 @@ function clickSeqSlot(slot) {
     seqHintActive = false;
     
     if (seqTargetIdx >= itemsList.length) {
+      // Řada kompletně dokončena
       clearInterval(seqTimerInterval); if (seqInactivityTimer) clearTimeout(seqInactivityTimer);
       sndFanfare(); addReward(3, typeof selectedGroupKey !== 'undefined' ? selectedGroupKey : "Řada");
+      seqSlots[slot] = -1; // Vyprázdníme poslední tlačítko
     } else {
-      // OPRAVA DUPLIKÁTŮ: Do uvolněného tlačítka pošleme další dosud neviděné slovo ze zásoby
-      seqHighestDeployed++;
-      seqSlots[slot] = seqHighestDeployed < itemsList.length ? seqHighestDeployed : -1;
+      // ANTI-FIFO OPRAVA: Najdeme nejbližší správné slovo, které JEŠTĚ NENÍ v žádném slotu
+      let nextItem = -1;
+      for (let i = seqTargetIdx; i < itemsList.length; i++) {
+          if (!seqSlots.includes(i)) {
+              nextItem = i;
+              break;
+          }
+      }
+      
+      // Nasadí do STÁVAJÍCÍHO políčka - takže políčka se už nemíchají, jen přepisují!
+      seqSlots[slot] = nextItem; 
       resetInactivityTimer();
     }
     if(typeof renderActiveGame === 'function') renderActiveGame();
   } else {
+    // Chyba, zaklepat a nechat být
     sndErr();
     if (btnEl) { btnEl.classList.add("wrong"); setTimeout(() => { if (btnEl) btnEl.classList.remove("wrong"); }, 250); }
     seqHintActive = true; resetInactivityTimer(); 
