@@ -1,3 +1,6 @@
+/**
+ * HLAVNÍ JÁDRO APLIKACE (Data, Uživatelé, Obchod, Menu, Časomíra)
+ */
 const API_URL = "https://script.google.com/macros/s/AKfycbxaxBIXP-ECpWstcqRDw8RuT_ds6UwcplU_3pZ9_-ksELN5FVeGt5EHjjexkJVmx1FR_w/exec";
 
 let appData = { users: [], progress: {}, items: [], syncDate: "" };
@@ -88,6 +91,14 @@ function buySkin(skinId, cost) {
 
     const u = (appData.users || []).find(x => x.name.toLowerCase().trim() === uKey);
     if (u) { u.unlockedThemes = themes; u.activeTheme = skinId; }
+    
+    try {
+      const fd = new URLSearchParams();
+      fd.append("action", "buy_theme"); fd.append("user", currentUser.name);
+      fd.append("themeId", skinId); fd.append("cost", cost);
+      fetch(API_URL, { method: "POST", mode: "no-cors", body: fd });
+    } catch(e) {}
+    
     alert("Nový vzhled byl odemčen a nasazen! 🎨");
     renderScreen();
   } else { alert("Nemáš dostatek zlaťáků! 💰"); }
@@ -102,20 +113,27 @@ function equipSkin(skinId) {
   applyAppSkin(skinId);
   const u = (appData.users || []).find(x => x.name.toLowerCase().trim() === uKey);
   if (u) u.activeTheme = skinId;
+  
+  try {
+    const fd = new URLSearchParams();
+    fd.append("action", "set_theme"); fd.append("user", currentUser.name); fd.append("themeId", skinId);
+    fetch(API_URL, { method: "POST", mode: "no-cors", body: fd });
+  } catch(e) {}
+  
   renderScreen();
 }
 
-// NASTAVENÍ PIN HESLA (Ukládá na Google)
+// NASTAVENÍ PIN HESLA
 function setUserPIN() {
   if (!currentUser) return;
   const newPin = prompt("Zadej nový číselný PIN (např. 1234). Pokud chceš PIN zrušit, nevyplňuj nic a dej OK:");
   if (newPin !== null) {
      const pinStr = newPin.trim();
-     
-     // Uložení lokálně i do cloudu
      const uKey = currentUser.name.toLowerCase().trim();
+     
      const u = (appData.users || []).find(x => x.name.toLowerCase().trim() === uKey);
      if (u) u.pin = pinStr;
+     localStorage.setItem(`user_pin_${uKey}`, pinStr);
      
      try {
        const fd = new URLSearchParams();
@@ -126,7 +144,7 @@ function setUserPIN() {
      } catch(e) {}
      
      alert(pinStr ? `Skvělé! Tvé heslo bylo nastaveno na: ${pinStr}` : "Heslo bylo zrušeno. Přístup je volný.");
-     renderScreen(); // Překreslí ikonu zámečku
+     renderScreen();
   }
 }
 
@@ -177,6 +195,11 @@ function addCoins(userName, amount) {
   if (!userName) return;
   const u = (appData.users || []).find(x => x.name.toLowerCase().trim() === userName.toLowerCase().trim());
   if (u) u.coins = Math.max(0, (u.coins || 0) + amount);
+  try {
+    const fd = new URLSearchParams();
+    fd.append("action", "add_coins"); fd.append("user", userName); fd.append("amount", amount);
+    fetch(API_URL, { method: "POST", mode: "no-cors", body: fd });
+  } catch(e) {}
 }
 
 function buyShopItem(itemKey, cost) {
@@ -189,6 +212,14 @@ function buyShopItem(itemKey, cost) {
     let curCount = Number(localStorage.getItem(`item_${itemKey}_${uKey}`) || 0);
     localStorage.setItem(`item_${itemKey}_${uKey}`, curCount + 1);
     addCoins(currentUser.name, -cost);
+    
+    try {
+      const fd = new URLSearchParams();
+      fd.append("action", "buy_item"); fd.append("user", currentUser.name);
+      fd.append("itemKey", itemKey); fd.append("cost", cost);
+      fetch(API_URL, { method: "POST", mode: "no-cors", body: fd });
+    } catch(e) {}
+    
     alert(`Úspěšně zakoupeno! 🛒\nPoložka ${itemKey} byla přidána.`);
     renderScreen();
   } else { alert("Nemáš dostatek zlaťáků! 💰"); }
@@ -210,14 +241,13 @@ function checkDateRollover() {
 
 function updateFooter() {
   const fUser = document.getElementById("footer-user"); if (fUser) fUser.innerText = currentUser ? `Žák: ${currentUser.name}` : "Žák: --";
-  const statusEl = document.getElementById("footer-status"); if (statusEl && statusEl.innerText.includes("Restart")) statusEl.innerText = "v7.2 (OK)";
+  const statusEl = document.getElementById("footer-status"); if (statusEl && statusEl.innerText.includes("Restart")) statusEl.innerText = "v7.3 (OK)";
 }
 
 function getStudyTimeKey(userName) { return `study_sec_${getTodayDateStr()}_${(userName || 'user').toLowerCase().trim()}`; }
 function loadUserStudyTime(userName) { if (!userName) return 0; return Number(localStorage.getItem(getStudyTimeKey(userName)) || 0); }
 function getUserStreak(userName) { if (!userName) return 0; return Number(localStorage.getItem(`streak_${userName.toLowerCase().trim()}`) || 0); }
 
-// OPRAVENÉ POČÍTÁNÍ SÉRIE S ODEČTEM ZMRAZENÍ
 function updateUserStreak(userName, targetMinutes) {
   if (!userName) return;
   const uKey = userName.toLowerCase().trim();
@@ -239,7 +269,6 @@ function updateUserStreak(userName, targetMinutes) {
       let freezes = getUserItemCount(userName, "Zmrazeni");
       
       if (freezes >= missedDays) {
-        // Odečtení zmrazení
         let newFreezeCount = freezes - missedDays;
         localStorage.setItem(`item_Zmrazeni_${uKey}`, newFreezeCount);
         const u = (appData.users || []).find(x => x.name.toLowerCase().trim() === uKey);
@@ -271,6 +300,8 @@ window.addEventListener('keydown', registerUserAction, true);
 
 setInterval(() => {
   checkDateRollover();
+  
+  // Had a Arkáda se nezapočítávají do času studia!
   const isJustGame = (currentScreen === "PLAYING" && (selectedGame === "SNAKE" || selectedGame === "ARCADE"));
   
   if (currentScreen === "PLAYING" && currentUser && !isJustGame) {
@@ -284,6 +315,7 @@ setInterval(() => {
       if (todaySecondsStudied - lastCloudSyncSec >= 45) { lastCloudSyncSec = todaySecondsStudied; sendTimeHeartbeatToGoogle(); }
     } else { isTimerPaused = true; }
   } else { isTimerPaused = true; }
+  
   updateStudyTimerUI();
 }, 1000);
 
@@ -309,9 +341,17 @@ function updateStudyTimerUI() {
   }
 }
 
-function sendTimeHeartbeatToGoogle() {}
+function sendTimeHeartbeatToGoogle() {
+  if (!currentUser) return;
+  try {
+    const fd = new URLSearchParams(); fd.append("action", "log_activity"); fd.append("user", currentUser.name);
+    fd.append("subject", selectedSubject || "Výuka"); fd.append("section", "Časomíra");
+    fd.append("stars", 0); fd.append("minutes", (todaySecondsStudied / 60).toFixed(1));
+    fetch(API_URL, { method: "POST", mode: "no-cors", body: fd });
+  } catch(e) {}
+}
 
-// RYCHLÉ NAČÍTÁNÍ (Opravený záchranný padák proti zaseknutí)
+// RYCHLÉ NAČÍTÁNÍ
 async function loadData() {
   checkDateRollover();
   if (currentUser) todaySecondsStudied = loadUserStudyTime(currentUser.name);
@@ -321,77 +361,52 @@ async function loadData() {
     try {
       appData = JSON.parse(cached);
       if (!appData.items) appData.items = []; 
-      renderScreen(); // Zobrazí okamžitě z mezipaměti
-    } catch(e) {
-      renderScreen(); // Pokud je cache poškozená, vykreslí se základní menu
-    }
-  } else {
-    // POKUD NENÍ CACHE: Vykreslí prázdnou strukturu, aby nezůstala jen viset hláška
-    renderScreen(); 
-  }
+      renderScreen();
+    } catch(e) { renderScreen(); }
+  } else { renderScreen(); }
   
-  // Aktualizace na pozadí, neruší uživatele načítací obrazovkou
   syncDataQuietly();
 }
 
-// TICHÁ SYNCHRONIZACE S API
 async function syncDataQuietly() {
   try {
     const res = await fetch(API_URL + '?t=' + Date.now() + '&clientDate=' + getTodayDateStr());
     const json = await res.json();
     if (json && json.items) {
-      json.syncDate = getTodayDateStr(); 
-      appData = json; 
-      localStorage.setItem("app_data", JSON.stringify(json));
+      json.syncDate = getTodayDateStr(); appData = json; localStorage.setItem("app_data", JSON.stringify(json));
       
       if (currentUser && appData.users) {
         const foundU = appData.users.find(u => u.name.toLowerCase().trim() === currentUser.name.toLowerCase().trim());
         if (foundU) {
-          currentUser.targetMinutes = foundU.targetMinutes || 15; 
-          currentUser.grade = parseInt(foundU.grade) || 2;
-          currentUser.coins = Number(foundU.coins || 0); 
-          currentUser.inventory = foundU.inventory || {};
+          currentUser.targetMinutes = foundU.targetMinutes || 15; currentUser.grade = parseInt(foundU.grade) || 2;
+          currentUser.coins = Number(foundU.coins || 0); currentUser.inventory = foundU.inventory || {};
           let cloudThemes = Array.isArray(foundU.unlockedThemes) ? foundU.unlockedThemes : (typeof foundU.unlockedThemes === 'string' ? foundU.unlockedThemes.split(',').map(s => s.trim().toLowerCase()) : []);
           let mergedThemes = [...new Set(['default', ...cloudThemes, ...getUserUnlockedThemes(currentUser.name)])];
           saveUserUnlockedThemes(currentUser.name, mergedThemes);
-          currentUser.unlockedThemes = mergedThemes; 
-          currentUser.activeTheme = getUserActiveTheme(currentUser.name);
+          currentUser.unlockedThemes = mergedThemes; currentUser.activeTheme = getUserActiveTheme(currentUser.name);
           currentUser.startLevels = foundU.startLevels || {};
           localStorage.setItem("cur_user", JSON.stringify(currentUser));
         }
       }
-      renderScreen(); // Tiché překreslení, pokud se něco změnilo (např. přibyli uživatelé)
-    } else {
-      renderScreen(); // Záchranný překres v případě chybného JSONu z Googlu
-    }
-  } catch(e) { 
-    console.log("Offline mód aktivní - nepodařilo se připojit k Google API"); 
-    renderScreen(); // Záchranný překres v případě, že jsi offline! Tím aplikace nezamrzne.
-  }
+      renderScreen();
+    } else { renderScreen(); }
+  } catch(e) { console.log("Offline mód aktivní"); renderScreen(); }
 }
 
 function setScreen(scr) { 
-  if (currentScreen === "SHOP" && scr !== "SHOP") cancelPreview(); // Oprava držícího skinu
-  currentScreen = scr; 
-  registerUserAction(); 
-  renderScreen(); 
+  if (currentScreen === "SHOP" && scr !== "SHOP") cancelPreview();
+  currentScreen = scr; registerUserAction(); renderScreen(); 
 }
 
-// VÝBĚR UŽIVATELE (Ošetření tlačítka Zrušit při heslu)
 function selectUser(name, grade, targetMinutes) {
   const uKey = name.toLowerCase().trim();
   const foundU = (appData.users || []).find(u => u.name.toLowerCase().trim() === uKey);
   
-  // Získáme PIN z tabulky (pokud je) nebo lokálně (záloha)
   const savedPin = (foundU && foundU.pin) ? foundU.pin : localStorage.getItem(`user_pin_${uKey}`);
-  
   if (savedPin && savedPin !== "") {
-     const inputPin = prompt(`Profil uživatele ${name} je chráněn PINem. Zadejte heslo:`);
-     if (inputPin === null) return; // Hráč klikl na "Zrušit", neděláme nic!
-     if (inputPin !== savedPin) {
-         alert("Nesprávné heslo!");
-         return;
-     }
+     const inputPin = prompt(`Profil ${name} je chráněn PINem. Zadejte heslo:`);
+     if (inputPin === null) return; 
+     if (inputPin !== savedPin) { alert("Nesprávné heslo!"); return; }
   }
 
   checkDateRollover();
@@ -402,13 +417,10 @@ function selectUser(name, grade, targetMinutes) {
     inventory: (foundU && foundU.inventory) ? foundU.inventory : {},
     unlockedThemes: themesArr, activeTheme: activeTh, coins: foundU ? Number(foundU.coins || 0) : 0
   };
-  localStorage.setItem("cur_user", JSON.stringify(currentUser)); 
-  applyAppSkin(currentUser.activeTheme);
+  localStorage.setItem("cur_user", JSON.stringify(currentUser)); applyAppSkin(currentUser.activeTheme);
   
   todaySecondsStudied = loadUserStudyTime(currentUser.name);
-  isTimerPaused = false; 
-  updateStudyTimerUI(); 
-  setScreen("SELECT_SUBJECT");
+  isTimerPaused = false; updateStudyTimerUI(); setScreen("SELECT_SUBJECT");
 }
 
 function chooseSubject(subj) { 
@@ -461,7 +473,7 @@ function renderScreen() {
             const uMin = Math.floor(uSec / 60); const targetM = u.targetMinutes || 15; const isDone = uMin >= targetM;
             const streakDays = (u.streak !== undefined) ? u.streak : getUserStreak(u.name);
             const coins = Number(u.coins || 0); const freezes = getUserItemCount(u.name, "Zmrazeni");
-            const hasPin = !!localStorage.getItem(`user_pin_${u.name.toLowerCase().trim()}`);
+            const hasPin = !!(u.pin || localStorage.getItem(`user_pin_${u.name.toLowerCase().trim()}`));
             let themesArr = getUserUnlockedThemes(u.name);
             const unlockedSkins = themesArr.filter(t => t !== 'default').map(t => { const s = APP_SKINS.find(x => x.id === t); return s ? s.name.split(' ')[0] : t; }).join(' ');
 
@@ -519,7 +531,7 @@ function renderScreen() {
         </div>
 
         <div class="grid-2">
-          <div class="tile" style="border-color:var(--col-active-tab);background:#102538;" onclick="openMathOperationSelect()">
+          <div class="tile" style="border-color:var(--col-active-tab);background:#102538;" onclick="if(typeof openMathOperationSelect === 'function') openMathOperationSelect()">
             <h2 style="color:var(--col-active-tab);">🔢 Matematika</h2><p>Výběr operací a dril</p>
           </div>
       `;
@@ -539,18 +551,21 @@ function renderScreen() {
       bSubj.style.display = "flex"; bSubj.innerText = "🛒 Obchod"; bGroup.style.display = "none";
       const coins = getUserCoins(currentUser.name); const freezes = getUserItemCount(currentUser.name, "Zmrazeni");
       const unlockedThemes = getUserUnlockedThemes(currentUser.name); const activeTheme = getUserActiveTheme(currentUser.name);
-      const hasPin = !!localStorage.getItem(`user_pin_${currentUser.name.toLowerCase().trim()}`);
+      
+      const uKey = currentUser.name.toLowerCase().trim();
+      const u = (appData.users || []).find(x => x.name.toLowerCase().trim() === uKey);
+      const hasPin = !!(u && u.pin) || !!localStorage.getItem(`user_pin_${uKey}`);
 
       main.innerHTML = `
         <div style="padding:4px;">
           <div style="background:var(--col-card);border:1px solid var(--col-card-border);border-radius:12px;padding:14px;margin-bottom:15px;display:flex;justify-content:space-between;align-items:center;">
-             <div><b style="color:#fff;font-size:16px;">🔐 Ochrana profilu</b><p style="font-size:12px;color:var(--col-text-muted);margin-top:2px;">Zamez ostatním ve vstupu do tvého účtu.</p></div>
+             <div><b style="font-size:16px;">🔐 Ochrana profilu</b><p style="font-size:12px;color:var(--col-text-muted);margin-top:2px;">Zamez ostatním ve vstupu do tvého účtu.</p></div>
              <button class="action-btn" style="margin:0;padding:8px 12px;font-size:14px;" onclick="setUserPIN()">${hasPin ? 'Změnit PIN' : 'Nastavit PIN'}</button>
           </div>
 
           <div style="background:var(--col-card);border:1px solid var(--col-card-border);border-radius:12px;padding:14px;margin-bottom:15px;">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-              <div><b style="color:#fff;font-size:16px;">🧊 Zmrazení série</b><p style="font-size:12px;color:var(--col-text-muted);margin-top:2px;">Ochrání tvou sérii, když vynecháš den.</p></div>
+              <div><b style="font-size:16px;">🧊 Zmrazení série</b><p style="font-size:12px;color:var(--col-text-muted);margin-top:2px;">Ochrání tvou sérii, když vynecháš den.</p></div>
               <span style="font-size:15px;color:var(--col-active-tab);font-weight:bold;margin-left:8px;">Máš: ${freezes}x</span>
             </div>
             <button class="action-btn" style="background:#2d2605;border-color:var(--col-yellow);color:var(--col-yellow);padding:10px;font-size:15px;width:100%;margin-top:6px;" onclick="buyFreeze()">Koupit zmrazení (Cena: 20 💰)</button>
@@ -639,18 +654,17 @@ function renderScreen() {
       selectedGroupKey = currentLesson; let curItems = vItems.filter(it => it.lesson === currentLesson);
       let currentPct = (typeof getGroupMasteryPercent === "function") ? getGroupMasteryPercent(curItems, selectedSubject) : 0;
 
-      // Generování CEFR ukazatele pro angličtinu
       let cefrHtml = "";
       if (subjNorm.includes("angli")) {
          const curIndex = lessons.indexOf(currentLesson);
          const cefrPct = Math.min(100, Math.max(0, Math.round((curIndex / Math.max(1, lessons.length - 1)) * 100)));
          cefrHtml = `
            <div style="margin-top:20px; background:var(--col-card); padding:10px 14px; border-radius:10px; border:1px solid var(--col-card-border);">
-             <div style="display:flex; justify-content:space-between; font-size:12px; color:var(--col-text-muted); margin-bottom:6px; font-weight:bold;">
-                <span style="${cefrPct<25?'color:#fff;':''}">A1</span>
-                <span style="${cefrPct>=25&&cefrPct<50?'color:#fff;':''}">A2</span>
-                <span style="${cefrPct>=50&&cefrPct<75?'color:#fff;':''}">B1</span>
-                <span style="${cefrPct>=75?'color:#fff;':''}">B2</span>
+             <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:6px;">
+                <span style="font-weight:${cefrPct<25?'bold':'normal'}; color:${cefrPct<25?'inherit':'var(--col-text-muted)'};">A1</span>
+                <span style="font-weight:${cefrPct>=25&&cefrPct<50?'bold':'normal'}; color:${cefrPct>=25&&cefrPct<50?'inherit':'var(--col-text-muted)'};">A2</span>
+                <span style="font-weight:${cefrPct>=50&&cefrPct<75?'bold':'normal'}; color:${cefrPct>=50&&cefrPct<75?'inherit':'var(--col-text-muted)'};">B1</span>
+                <span style="font-weight:${cefrPct>=75?'bold':'normal'}; color:${cefrPct>=75?'inherit':'var(--col-text-muted)'};">B2</span>
              </div>
              <div class="bargraph-track" style="height:12px; position:relative; background:#111a2a; border-radius:6px; overflow:hidden;">
                <div class="bargraph-fill" style="width:${cefrPct}%; background:linear-gradient(90deg, #3b82f6, #8b5cf6);"></div>
@@ -667,7 +681,7 @@ function renderScreen() {
         <div style="text-align:center;padding:15px 10px;">
           <h2 style="color:var(--col-active-tab);font-size:26px;margin-bottom:12px;">Spirálová výuka</h2>
           <p style="color:var(--col-text-muted);font-size:16px;margin-bottom:6px;">Aktuální lekce:</p>
-          <p style="color:#fff;font-size:28px;font-weight:bold;margin-bottom:10px;">${currentLesson}</p>
+          <p style="font-size:28px;font-weight:bold;margin-bottom:10px;">${currentLesson}</p>
 
           <div class="bargraph-container" style="max-width:280px;margin:0 auto 20px auto;">
             <div class="bargraph-header"><span>Postup lekce</span><span style="color:var(--col-green);">${currentPct} %</span></div>
@@ -713,7 +727,7 @@ function renderScreen() {
       if (quickMode) {
         html += `
           <div class="tile" style="border-color:var(--col-orange);grid-column: span 2;background:#231a0a;" onclick="if(typeof startArcadeGame==='function') startArcadeGame()">
-            <h2 style="color:var(--col-orange);">☄️ Padající slova (${quickMode.replace(/_/g, ' ')})</h2><p>Arkáda: 3 životy, zrychlování!</p>
+            <h2 style="color:var(--col-orange);">☄️ Padající slova (${quickMode.replace(/_/g, ' ')})</h2><p>Arkáda: 3 životy!</p>
           </div>
         `;
       }
