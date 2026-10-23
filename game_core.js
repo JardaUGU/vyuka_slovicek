@@ -443,55 +443,57 @@ function renderActiveGame() {
     `;
   }
 
- else if (selectedGame === "PROCEDURAL_MATH") {
+else if (selectedGame === "PROCEDURAL_MATH") {
     
-    // --- VYKRESLENÍ: KROKOVÉ ROVNICE (ALGEBRA + VÝRAZY) ---
+    // Nádherné formátování zlomků pro tlačítka u "Zlomky (+ a -)"
+    const displayMathOpt = (opt) => {
+        if (typeof opt === 'string' && opt.includes('/')) {
+            let [n, d] = opt.split('/');
+            return `<span style="display:inline-flex; flex-direction:column; text-align:center; vertical-align:middle; line-height:1.1; font-size:0.7em;">
+                      <span style="border-bottom:2px solid currentColor; padding:0 3px;">${n}</span>
+                      <span style="padding:0 3px;">${d}</span>
+                    </span>`;
+        }
+        return opt;
+    };
+
+    // --- VYKRESLENÍ: KROKOVÉ ROVNICE A VÝRAZY ---
     if (mathTask.type === "STEP_EQ" || mathTask.type === "BUILD_EXPR") {
         const isDone = mathTask.isDone === true;
         
         let controlsHtml = "";
         if (!isDone) {
-            if (mathTask.mode === "KEYBOARD" || mathTask.type === "BUILD_EXPR") {
-                // UI 5-SLOUPCOVÁ KLÁVESNICE
-                controlsHtml = `
-                  <div style="background:var(--col-card); border:1px solid var(--col-card-border); border-radius:10px; padding:10px; margin-bottom:12px; text-align:center; font-size:32px; font-family:monospace; color:var(--col-yellow); min-height:65px; display:flex; align-items:center; justify-content:center; letter-spacing:2px; box-shadow: inset 0 2px 5px rgba(0,0,0,0.2);">
-                      ${mathTask.input ? mathTask.input : '<span style="color:var(--col-text-muted); font-size:16px; letter-spacing:normal;">Zadej operaci... (např. /2, +x²)</span>'}
-                  </div>
-                  <div style="display:grid; grid-template-columns:repeat(5, 1fr); gap:6px; max-width:480px; margin: 0 auto;">
-                      <div class="opt-btn" style="height:60px; font-size:26px;" onclick="clickMathKey('+')">+</div>
-                      <div class="opt-btn" style="height:60px; font-size:26px;" onclick="clickMathKey('7')">7</div>
-                      <div class="opt-btn" style="height:60px; font-size:26px;" onclick="clickMathKey('8')">8</div>
-                      <div class="opt-btn" style="height:60px; font-size:26px;" onclick="clickMathKey('9')">9</div>
-                      <div class="opt-btn" style="height:60px; font-size:26px; background:#1e293b; color:#38bdf8; border-color:#0284c7;" onclick="clickMathKey('x')">x</div>
+            // UI 5-SLOUPCOVÁ KLÁVESNICE
+            controlsHtml = `
+              <div style="background:var(--col-card); border:1px solid var(--col-card-border); border-radius:10px; padding:10px; margin-bottom:12px; text-align:center; font-size:28px; font-family:monospace; color:var(--col-yellow); min-height:55px; display:flex; align-items:center; justify-content:center; letter-spacing:2px; box-shadow: inset 0 2px 5px rgba(0,0,0,0.2); overflow:hidden;">
+                  ${mathTask.input ? mathTask.input : `<span style="color:var(--col-text-muted); font-size:14px; letter-spacing:normal;">${mathTask.type === "BUILD_EXPR" ? "Zadej tvar... např. (x-5)*(x-5)" : "Zadej úpravu... např. /2, -3x"}</span>`}
+              </div>
+              <div style="display:grid; grid-template-columns:repeat(5, 1fr); gap:6px; max-width:480px; margin: 0 auto;">
+                  <div class="opt-btn" style="height:55px; font-size:24px;" onclick="clickMathKey('+')">+</div>
+                  <div class="opt-btn" style="height:55px; font-size:24px;" onclick="clickMathKey('-')">-</div>
+                  <div class="opt-btn" style="height:55px; font-size:24px;" onclick="clickMathKey('*')">*</div>
+                  <div class="opt-btn" style="height:55px; font-size:24px;" onclick="clickMathKey('/')">/</div>
+                  <div class="opt-btn" style="height:55px; font-size:24px;" onclick="clickMathKey('(')">(</div>
 
-                      <div class="opt-btn" style="height:60px; font-size:26px;" onclick="clickMathKey('-')">-</div>
-                      <div class="opt-btn" style="height:60px; font-size:26px;" onclick="clickMathKey('4')">4</div>
-                      <div class="opt-btn" style="height:60px; font-size:26px;" onclick="clickMathKey('5')">5</div>
-                      <div class="opt-btn" style="height:60px; font-size:26px;" onclick="clickMathKey('6')">6</div>
-                      <div class="opt-btn" style="height:60px; font-size:24px; background:#1e293b; color:#c084fc; border-color:#9333ea;" onclick="clickMathKey('x²')">x²</div>
+                  <div class="opt-btn" style="height:55px; font-size:24px;" onclick="clickMathKey('7')">7</div>
+                  <div class="opt-btn" style="height:55px; font-size:24px;" onclick="clickMathKey('8')">8</div>
+                  <div class="opt-btn" style="height:55px; font-size:24px;" onclick="clickMathKey('9')">9</div>
+                  <div class="opt-btn" style="height:55px; font-size:24px; background:#1e293b; color:#38bdf8; border-color:#0284c7;" onclick="clickMathKey('x')">x</div>
+                  <div class="opt-btn" style="height:55px; font-size:24px;" onclick="clickMathKey(')')">)</div>
 
-                      <div class="opt-btn" style="height:60px; font-size:26px;" onclick="clickMathKey('*')">*</div>
-                      <div class="opt-btn" style="height:60px; font-size:26px;" onclick="clickMathKey('1')">1</div>
-                      <div class="opt-btn" style="height:60px; font-size:26px;" onclick="clickMathKey('2')">2</div>
-                      <div class="opt-btn" style="height:60px; font-size:26px;" onclick="clickMathKey('3')">3</div>
-                      <div class="opt-btn" style="height:60px; font-size:26px; background:var(--col-red); border-color:#f87171;" onclick="clickMathKey('C')">C</div>
+                  <div class="opt-btn" style="height:55px; font-size:24px;" onclick="clickMathKey('4')">4</div>
+                  <div class="opt-btn" style="height:55px; font-size:24px;" onclick="clickMathKey('5')">5</div>
+                  <div class="opt-btn" style="height:55px; font-size:24px;" onclick="clickMathKey('6')">6</div>
+                  <div class="opt-btn" style="height:55px; font-size:22px; background:#1e293b; color:#c084fc; border-color:#9333ea;" onclick="clickMathKey('x²')">x²</div>
+                  <div class="opt-btn" style="height:55px; font-size:24px; background:var(--col-red); border-color:#f87171;" onclick="clickMathKey('C')">C</div>
 
-                      <div class="opt-btn" style="height:60px; font-size:26px;" onclick="clickMathKey('/')">/</div>
-                      <div class="opt-btn" style="grid-column: span 2; height:60px; font-size:26px;" onclick="clickMathKey('0')">0</div>
-                      <div class="opt-btn green" style="grid-column: span 2; display:flex; align-items:center; justify-content:center; font-size:24px;" onclick="submitMathKey()">OK</div>
-                  </div>
-                `;
-            } else {
-                // UI VÝBĚRU (4 MOŽNOSTI)
-                controlsHtml = `
-                  <p style="text-align:center; color:var(--col-text-muted); margin-bottom:8px;">Vyber operaci pro aplikaci na obě strany:</p>
-                  <div class="grid-2">
-                     ${mathTask.opts.map(opt => `
-                       <div class="opt-btn" style="height:65px; font-size:24px; font-weight:bold; font-family:monospace;" onclick="handleEqStepChoice('${opt}')">${opt}</div>
-                     `).join('')}
-                  </div>
-                `;
-            }
+                  <div class="opt-btn" style="height:55px; font-size:24px;" onclick="clickMathKey('1')">1</div>
+                  <div class="opt-btn" style="height:55px; font-size:24px;" onclick="clickMathKey('2')">2</div>
+                  <div class="opt-btn" style="height:55px; font-size:24px;" onclick="clickMathKey('3')">3</div>
+                  <div class="opt-btn" style="height:55px; font-size:24px;" onclick="clickMathKey('0')">0</div>
+                  <div class="opt-btn green" style="height:55px; font-size:20px; display:flex; align-items:center; justify-content:center;" onclick="submitMathKey()">OK</div>
+              </div>
+            `;
         } else {
             controlsHtml = `<div class="action-btn green" style="padding:18px; font-size:22px; width:100%;" onclick="generateMathTask();renderActiveGame();">VÝBORNĚ! DALŠÍ ➔</div>`;
         }
@@ -506,13 +508,13 @@ function renderActiveGame() {
                 <div class="bargraph-track"><div class="bargraph-fill" style="width:${Math.min(100, (typeof mathStreak !== "undefined" ? mathStreak : 0) * 10)}%;"></div></div>
               </div>
               
-              ${mathTask.q ? `<div style="text-align:center; font-size:26px; font-weight:bold; color:var(--col-yellow); margin-top:12px; letter-spacing:1px;">Zadání: ${mathTask.q}</div>` : ''}
+              ${mathTask.q ? `<div style="text-align:center; font-size:28px; font-weight:bold; color:var(--col-yellow); margin-top:12px; margin-bottom:4px; letter-spacing:1px;">${mathTask.q}</div>` : ''}
 
-              <div id="eq-history-container" style="background:var(--col-card); border:1px solid var(--col-card-border); border-radius:10px; padding:15px; margin:15px 0; max-height:42vh; overflow-y:auto; flex-shrink:0;">
+              <div id="eq-history-container" style="background:var(--col-card); border:1px solid var(--col-card-border); border-radius:10px; padding:15px; margin:10px 0; max-height:38vh; overflow-y:auto; flex-shrink:0;">
                  ${mathTask.history.map((step, i) => `
                     <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:${i<mathTask.history.length-1 ? '1px solid var(--col-card-border)' : 'none'}; padding-bottom:${i<mathTask.history.length-1 ? '10px' : '0'}; margin-bottom:${i<mathTask.history.length-1 ? '10px' : '0'};">
-                       <div style="font-size:28px; color:${i===mathTask.history.length-1 && isDone ? 'var(--col-green)' : 'inherit'}; font-weight:bold;">${step.eq}</div>
-                       ${step.op ? `<div style="background:var(--col-bg); color:var(--col-yellow); padding:6px 12px; border-radius:6px; font-weight:bold; font-family:monospace; font-size:18px; border: 1px solid var(--col-card-border);">| ${step.op}</div>` : ''}
+                       <div style="font-size:26px; color:${i===mathTask.history.length-1 && isDone ? 'var(--col-green)' : 'inherit'}; font-weight:bold;">${step.eq}</div>
+                       ${step.op ? `<div style="background:var(--col-bg); color:var(--col-yellow); padding:6px 12px; border-radius:6px; font-weight:bold; font-family:monospace; font-size:16px; border: 1px solid var(--col-card-border);">| ${step.op}</div>` : ''}
                     </div>
                  `).join('')}
               </div>
@@ -534,7 +536,7 @@ function renderActiveGame() {
 
     } 
     
-    // --- VYKRESLENÍ: STANDARDNÍ VÝPOČTY (Zlomky, Procenta, atd.) ---
+    // --- VYKRESLENÍ: STANDARDNÍ VÝPOČTY (Sčítání Zlomků, Procenta, atd.) ---
     else {
         const isAns = (typeof mathChosenAnswer !== "undefined" && mathChosenAnswer !== null);
         main.innerHTML = `
@@ -545,10 +547,10 @@ function renderActiveGame() {
             </div>
             <div class="bargraph-track"><div class="bargraph-fill" style="width:${Math.min(100, (typeof mathStreak !== "undefined" ? mathStreak : 0) * 10)}%;"></div></div>
           </div>
-          <div class="prompt-box" style="font-size:36px; color:inherit; margin:20px 0; letter-spacing: 2px;">${mathTask.q}</div>
+          <div class="prompt-box" style="font-size:42px; color:inherit; margin:25px 0; letter-spacing: 2px;">${mathTask.q}</div>
           <div class="grid-2">
             ${mathTask.opts.map(opt => `
-              <div class="opt-btn ${isAns ? (String(opt)===String(mathTask.ans)?'correct':(opt===mathChosenAnswer?'wrong':'')) : ''}" style="height:60px;font-size:26px;font-weight:bold;" onclick="clickMathChoice('${opt}')">${opt}</div>
+              <div class="opt-btn ${isAns ? (String(opt)===String(mathTask.ans)?'correct':(opt===mathChosenAnswer?'wrong':'')) : ''}" style="height:70px;font-size:32px;font-weight:bold;" onclick="clickMathChoice('${opt}')">${displayMathOpt(opt)}</div>
             `).join('')}
           </div>
           ${isAns ? `<div class="action-btn ${String(mathChosenAnswer)===String(mathTask.ans)?'green':'red'}" onclick="generateMathTask();renderActiveGame();">DALŠÍ PŘÍKLAD ➔</div>` : ''}
