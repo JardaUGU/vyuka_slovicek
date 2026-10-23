@@ -136,6 +136,7 @@ function getGroupMasteryPercent(groupItems, subjName) {
   return Math.min(100, Math.round((points / (vList.length * 4)) * 100));
 }
 
+// Opravené tlačítko ZPĚT, které respektuje Příběhy a Cestu
 function goBack() {
   if (typeof stopArcadeLoop === "function") stopArcadeLoop();
   if (typeof stopSnakeLoop === "function") stopSnakeLoop();
@@ -155,7 +156,15 @@ function goBack() {
   }
   else if (currentScreen === "CAMPAIGN_HUB") setScreen("SELECT_SUBJECT"); 
   else if (currentScreen === "SELECT_MATH_OP") setScreen("SELECT_SUBJECT");
-  else if (currentScreen === "SELECT_GAME") setScreen("SELECT_GROUP");
+  else if (currentScreen === "SELECT_GAME") {
+    // Oprava: Pokud jsme se sem dostali z Příběhu na Cestě
+    const sLow = (selectedSubject || "").toLowerCase();
+    if (sLow.includes("cesta") || sLow.includes("postupn") || sLow.includes("inteligentn")) {
+        setScreen("CAMPAIGN_HUB");
+    } else {
+        setScreen("SELECT_GROUP");
+    }
+  }
   else if (currentScreen === "SELECT_GROUP") setScreen("SELECT_SUBJECT");
   else if (currentScreen === "SELECT_SUBJECT") setScreen("SELECT_USER");
 }
