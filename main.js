@@ -701,7 +701,7 @@ function renderScreen() {
           storiesHtml += `<div style="display:flex; flex-direction:column; gap:8px;">`;
           storyKeys.forEach(title => {
               let sItems = storiesGroups[title];
-              let isDone = (typeof getSavedMastery === "function" && getSavedMastery(title, "STORY") >= 2) || localStorage.getItem(`story_done_${uKey}_${title}`) === "1";
+              let isDone = (typeof isStoryCompleted === "function") && isStoryCompleted(title, sItems);
               let borderCol = isDone ? "var(--col-green)" : "var(--col-yellow)";
               let badgeText = isDone ? `<span style="color:var(--col-green); font-weight:bold; font-size:14px;">✅ Přečteno</span>` : `<span style="color:var(--col-yellow); font-weight:bold; font-size:15px;">🎁 +10 💰</span>`;
 
