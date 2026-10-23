@@ -190,7 +190,7 @@ function renderActiveGame() {
       <div class="prompt-box ${isHebrew ? 'hebrew-text' : ''}">
         ${w.question} <span class="audio-btn" onclick="speakCurrentCard()">🔊</span>
       </div>
-      <div class="prompt-box" style="color:#fff;">${cleanCzechTranslation(w.answer)}</div>
+      <div class="prompt-box" style="color:inherit;">${cleanCzechTranslation(w.answer)}</div>
       ${w.help ? `<div style="text-align:center;color:var(--col-active-tab);font-size:18px;margin-bottom:12px;font-weight:bold;">[ ${w.help} ]</div>` : ''}
       <div class="grid-2">
         <div class="action-btn" onclick="vCardPrev()">Předchozí</div>
@@ -208,7 +208,7 @@ function renderActiveGame() {
       main.innerHTML = `
         <div style="text-align:center;padding:30px;">
           <h2 style="color:var(--col-green);margin-bottom:10px;">${isAdaptiveBatchMode ? 'BLOK 15 SLOV ZVLÁDNUT! 🎉' : 'KOMPLETNĚ ZVLÁDNUTO! 🎉'}</h2>
-          <p style="color:#fff;margin-bottom:15px;">Všech ${stats.totalWords} položek bloku umíš na 2 ★!</p>
+          <p style="color:inherit;margin-bottom:15px;">Všech ${stats.totalWords} položek bloku umíš na 2 ★!</p>
           <div class="action-btn" onclick="startScrambleFromAdaptiveBatch()">SKLÁDAT TĚCHTO ${stats.totalWords} SLOV 🧩</div>
           ${isAdaptiveBatchMode ? `<div class="action-btn green" onclick="initGameState();renderActiveGame();">DALŠÍ BLOK (15 SLOV) ➔</div>` : ''}
           <div class="action-btn" onclick="toggleTestingDirection()">PŘEPNOUT SMĚR (${isDirOut ? 'Cizí ➔ 🇨🇿' : '🇨🇿 ➔ Cizí'}) ⇄</div>
@@ -231,7 +231,7 @@ function renderActiveGame() {
         <span>Slovo: ${vMastery[vCurrentWord]||0}/2 ★</span>
         <button class="toggle-btn on" onclick="toggleTestingDirection()">${isDirOut?'🇨🇿 ➔ Cizí':'Cizí ➔ 🇨🇿'}</button>
       </div>
-      <div class="prompt-box" style="color:#fff;">
+      <div class="prompt-box" style="color:inherit;">
         ${isDirOut ? cleanCzechTranslation(w.answer) : w.question}
         ${!isDirOut ? `<span class="audio-btn" onclick="speakAdaptiveCurrent()">🔊</span>` : ''}
       </div>
@@ -251,8 +251,6 @@ function renderActiveGame() {
 
   else if (selectedGame === "SCRAMBLE") {
     const w = vItems[vCurrentWord];
-    
-    // Zde je oprava bugu, aby ukazatel počítal jen se zvolenými slovy (např. s těmi 15, co jsme právě zkoušeli)
     const totalWords = (isAdaptiveBatchMode && adaptiveBatchIndices && adaptiveBatchIndices.length > 0) ? adaptiveBatchIndices.length : vItems.length;
     const pct = Math.min(100, Math.round((scrambleSolvedCount / totalWords) * 100));
 
@@ -264,7 +262,7 @@ function renderActiveGame() {
         </div>
         <div class="bargraph-track"><div class="bargraph-fill" style="width:${pct}%;"></div></div>
       </div>
-      <div class="prompt-box">Slož: <b>${cleanCzechTranslation(w.answer)}</b></div>
+      <div class="prompt-box" style="color:inherit;">Slož: <b>${cleanCzechTranslation(w.answer)}</b></div>
       <div class="slots-row ${isHebrew ? 'hebrew-text' : ''}">
         ${scrambleTiles.map((t, i) => `<div class="letter-slot ${scrambleIsWordMode?'word-slot':''} ${i<scramblePlaced.length?'filled':''}">${i<scramblePlaced.length?scramblePlaced[i]:'_'}</div>`).join('')}
       </div>
@@ -294,7 +292,7 @@ function renderActiveGame() {
           main.innerHTML = `
             <div style="text-align:center;padding:35px;">
               <h2 style="color:var(--col-green);font-size:28px;">TRÉNINK DOKONČEN! 🎉</h2>
-              <p style="font-size:20px;color:#fff;margin:10px 0;">Sestřeleno: <b>${arcadeScore} slov</b> (Bonus: +${bonusCoins} 💰)</p>
+              <p style="font-size:20px;color:inherit;margin:10px 0;">Sestřeleno: <b>${arcadeScore} slov</b> (Bonus: +${bonusCoins} 💰)</p>
               <p style="font-size:24px;color:var(--col-yellow);margin-bottom:25px;">Celkem získáváš: +${campaignMinigameCoins + bonusCoins} 💰</p>
               <div class="action-btn green" onclick="finishCampaign(${campaignMinigameCoins + bonusCoins})">PŘIPSAT ZLAŤÁKY A ZPĚT</div>
             </div>
@@ -303,7 +301,7 @@ function renderActiveGame() {
           main.innerHTML = `
             <div style="text-align:center;padding:35px;">
               <h2 style="color:var(--col-red);font-size:32px;font-weight:bold;">GAME OVER! 💔</h2>
-              <p style="font-size:20px;color:#fff;margin:10px 0;">Sestřeleno: <b>${arcadeScore} slov</b> (LVL ${arcadeLevel})</p>
+              <p style="font-size:20px;color:inherit;margin:10px 0;">Sestřeleno: <b>${arcadeScore} slov</b> (LVL ${arcadeLevel})</p>
               <div class="action-btn green" onclick="if(typeof startArcadeGame==='function') startArcadeGame()">HRÁT ZNOVU ➔</div>
               <div class="action-btn" onclick="setScreen('SELECT_GAME')">ZPĚT</div>
             </div>
@@ -370,7 +368,7 @@ function renderActiveGame() {
       ` : (isCampaignMinigame ? `
         <div style="text-align:center;padding:30px;">
           <h2 style="color:var(--col-green);">TRÉNINK DOKONČEN! 🎉</h2>
-          <p style="font-size:18px;color:#fff;margin:10px 0;">Pexeso zvládnuto za <b>${pexesoAttempts} pokusů</b>.</p>
+          <p style="font-size:18px;color:inherit;margin:10px 0;">Pexeso zvládnuto za <b>${pexesoAttempts} pokusů</b>.</p>
           <p style="font-size:24px;color:var(--col-yellow);margin-bottom:25px;">Celkem získáváš: +${campaignMinigameCoins + (pexesoAttempts <= 12 ? 3 : (pexesoAttempts <= 16 ? 2 : 1))} 💰</p>
           <div class="action-btn green" onclick="finishCampaign(${campaignMinigameCoins + (pexesoAttempts <= 12 ? 3 : (pexesoAttempts <= 16 ? 2 : 1))})">PŘIPSAT ZLAŤÁKY A ZPĚT</div>
         </div>
@@ -394,7 +392,7 @@ function renderActiveGame() {
       main.innerHTML = `
         <div style="text-align:center;padding:30px;">
           <h2 style="color:var(--col-green);margin-bottom:10px;">KVÍZ DOKONČEN! 🎉</h2>
-          <p style="color:#fff;margin-bottom:15px;">Zvládl jsi všech ${qActiveList.length} otázek!</p>
+          <p style="color:inherit;margin-bottom:15px;">Zvládl jsi všech ${qActiveList.length} otázek!</p>
           <div class="action-btn green" onclick="setScreen('SELECT_GAME')">ZPĚT DO MENU</div>
         </div>
       `;
@@ -422,7 +420,7 @@ function renderActiveGame() {
         </div>
         <div class="bargraph-track"><div class="bargraph-fill" style="width:${pct}%;"></div></div>
       </div>
-      <div class="prompt-box" style="font-size:22px;color:#fff;margin:15px 0;">
+      <div class="prompt-box" style="font-size:22px;color:inherit;margin:15px 0;">
         ${promptDisplay}
         ${(qAnswered && getTargetLang(selectedSubject) !== 'cs-CZ') ? `<span class="audio-btn" onclick="speakWord('${(q.question.includes('___') ? q.question.replace(/___+/g, q.answer) : q.question + ' ' + q.answer).replace(/[*_]/g, '')}', '${selectedSubject}')">🔊</span>` : ''}
       </div>
@@ -443,9 +441,20 @@ function renderActiveGame() {
     `;
   }
 
-else if (selectedGame === "PROCEDURAL_MATH") {
+  // --- ZDE JE MATEMATIKA ---
+  else if (selectedGame === "PROCEDURAL_MATH") {
     
-    // --- VYKRESLENÍ: KROKOVÉ ROVNICE, VÝRAZY, ZLOMKY ---
+    const displayMathOpt = (opt) => {
+        if (typeof opt === 'string' && opt.includes('/')) {
+            let [n, d] = opt.split('/');
+            return `<span style="display:inline-flex; flex-direction:column; text-align:center; vertical-align:middle; line-height:1.1; font-size:0.7em;">
+                      <span style="border-bottom:2px solid currentColor; padding:0 3px;">${n}</span>
+                      <span style="padding:0 3px;">${d}</span>
+                    </span>`;
+        }
+        return opt;
+    };
+
     if (mathTask.type === "STEP_EQ" || mathTask.type === "BUILD_EXPR" || mathTask.type === "FRAC_STEP") {
         const isDone = mathTask.isDone === true;
         
@@ -455,7 +464,6 @@ else if (selectedGame === "PROCEDURAL_MATH") {
         
         let controlsHtml = "";
         if (!isDone) {
-            // UI 5-SLOUPCOVÁ KLÁVESNICE
             controlsHtml = `
               <div id="math-keyboard-input" style="background:var(--col-card); border:1px solid var(--col-card-border); border-radius:10px; padding:10px; margin-bottom:12px; text-align:center; font-size:32px; font-family:monospace; color:var(--col-yellow); min-height:65px; display:flex; align-items:center; justify-content:center; letter-spacing:2px; box-shadow: inset 0 2px 5px rgba(0,0,0,0.2); overflow:hidden;">
                   ${mathTask.input ? mathTask.input : `<span style="color:var(--col-text-muted); font-size:14px; letter-spacing:normal;">${placeholderText}</span>`}
@@ -477,8 +485,6 @@ else if (selectedGame === "PROCEDURAL_MATH") {
                   <div class="opt-btn" style="height:60px; font-size:26px;" onclick="clickMathKey('1')">1</div>
                   <div class="opt-btn" style="height:60px; font-size:26px;" onclick="clickMathKey('2')">2</div>
                   <div class="opt-btn" style="height:60px; font-size:26px;" onclick="clickMathKey('3')">3</div>
-                  
-                  <!-- Tlačítko BACKSPACE (⌫) -->
                   <div class="opt-btn" style="height:60px; font-size:24px; background:var(--col-orange); border-color:#f97316;" onclick="clickMathKey('⌫')">⌫</div>
 
                   <div class="opt-btn" style="height:60px; font-size:26px;" onclick="clickMathKey('/')">/</div>
@@ -502,13 +508,13 @@ else if (selectedGame === "PROCEDURAL_MATH") {
                 <div class="bargraph-track"><div class="bargraph-fill" style="width:${Math.min(100, (typeof mathStreak !== "undefined" ? mathStreak : 0) * 10)}%;"></div></div>
               </div>
               
-              ${mathTask.q ? `<div style="text-align:center; font-size:28px; font-weight:bold; color:var(--col-yellow); margin-top:12px; margin-bottom:4px; letter-spacing:1px;">${mathTask.q}</div>` : ''}
+              ${mathTask.q ? `<div style="text-align:center; font-size:28px; font-weight:bold; color:inherit; margin-top:12px; margin-bottom:4px; letter-spacing:1px;">${mathTask.q}</div>` : ''}
 
               <div id="eq-history-container" style="background:var(--col-card); border:1px solid var(--col-card-border); border-radius:10px; padding:15px; margin:10px 0; max-height:38vh; overflow-y:auto; flex-shrink:0;">
                  ${mathTask.history.map((step, i) => `
                     <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:${i<mathTask.history.length-1 ? '1px solid var(--col-card-border)' : 'none'}; padding-bottom:${i<mathTask.history.length-1 ? '10px' : '0'}; margin-bottom:${i<mathTask.history.length-1 ? '10px' : '0'};">
                        <div style="font-size:26px; color:${i===mathTask.history.length-1 && isDone ? 'var(--col-green)' : 'inherit'}; font-weight:bold;">${step.eq}</div>
-                       ${step.op ? `<div style="background:var(--col-bg); color:var(--col-yellow); padding:6px 12px; border-radius:6px; font-weight:bold; font-family:monospace; font-size:16px; border: 1px solid var(--col-card-border);">| ${step.op}</div>` : ''}
+                       ${step.op ? `<div style="background:var(--col-bg); padding:6px 12px; border-radius:6px; font-weight:bold; font-family:monospace; font-size:16px; border: 1px solid var(--col-card-border);">${step.op}</div>` : ''}
                     </div>
                  `).join('')}
               </div>
@@ -521,7 +527,6 @@ else if (selectedGame === "PROCEDURAL_MATH") {
           </div>
         `;
 
-        // Automatické scrollování AŽ po kliknutí na OK (kdy se reálně vyrenderuje nová HTML struktura historie)
         setTimeout(() => {
             const histEl = document.getElementById("eq-history-container");
             if (histEl) histEl.scrollTop = histEl.scrollHeight;
@@ -545,11 +550,233 @@ else if (selectedGame === "PROCEDURAL_MATH") {
           <div class="prompt-box" style="font-size:36px; color:inherit; margin:20px 0; letter-spacing: 2px;">${mathTask.q}</div>
           <div class="grid-2">
             ${mathTask.opts.map(opt => `
-              <div class="opt-btn ${isAns ? (String(opt)===String(mathTask.ans)?'correct':(opt===mathChosenAnswer?'wrong':'')) : ''}" style="height:60px;font-size:26px;font-weight:bold;" onclick="clickMathChoice('${opt}')">${opt}</div>
+              <div class="opt-btn ${isAns ? (String(opt)===String(mathTask.ans)?'correct':(opt===mathChosenAnswer?'wrong':'')) : ''}" style="height:70px;font-size:32px;font-weight:bold;" onclick="clickMathChoice('${opt}')">${displayMathOpt(opt)}</div>
             `).join('')}
           </div>
           ${isAns ? `<div class="action-btn ${String(mathChosenAnswer)===String(mathTask.ans)?'green':'red'}" onclick="generateMathTask();renderActiveGame();">DALŠÍ PŘÍKLAD ➔</div>` : ''}
         `;
     }
+  }
+
+  else if (selectedGame === "SEQ") {
+    if (sItems.length === 0) return;
+    const seqConfig = sItems[selectedSeqIndex] || sItems[0];
+    const itemsList = seqConfig.answer.split('|').map(s => s.trim()).filter(Boolean);
+    const isFinished = seqTargetIdx >= itemsList.length;
+    const targetWord = itemsList[seqTargetIdx];
+    const pct = Math.round((seqTargetIdx / itemsList.length) * 100);
+
+    main.innerHTML = `
+      <div class="bargraph-container">
+        <div class="bargraph-header">
+          <span>Položka ${Math.min(seqTargetIdx + 1, itemsList.length)} z ${itemsList.length} ${seqHintActive ? '<b style="color:var(--col-yellow);">[NÁPOVĚDA]</b>' : ''}</span>
+          <span id="seq-timer" style="color:var(--col-yellow);font-weight:bold;">0.0 s</span>
+        </div>
+        <div class="bargraph-track"><div class="bargraph-fill" style="width:${pct}%;"></div></div>
+      </div>
+      <div class="prompt-box ${isHebrew ? 'hebrew-text' : ''}" style="margin:8px 0;min-height:56px;color:inherit;font-size:22px;">
+        ${itemsList.slice(0, seqTargetIdx).join(' ')} 
+        <span style="color:var(--col-yellow);">${seqHintActive ? `[ ${targetWord}! ]` : '[ ??? ]'}</span>
+      </div>
+      ${!isFinished ? `
+        <div class="grid-2">
+          ${seqSlots.map((itemIdx, slot) => {
+            const isHintSlot = (seqHintActive && itemIdx === seqTargetIdx);
+            return `<div id="seq-btn-${slot}" class="opt-btn ${isHebrew ? 'hebrew' : ''} ${isHintSlot ? 'hint' : ''}" onclick="clickSeqSlot(${slot})">${itemIdx !== -1 ? itemsList[itemIdx] : ''}</div>`;
+          }).join('')}
+        </div>
+      ` : `<div class="action-btn green" onclick="initSequence();renderActiveGame();">DOKONČENO! HRÁT ZNOVU</div>`}
+    `;
+  }
+
+  else if (selectedGame === "SNAKE") {
+    if (typeof snakeState === "undefined") {
+      main.innerHTML = `<div style="text-align:center;padding:30px;color:var(--col-red);">Chyba: Soubor snake.js chybí nebo se nenačetl!</div>`;
+      return;
+    }
+
+    if (snakeState === "GAMEOVER") {
+      if (isCampaignMinigame) {
+        let bonusCoins = Math.floor(snakeScore / 2);
+        main.innerHTML = `
+          <div style="text-align:center;padding:35px;">
+            <h2 style="color:var(--col-green);font-size:28px;">GAME OVER! (Trénink dokončen) 🎉</h2>
+            <p style="font-size:20px;color:inherit;margin:10px 0;">Had poskládal: <b>${snakeScore} slov</b> (Bonus: +${bonusCoins} 💰)</p>
+            <p style="font-size:24px;color:var(--col-yellow);margin-bottom:25px;">Celkem získáváš: +${campaignMinigameCoins + bonusCoins} 💰</p>
+            <div class="action-btn green" ontouchstart="if(typeof finishCampaign === 'function') finishCampaign(${campaignMinigameCoins + bonusCoins})" onclick="if(typeof finishCampaign === 'function') finishCampaign(${campaignMinigameCoins + bonusCoins})">PŘIPSAT ZLAŤÁKY A ZPĚT</div>
+          </div>
+        `;
+      } else {
+        main.innerHTML = `
+          <div style="text-align:center;padding:35px;">
+            <h2 style="color:var(--col-red);font-size:32px;font-weight:bold;">GAME OVER! 💔</h2>
+            <p style="font-size:20px;color:inherit;margin:12px 0;">Správně složeno: <b>${snakeScore} slov</b></p>
+            <div class="action-btn green" ontouchstart="if(typeof startSnakeGame === 'function') startSnakeGame()" onclick="if(typeof startSnakeGame === 'function') startSnakeGame()">HRÁT ZNOVU ➔</div>
+            <div class="action-btn" ontouchstart="if(typeof setScreen === 'function') setScreen('SELECT_GAME')" onclick="if(typeof setScreen === 'function') setScreen('SELECT_GAME')">ZPĚT</div>
+          </div>
+        `;
+      }
+      return;
+    }
+
+    const canBuyShield = snakeLives > 1 && snakeShieldLetters <= 0;
+    const coins = typeof currentUser !== 'undefined' && currentUser ? getUserCoins(currentUser.name) : 0;
+    const canBuyShieldCoins = snakeLives === 1 && snakeShieldLetters <= 0 && coins >= 15;
+    let targetLetterChar = (typeof snakeTargetLetters !== "undefined" && snakeTargetLetters && snakeTargetLetters[snakeCurrentIdx]) ? snakeTargetLetters[snakeCurrentIdx] : '';
+
+    main.innerHTML = `
+      <div class="snake-container">
+        <div class="snake-header-box">
+          <div class="snake-stats">
+            <span>${"❤️".repeat(snakeLives)}</span>
+            
+            ${snakeShieldLetters > 0 ? `
+              <span id="snake-shield-indicator" class="snake-shield-btn active">🛡️ Štít: ${snakeShieldLetters} p.</span>
+            ` : (canBuyShield ? `
+              <button class="snake-shield-btn" ontouchstart="if(typeof buySnakeShieldInGame === 'function') buySnakeShieldInGame(event)" onclick="if(typeof buySnakeShieldInGame === 'function') buySnakeShieldInGame(event)">
+                🛡️ Koupit štít (-1 ❤️)
+              </button>
+            ` : (canBuyShieldCoins ? `
+              <button class="snake-shield-btn" style="border-color:var(--col-yellow);color:var(--col-yellow);" ontouchstart="if(typeof buySnakeShieldWithCoins === 'function') buySnakeShieldWithCoins(event)" onclick="if(typeof buySnakeShieldWithCoins === 'function') buySnakeShieldWithCoins(event)">
+                🛡️ Štít (15 💰)
+              </button>
+            ` : `
+              <span class="snake-shield-btn" style="opacity:0.4;">🛡️ Štít</span>
+            `))}
+
+            <span style="color:var(--col-active-tab);">Body: ${snakeScore}</span>
+          </div>
+
+          ${snakeCurrentWord ? `
+            <div class="snake-prompt-cz">${snakeCurrentWord.czech}</div>
+            <div id="snake-slots-wrap" class="snake-slots-row">
+              ${snakeTargetLetters.map((ch, idx) => `
+                <div class="snake-slot ${idx < snakeCurrentIdx ? 'done' : (idx === snakeCurrentIdx ? 'active' : '')}">
+                  ${idx < snakeCurrentIdx ? ch : (idx === snakeCurrentIdx ? ch : '_')}
+                </div>
+              `).join('')}
+            </div>
+          ` : ''}
+
+          <div class="snake-status-bar" style="color:${(snakeState==='PAUSED_SHIELD' || snakeState==='WAITING')?'var(--col-yellow)':'var(--col-red)'};">
+            ${snakeStatusMsg}
+          </div>
+        </div>
+
+        <div class="snake-canvas-wrap">
+          <canvas id="snake-canvas" width="340" height="340"></canvas>
+
+          <!-- DIALOG PŘI VYPRŠENÍ ŠTÍTU -->
+          ${snakeState === "SHIELD_EXPIRED_PAUSE" ? `
+            <div class="snake-overlay">
+              <h3 style="color:var(--col-yellow);font-size:22px;margin-bottom:6px;">🛡️ ŠTÍT VYPRŠEL!</h3>
+              <p style="font-size:13px;color:#fff;margin-bottom:14px;">Dál už tě zdi ani tvůj ocas neochrání.</p>
+              ${canBuyShield ? `
+                <button class="action-btn" style="background:#4338ca;border-color:#818cf8;width:100%;max-width:250px;margin-bottom:8px;padding:9px;font-size:14px;" 
+                        ontouchstart="if(typeof buySnakeShieldInGame === 'function') buySnakeShieldInGame(event)" onclick="if(typeof buySnakeShieldInGame === 'function') buySnakeShieldInGame(event)">
+                  Koupit další štít (-1 ❤️ / 20 p.)
+                </button>
+              ` : (canBuyShieldCoins ? `
+                <button class="action-btn" style="background:#2d2605;border-color:var(--col-yellow);color:var(--col-yellow);width:100%;max-width:250px;margin-bottom:8px;padding:9px;font-size:14px;" 
+                        ontouchstart="if(typeof buySnakeShieldWithCoins === 'function') buySnakeShieldWithCoins(event)" onclick="if(typeof buySnakeShieldWithCoins === 'function') buySnakeShieldWithCoins(event)">
+                  Koupit štít za 15 💰 (20 p.)
+                </button>
+              ` : '')}
+              <button class="action-btn green" style="width:100%;max-width:250px;padding:9px;font-size:14px;" 
+                      ontouchstart="if(typeof resumeSnakeWithoutShield === 'function') resumeSnakeWithoutShield(event)" onclick="if(typeof resumeSnakeWithoutShield === 'function') resumeSnakeWithoutShield(event)">
+                Pokračovat bez štítu ▶️
+              </button>
+            </div>
+          ` : ''}
+        </div>
+
+        <div class="snake-dpad">
+          <div class="dpad-row">
+            <button class="dpad-btn" ontouchstart="event.preventDefault(); if(typeof setSnakeDirection === 'function') setSnakeDirection(0, -1);" onclick="if(typeof setSnakeDirection === 'function') setSnakeDirection(0, -1)">▲</button>
+          </div>
+          <div class="dpad-row">
+            <button class="dpad-btn" ontouchstart="event.preventDefault(); if(typeof setSnakeDirection === 'function') setSnakeDirection(-1, 0);" onclick="if(typeof setSnakeDirection === 'function') setSnakeDirection(-1, 0)">◄</button>
+            <button class="dpad-btn" ontouchstart="event.preventDefault(); if(typeof setSnakeDirection === 'function') setSnakeDirection(0, 1);" onclick="if(typeof setSnakeDirection === 'function') setSnakeDirection(0, 1)">▼</button>
+            <button class="dpad-btn" ontouchstart="event.preventDefault(); if(typeof setSnakeDirection === 'function') setSnakeDirection(1, 0);" onclick="if(typeof setSnakeDirection === 'function') setSnakeDirection(1, 0)">►</button>
+          </div>
+        </div>
+      </div>
+    `;
+    
+    if (typeof drawSnake === "function") {
+       drawSnake();
+       setTimeout(() => { if(typeof attachSnakeTouchHandlers === 'function') attachSnakeTouchHandlers(); }, 50);
+    }
+  }
+
+  else if (selectedGame === "CAMPAIGN") {
+    if (cmpIdx >= cmpQueue.length) {
+      launchCampaignMinigame();
+      return;
+    }
+
+    const task = cmpQueue[cmpIdx];
+    const pct = Math.round((cmpIdx / cmpQueue.length) * 100);
+    const heartsHtml = "❤️".repeat(cmpHearts) + "🖤".repeat(5 - cmpHearts);
+
+    let html = `
+      <div class="bargraph-container">
+        <div class="bargraph-header">
+          <span>Trénink: Úkol ${cmpIdx + 1} z ${cmpQueue.length}</span>
+          <span style="font-size:14px;">${heartsHtml}</span>
+        </div>
+        <div class="bargraph-track"><div class="bargraph-fill" style="width:${pct}%;"></div></div>
+      </div>
+    `;
+
+    if (task.type === 'KVIZ' || task.type.startsWith('QUIZ')) {
+      const isEval = cmpState === 'EVAL';
+      let promptDisplay = task.prompt;
+
+      if (isEval && task.type === 'KVIZ') {
+        const fillHtml = `<span style="color:var(--col-green);font-weight:bold;text-decoration:underline;">${task.correctAns}</span>`;
+        if (task.data.question.includes('___')) {
+          promptDisplay = formatPromptText(task.data.question.replace(/___+/g, fillHtml));
+        } else {
+          promptDisplay = formatPromptText(task.data.question) + " " + fillHtml;
+        }
+      }
+
+      html += `<div class="prompt-box" style="font-size:24px;color:inherit;margin:20px 0;">
+                 ${promptDisplay}
+                 ${(isEval && getTargetLang(selectedSubject) !== 'cs-CZ' && task.type !== 'QUIZ_IN') ? `<span class="audio-btn" onclick="speakWord('${(task.type==='KVIZ' && task.data.question.includes('___') ? task.data.question.replace(/___+/g, task.data.answer) : task.data.question).replace(/[*_]/g, '')}', '${selectedSubject}')">🔊</span>` : ''}
+               </div>`;
+      
+      html += `<div class="grid-2">`;
+      task.opts.forEach(opt => {
+        let btnCls = "";
+        if (isEval) {
+          if (opt === task.correctAns) btnCls = "correct";
+          else if (opt === cmpChosenOpt) btnCls = "wrong";
+        }
+        html += `<div class="opt-btn ${btnCls}" onclick="clickCmpQuizOpt('${opt.replace(/'/g, "\\'")}')">${opt}</div>`;
+      });
+      html += `</div>`;
+
+      if (isEval) {
+        if (task.data.help) html += `<div style="text-align:center;color:var(--col-yellow);margin:12px 0;font-weight:bold;">[ ${task.data.help} ]</div>`;
+        html += `<div class="action-btn green" style="margin-top:15px;" onclick="nextCmpTask()">DALŠÍ ➔</div>`;
+      }
+    }
+    else if (task.type === 'SCRAMBLE') {
+      html += `
+        <div class="prompt-box" style="color:inherit;">Slož: <b>${cleanCzechTranslation(task.data.answer)}</b></div>
+        <div class="slots-row ${isHebrew ? 'hebrew-text' : ''}">
+          ${task.tiles.map((t, i) => `<div class="letter-slot ${task.isWordMode?'word-slot':''} ${i<task.placed.length?'filled':''}">${i<task.placed.length?task.placed[i]:'_'}</div>`).join('')}
+        </div>
+      `;
+      if (cmpState !== 'EVAL') {
+        html += `<div class="letters-row">${task.tiles.map((t, i) => `<div class="letter-tile ${task.isWordMode?'word-tile':''} ${isHebrew ? 'hebrew' : ''} ${t.used?'used':''}" onclick="clickCmpScrambleTile(${i})">${t.text}</div>`).join('')}</div>`;
+      } else {
+        if (task.data.help) html += `<div style="text-align:center;color:var(--col-active-tab);font-weight:bold;margin:10px 0;">[ ${task.data.help} ]</div>`;
+        html += `<div class="action-btn green" onclick="nextCmpTask()">DALŠÍ ➔</div>`;
+      }
+    }
+    main.innerHTML = html;
   }
 }
