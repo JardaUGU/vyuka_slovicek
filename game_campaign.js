@@ -173,3 +173,97 @@ function launchCampaignMinigame() {
 function finishCampaign(coins) {
   addCoins(currentUser.name, coins); addReward(1, "Trénink: " + selectedGroupKey); setScreen("CAMPAIGN_HUB");
 }
+
+// ==========================================
+// INTERAKTIVNÍ ČTEČKA PŘÍBĚHŮ (STORY MODE)
+// ==========================================
+let storyList = [];
+let storyStep = 0;
+let storyAnswered = false;
+let storyChosenOpt = null;
+let storyShowTrans = false;
+
+function launchStoryMode(topicName) {
+  selectedGroupKey = topicName;
+  const userG = parseInt(currentUser.grade) || 2;
+  
+  // Zachováme přesné pořadí vět tak, jak jdou za sebou v tabulce!
+  storyList = (appData.items || []).filter(it => 
+    it.subject === selectedSubject && 
+    isItemAllowedForGrade(it, userG) && 
+    it.topic === topicName && 
+    (it.type || '').toUpperCase().includes('PRIBEH')
+  );
+
+  if (storyList.length === 0) {
+    alert("Tento příběh zatím neobsahuje žádné věty.");
+    return;
+  }
+
+  storyStep = 0;
+  storyAnswered = false;
+  storyChosenOpt = null;
+  storyShowTrans = false;
+  selectedGame = "STORY";
+  setScreen("PLAYING");
+  speakCurrentStoryLine();
+}
+
+function speakCurrentStoryLine() {
+  if (typeof isAutoTTS === "undefined" || !isAutoTTS || storyStep >= storyList.length) return;
+  const item = storyList[storyStep];
+  if (!item) return;
+  const hasOpts = item.options && item.options.length > 0;
+  // Pokud není kvízová, přečteme ji hned při zobrazení
+  if (!hasOpts) {
+    speakWord(item.question.replace(/[*_]/g, ''), selectedSubject);
+  }
+}
+
+function clickStoryOpt(optIdx) {
+  if (storyAnswered) return;
+  const item = storyList[storyStep];
+  const chosen = item.options[optIdx];
+  storyAnswered = true;
+  storyChosenOpt = chosen;
+
+  if (chosen === item.answer) {
+    sndOk();
+  } else {
+    sndErr();
+  }
+
+  // Přečtení celé doplněné věty
+  if (typeof isAutoTTS !== "undefined" && isAutoTTS) {
+    let fullSentence = item.question.includes('___') 
+      ? item.question.replace(/___+/g, item.answer) 
+      : item.question;
+    speakWord(fullSentence.replace(/[*_]/g, ''), selectedSubject);
+  }
+  renderActiveGame();
+}
+
+function nextStoryStep() {
+  storyStep++;
+  storyAnswered = false;
+  storyChosenOpt = null;
+  storyShowTrans = false;
+  renderActiveGame();
+  speakCurrentStoryLine();
+}
+
+function finishStory() {
+  const uKey = currentUser.name.toLowerCase().trim();
+  const alreadyDone = (typeof getSavedMastery === "function" && getSavedMastery(selectedGroupKey, "STORY") >= 2) || localStorage.getItem(`story_done_${uKey}_${selectedGroupKey}`) === "1";
+
+  if (!alreadyDone) {
+    addCoins(currentUser.name, 10);
+    addReward(3, "Příběh: " + selectedGroupKey);
+    saveWordMasteryToGoogle(selectedGroupKey, 2, "STORY");
+    localStorage.setItem(`story_done_${uKey}_${selectedGroupKey}`, "1");
+    sndFanfare();
+  } else {
+    addReward(1, "Opakování příběhu: " + selectedGroupKey);
+  }
+  setScreen("CAMPAIGN_HUB");
+}
