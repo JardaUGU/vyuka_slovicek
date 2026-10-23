@@ -738,6 +738,7 @@ function renderActiveGame() {
     }
   }
   // PŘÍBĚHY (INTERAKTIVNÍ ČTENÍ)
+  // PŘÍBĚHY (INTERAKTIVNÍ ČTENÍ)
   else if (selectedGame === "STORY") {
     if (storyStep >= storyList.length) {
       const uKey = currentUser.name.toLowerCase().trim();
@@ -752,7 +753,7 @@ function renderActiveGame() {
           ` : `
             <p style="font-size:16px;color:var(--col-text-muted);margin-bottom:25px;">Tento příběh už máš splněný (odměna již byla vyplacena).</p>
           `}
-          <div class="action-btn green" onclick="finishStory()">${!alreadyDone ? 'VYinkasovat 10 💰 A ZPĚT' : 'ZPĚT NA CESTU'}</div>
+          <div class="action-btn green" onclick="finishStory()">${!alreadyDone ? 'VYINKASOVAT 10 💰 A ZPĚT' : 'ZPĚT NA CESTU'}</div>
         </div>
       `;
       return;
@@ -761,6 +762,9 @@ function renderActiveGame() {
     const item = storyList[storyStep];
     const pct = Math.round(((storyStep + 1) / storyList.length) * 100);
     const hasOpts = item.options && item.options.length > 0;
+    
+    // OPRAVA: Detekce české kontrolní otázky (má možnosti na výběr, ale nemá '___')
+    const isCzechQuestion = hasOpts && !item.question.includes('___');
 
     let promptDisplay = formatPromptText(item.question);
     if (hasOpts && storyAnswered && item.question.includes('___')) {
@@ -783,13 +787,13 @@ function renderActiveGame() {
 
       <div class="prompt-box" style="font-size:22px;color:inherit;margin:15px 0;line-height:1.5;padding:20px;">
         ${promptDisplay}
-        <span class="audio-btn" onclick="speakWord('${sentenceToRead}', '${selectedSubject}')">🔊</span>
+        ${!isCzechQuestion ? `<span class="audio-btn" onclick="speakWord('${sentenceToRead}', '${selectedSubject}')">🔊</span>` : ''}
       </div>
 
       ${!hasOpts ? `
         ${item.answer ? `
           <div class="prompt-box" style="font-size:18px;color:var(--col-text-muted);cursor:pointer;" onclick="storyShowTrans=!storyShowTrans;renderActiveGame();">
-            ${storyShowTrans ? cleanCzechTranslation(item.answer) : '🇨🇿 Klikni pro zobrazení překladu'}
+            ${typeof storyShowTrans !== 'undefined' && storyShowTrans ? cleanCzechTranslation(item.answer) : '🇨🇿 Klikni pro zobrazení překladu'}
           </div>
         ` : ''}
         <div class="action-btn green" style="margin-top:15px;" onclick="nextStoryStep()">POKRAČOVAT ➔</div>
