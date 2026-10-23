@@ -105,20 +105,28 @@ function equipSkin(skinId) {
   renderScreen();
 }
 
-// NASTAVENÍ PIN HESLA
+// NASTAVENÍ PIN HESLA (Ukládá na Google)
 function setUserPIN() {
   if (!currentUser) return;
-  const uKey = currentUser.name.toLowerCase().trim();
   const newPin = prompt("Zadej nový číselný PIN (např. 1234). Pokud chceš PIN zrušit, nevyplňuj nic a dej OK:");
   if (newPin !== null) {
      const pinStr = newPin.trim();
-     if (pinStr === "") {
-        localStorage.removeItem(`user_pin_${uKey}`);
-        alert("Heslo bylo zrušeno. Přístup je nyní volný.");
-     } else {
-        localStorage.setItem(`user_pin_${uKey}`, pinStr);
-        alert(`Skvělé! Tvé heslo bylo nastaveno na: ${pinStr}`);
-     }
+     
+     // Uložení lokálně i do cloudu
+     const uKey = currentUser.name.toLowerCase().trim();
+     const u = (appData.users || []).find(x => x.name.toLowerCase().trim() === uKey);
+     if (u) u.pin = pinStr;
+     
+     try {
+       const fd = new URLSearchParams();
+       fd.append("action", "set_pin");
+       fd.append("user", currentUser.name);
+       fd.append("pin", pinStr);
+       fetch(API_URL, { method: "POST", mode: "no-cors", body: fd });
+     } catch(e) {}
+     
+     alert(pinStr ? `Skvělé! Tvé heslo bylo nastaveno na: ${pinStr}` : "Heslo bylo zrušeno. Přístup je volný.");
+     renderScreen(); // Překreslí ikonu zámečku
   }
 }
 
@@ -350,12 +358,16 @@ function setScreen(scr) {
   renderScreen(); 
 }
 
+// VÝBĚR UŽIVATELE (Čte z Google)
 function selectUser(name, grade, targetMinutes) {
   const uKey = name.toLowerCase().trim();
-  const savedPin = localStorage.getItem(`user_pin_${uKey}`);
+  const foundU = (appData.users || []).find(u => u.name.toLowerCase().trim() === uKey);
   
-  if (savedPin) {
-     const inputPin = prompt(`Uživatel ${name} je chráněn PINem. Zadejte heslo:`);
+  // Získáme PIN z tabulky (pokud je)
+  const savedPin = foundU ? foundU.pin : null;
+  
+  if (savedPin && savedPin !== "") {
+     const inputPin = prompt(`Profil ${name} je chráněn PINem. Zadejte heslo:`);
      if (inputPin !== savedPin) {
          alert("Nesprávné heslo!");
          return;
