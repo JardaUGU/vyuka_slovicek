@@ -311,44 +311,63 @@ function updateStudyTimerUI() {
 
 function sendTimeHeartbeatToGoogle() {}
 
-// RYCHLÉ NAČÍTÁNÍ
+// RYCHLÉ NAČÍTÁNÍ (Opravený záchranný padák proti zaseknutí)
 async function loadData() {
   checkDateRollover();
   if (currentUser) todaySecondsStudied = loadUserStudyTime(currentUser.name);
+  
   const cached = localStorage.getItem("app_data");
   if (cached) {
     try {
       appData = JSON.parse(cached);
       if (!appData.items) appData.items = []; 
       renderScreen(); // Zobrazí okamžitě z mezipaměti
-    } catch(e) {}
+    } catch(e) {
+      renderScreen(); // Pokud je cache poškozená, vykreslí se základní menu
+    }
+  } else {
+    // POKUD NENÍ CACHE: Vykreslí prázdnou strukturu, aby nezůstala jen viset hláška
+    renderScreen(); 
   }
+  
   // Aktualizace na pozadí, neruší uživatele načítací obrazovkou
   syncDataQuietly();
 }
 
+// TICHÁ SYNCHRONIZACE S API
 async function syncDataQuietly() {
   try {
     const res = await fetch(API_URL + '?t=' + Date.now() + '&clientDate=' + getTodayDateStr());
     const json = await res.json();
     if (json && json.items) {
-      json.syncDate = getTodayDateStr(); appData = json; localStorage.setItem("app_data", JSON.stringify(json));
+      json.syncDate = getTodayDateStr(); 
+      appData = json; 
+      localStorage.setItem("app_data", JSON.stringify(json));
+      
       if (currentUser && appData.users) {
         const foundU = appData.users.find(u => u.name.toLowerCase().trim() === currentUser.name.toLowerCase().trim());
         if (foundU) {
-          currentUser.targetMinutes = foundU.targetMinutes || 15; currentUser.grade = parseInt(foundU.grade) || 2;
-          currentUser.coins = Number(foundU.coins || 0); currentUser.inventory = foundU.inventory || {};
+          currentUser.targetMinutes = foundU.targetMinutes || 15; 
+          currentUser.grade = parseInt(foundU.grade) || 2;
+          currentUser.coins = Number(foundU.coins || 0); 
+          currentUser.inventory = foundU.inventory || {};
           let cloudThemes = Array.isArray(foundU.unlockedThemes) ? foundU.unlockedThemes : (typeof foundU.unlockedThemes === 'string' ? foundU.unlockedThemes.split(',').map(s => s.trim().toLowerCase()) : []);
           let mergedThemes = [...new Set(['default', ...cloudThemes, ...getUserUnlockedThemes(currentUser.name)])];
           saveUserUnlockedThemes(currentUser.name, mergedThemes);
-          currentUser.unlockedThemes = mergedThemes; currentUser.activeTheme = getUserActiveTheme(currentUser.name);
+          currentUser.unlockedThemes = mergedThemes; 
+          currentUser.activeTheme = getUserActiveTheme(currentUser.name);
           currentUser.startLevels = foundU.startLevels || {};
           localStorage.setItem("cur_user", JSON.stringify(currentUser));
         }
       }
-      renderScreen(); // Tiché překreslení, pokud se něco změnilo
+      renderScreen(); // Tiché překreslení, pokud se něco změnilo (např. přibyli uživatelé)
+    } else {
+      renderScreen(); // Záchranný překres v případě chybného JSONu z Googlu
     }
-  } catch(e) { console.log("Offline mód aktivní"); }
+  } catch(e) { 
+    console.log("Offline mód aktivní - nepodařilo se připojit k Google API"); 
+    renderScreen(); // Záchranný překres v případě, že jsi offline! Tím aplikace nezamrzne.
+  }
 }
 
 function setScreen(scr) { 
@@ -358,16 +377,17 @@ function setScreen(scr) {
   renderScreen(); 
 }
 
-// VÝBĚR UŽIVATELE (Čte z Google)
+// VÝBĚR UŽIVATELE (Ošetření tlačítka Zrušit při heslu)
 function selectUser(name, grade, targetMinutes) {
   const uKey = name.toLowerCase().trim();
   const foundU = (appData.users || []).find(u => u.name.toLowerCase().trim() === uKey);
   
-  // Získáme PIN z tabulky (pokud je)
-  const savedPin = foundU ? foundU.pin : null;
+  // Získáme PIN z tabulky (pokud je) nebo lokálně (záloha)
+  const savedPin = (foundU && foundU.pin) ? foundU.pin : localStorage.getItem(`user_pin_${uKey}`);
   
   if (savedPin && savedPin !== "") {
-     const inputPin = prompt(`Profil ${name} je chráněn PINem. Zadejte heslo:`);
+     const inputPin = prompt(`Profil uživatele ${name} je chráněn PINem. Zadejte heslo:`);
+     if (inputPin === null) return; // Hráč klikl na "Zrušit", neděláme nic!
      if (inputPin !== savedPin) {
          alert("Nesprávné heslo!");
          return;
@@ -375,7 +395,6 @@ function selectUser(name, grade, targetMinutes) {
   }
 
   checkDateRollover();
-  const foundU = (appData.users || []).find(u => u.name.toLowerCase().trim() === uKey);
   const themesArr = getUserUnlockedThemes(name); const activeTh = getUserActiveTheme(name);
   currentUser = { 
     name, grade: parseInt(grade) || 2, targetMinutes: parseInt(targetMinutes) || 15, stars: 0,
@@ -383,9 +402,13 @@ function selectUser(name, grade, targetMinutes) {
     inventory: (foundU && foundU.inventory) ? foundU.inventory : {},
     unlockedThemes: themesArr, activeTheme: activeTh, coins: foundU ? Number(foundU.coins || 0) : 0
   };
-  localStorage.setItem("cur_user", JSON.stringify(currentUser)); applyAppSkin(currentUser.activeTheme);
+  localStorage.setItem("cur_user", JSON.stringify(currentUser)); 
+  applyAppSkin(currentUser.activeTheme);
+  
   todaySecondsStudied = loadUserStudyTime(currentUser.name);
-  isTimerPaused = false; updateStudyTimerUI(); setScreen("SELECT_SUBJECT");
+  isTimerPaused = false; 
+  updateStudyTimerUI(); 
+  setScreen("SELECT_SUBJECT");
 }
 
 function chooseSubject(subj) { 
