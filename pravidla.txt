@@ -1,0 +1,20 @@
+======================================
+PRAVIDLA PRO ÚPRAVU KÓDU (NEZAPOMENOUT!)
+======================================
+1. AUDIO A TTS: 
+   - Funkce speakWord() MUSÍ vždy odřezávat jména postav před dvojtečkou (např. "Lucy:") a mazat emotikony (jinak čte "Girl").
+   - TTS NESMÍ číst české kontrolní otázky v příbězích (ty poznáme tak, že mají options, ale chybí v nich "___").
+   - TTS NESMÍ číst obsah závorek (např. v němčině "Sie (ona)").
+
+2. HERNÍ LOGIKA:
+   - "Řada na čas" (SEQ) NESMÍ používat FIFO! Tlačítka se míchají jen na začátku, pak se doplní nové slovo přímo do uvolněného slotu.
+   - Skládání (Scramble) MUSÍ před rozpadem na kostičky odstranit závorky z textu.
+   - Had (Snake) a Arkáda NESMÍ započítávat čas do studyTimeru (jsou to oddechovky).
+   - Had po smrti musí nabídnout funkční Game Over obrazovku, tvrdě zastavit smyčku a po Zpět se korektně vrátit.
+
+3. MATEMATIKA A ZLOMKY:
+   - Zlomky v historii se vykreslují přes CSS flexbox vertikálně. Mínusy v rovnici se NESMÍ nahrazovat (replace) AŽ PO vygenerování HTML zlomku (jinak se rozbije CSS "inline-flex").
+
+4. OBCHOD A MENU:
+   - Zmrazení série (Streak Freeze) se reálně odečítá z inventory uživatele, pokud vynechal dny.
+   - Tlačítko Zpět z her musí rozlišovat, zda jsme v kampani/příběhu (vrací do HUBu) nebo v běžném předmětu.
