@@ -20,6 +20,8 @@ function fSub(a, b) { return frac(a.n * b.d - b.n * a.d, a.d * b.d); }
 function fMul(a, b) { return frac(a.n * b.n, a.d * b.d); }
 function fDiv(a, b) { return frac(a.n * b.d, a.d * b.n); }
 
+// DŮLEŽITÉ (BUGFIX): HTML zlomky používají CSS třídy s pomlčkami. 
+// Tyto pomlčky nesmí být nikdy přepsány přes replace(/-/g)!
 function formatFrac(f, isX, isFirst) {
     if (f.n === 0) return "";
     let absN = Math.abs(f.n);
@@ -234,10 +236,12 @@ window.handleEqStepChoice = function(opt) {
             return; 
         }
 
-        // Magické zformátování uživatelského vstupu do krásných zlomků pro zobrazení v historii
-        let displayEq = cleanOpt.replace(/(\d+)\/(\d+)/g, (match, n, d) => {
-            return `<span style="display:inline-flex; flex-direction:column; text-align:center; vertical-align:middle; line-height:1.1; font-size:0.85em; margin: 0 4px;"><span style="border-bottom:2px solid currentColor; padding:0 3px;">${n}</span><span style="padding:0 3px;">${d}</span></span>`;
-        }).replace(/\+/g, ' + ').replace(/-/g, ' - ').replace(/^ \- /, '-');
+        // DŮLEŽITÉ (BUGFIX): Aby se nerozbilo CSS zlomků ("inline-flex" atd.), musíme vyměnit mínusy za 
+        // oddělovací znaky a mezery JEŠTĚ PŘED vygenerováním HTML struktur pro zlomky!
+        let displayEq = cleanOpt.replace(/\+/g, ' &nbsp;+&nbsp; ')
+                                .replace(/-/g, ' &nbsp;-&nbsp; ')
+                                .replace(/^ &nbsp;\-&nbsp; /, '-')
+                                .replace(/(\d+)\/(\d+)/g, (match, n, d) => renderSimpleFrac(n, d));
 
         if (Math.abs(val - mathTask.targetVal) < 0.0001) {
             let finalMatch = cleanOpt.match(/^(-?\d+)(?:\/(\d+))?$/);
@@ -249,7 +253,6 @@ window.handleEqStepChoice = function(opt) {
                     sndOk(); mathTask.isDone = true; mathStreak++; addReward(2, "Zlomky");
                     mathTask.history.push({ eq: displayEq, op: "<span style='color:var(--col-green);'>✓ Hotovo</span>" });
                 } else {
-                    // Spočítáno správně, ale nezkráceno! Zapíšeme s varováním a ukážeme dítěti zlomek.
                     playTone(500, 'sine', 0.05);
                     mathTask.history.push({ eq: displayEq, op: "<span style='color:var(--col-orange);'>Zkrať na základní tvar!</span>" });
                 }
@@ -258,8 +261,7 @@ window.handleEqStepChoice = function(opt) {
                 mathTask.history.push({ eq: displayEq, op: "✓ Správný mezikrok" });
             }
         } else {
-            sndErr(); // Špatný výpočet
-            mathTask.history.push({ eq: displayEq, op: "<span style='color:var(--col-red);'>Chyba ve výpočtu</span>" });
+            sndErr(); mathTask.history.push({ eq: displayEq, op: "<span style='color:var(--col-red);'>Chyba ve výpočtu</span>" });
         }
         if (typeof renderActiveGame === 'function') renderActiveGame();
         return;
@@ -283,8 +285,7 @@ window.handleEqStepChoice = function(opt) {
                 mathTask.history.push({ eq: opt, op: "✓ Správný mezikrok" });
             }
         } else {
-            sndErr();
-            mathTask.history.push({ eq: opt, op: "<span style='color:var(--col-red);'>Není rovno zadání!</span>" });
+            sndErr(); mathTask.history.push({ eq: opt, op: "<span style='color:var(--col-red);'>Není rovno zadání!</span>" });
         }
         if (typeof renderActiveGame === 'function') renderActiveGame();
         return;
