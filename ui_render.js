@@ -31,7 +31,7 @@ function renderScreen() {
             const coins = Number(u.coins || 0); const freezes = typeof getUserItemCount === 'function' ? getUserItemCount(u.name, "Zmrazeni") : 0;
             const hasPin = !!(u.pin || localStorage.getItem(`user_pin_${u.name.toLowerCase().trim()}`));
             let themesArr = typeof getUserUnlockedThemes === 'function' ? getUserUnlockedThemes(u.name) : [];
-            const unlockedSkins = themesArr.filter(t => t !== 'default').map(t => { const s = APP_SKINS.find(x => x.id === t); return s ? s.name.split(' ')[0] : t; }).join(' ');
+            const unlockedSkins = themesArr.filter(t => t !== 'default').map(t => { const s = typeof APP_SKINS !== 'undefined' ? APP_SKINS.find(x => x.id === t) : null; return s ? s.name.split(' ')[0] : t; }).join(' ');
 
             return `
               <div class="tile" style="${isDone ? 'border-color:var(--col-yellow);background:#1a2512;' : ''} position:relative;" onclick="if(typeof selectUser === 'function') selectUser('${u.name.replace(/'/g, "\\'")}', ${g}, ${targetM})">
@@ -50,7 +50,7 @@ function renderScreen() {
       `;
     }
 
-    // 2. VÝBĚR PŘEDMĚTU + OBCHOD
+    // 2. VÝBĚR PŘEDMĚTU + OBCHOD (Opraveno zobrazení obchodu zde)
     else if (currentScreen === "SELECT_SUBJECT") {
       if(bSubj) bSubj.style.display = "none"; if(bGroup) bGroup.style.display = "none";
       const userG = parseInt(currentUser.grade) || 2;
@@ -65,7 +65,7 @@ function renderScreen() {
       let html = `
         <div class="filter-bar">
           <span>Filtr: ${typeof filterExactGradeOnly !== 'undefined' && filterExactGradeOnly ? 'Jen ' + userG + '. třída' : 'Všechny ročníky'}</span>
-          <button class="toggle-btn ${typeof filterExactGradeOnly !== 'undefined' && filterExactGradeOnly ? 'on' : ''}" onclick="if(typeof filterExactGradeOnly !== 'undefined') filterExactGradeOnly=!filterExactGradeOnly;renderScreen();">
+          <button class="toggle-btn ${typeof filterExactGradeOnly !== 'undefined' && filterExactGradeOnly ? 'on' : ''}" onclick="if(typeof filterExactGradeOnly !== 'undefined') { filterExactGradeOnly=!filterExactGradeOnly; renderScreen(); }">
             ${typeof filterExactGradeOnly !== 'undefined' && filterExactGradeOnly ? 'Jen má třída' : 'Všechny ročníky'}
           </button>
         </div>
@@ -193,11 +193,11 @@ function renderScreen() {
       `;
     }
 
-    // 6. KAMPAŇ HUB (S PŘÍBĚHY A CEFR)
+    // 6. KAMPAŇ HUB (Opraveno: zobrazeny příběhy a odstraněn obchod)
     else if (currentScreen === "CAMPAIGN_HUB") {
       if(bSubj) { bSubj.style.display = "flex"; bSubj.innerText = selectedSubject; }
       if(bGroup) bGroup.style.display = "none";
-      const coins = typeof getUserCoins === 'function' ? getUserCoins(currentUser.name) : 0; 
+      
       const vItems = typeof getVocabItems === 'function' ? getVocabItems() : [];
       let lessons = [...new Set(vItems.map(it => it.lesson))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
 
@@ -243,7 +243,7 @@ function renderScreen() {
 
       let storiesGroups = {};
       const userG = parseInt(currentUser.grade) || 2;
-      let allSubjectItems = (appData.items || []).filter(it => it.subject === selectedSubject && (typeof isItemAllowedForGrade==='function'&&isItemAllowedForGrade(it, userG)));
+      let allSubjectItems = (appData.items || []).filter(it => it.subject === selectedSubject && (typeof isItemAllowedForGrade==='function' ? isItemAllowedForGrade(it, userG) : true));
       
       allSubjectItems.forEach(it => {
           if (it.type && it.type.toUpperCase().includes('PRIBEH')) {
@@ -298,13 +298,6 @@ function renderScreen() {
 
           ${cefrHtml}
           ${storiesHtml}
-
-          <div class="tile" style="border-color:var(--col-yellow);background:#1f1905;margin-top:20px;padding:12px;cursor:pointer;" onclick="if(typeof setScreen==='function') setScreen('SHOP')">
-            <div style="display:flex;justify-content:space-between;align-items:center;width:100%;">
-              <span style="color:var(--col-yellow);font-weight:bold;font-size:15px;">🛒 Přejít do Obchodu</span>
-              <span style="color:var(--col-yellow);font-weight:bold;">${coins} 💰</span>
-            </div>
-          </div>
         </div>
       `;
     }
@@ -440,7 +433,7 @@ function renderActiveGame() {
           <h2 style="color:var(--col-green);margin-bottom:10px;">${typeof isAdaptiveBatchMode!=='undefined' && isAdaptiveBatchMode ? 'BLOK ZVLÁDNUT! 🎉' : 'KOMPLETNĚ ZVLÁDNUTO! 🎉'}</h2>
           <p style="color:inherit;margin-bottom:15px;">Všech ${stats.totalWords} položek bloku umíš na 2 ★!</p>
           <div class="action-btn" onclick="if(typeof startScrambleFromAdaptiveBatch==='function') startScrambleFromAdaptiveBatch()">SKLÁDAT TĚCHTO ${stats.totalWords} SLOV 🧩</div>
-          ${typeof isAdaptiveBatchMode!=='undefined' && isAdaptiveBatchMode ? `<div class="action-btn green" onclick="if(typeof initGameState==='function') initGameState();renderActiveGame();">DALŠÍ BLOK (15 SLOV) ➔</div>` : ''}
+          ${typeof isAdaptiveBatchMode!=='undefined' && isAdaptiveBatchMode ? `<div class="action-btn green" onclick="if(typeof initGameState==='function') { initGameState(); renderActiveGame(); }">DALŠÍ BLOK (15 SLOV) ➔</div>` : ''}
           <div class="action-btn" onclick="if(typeof toggleTestingDirection==='function') toggleTestingDirection()">PŘEPNOUT SMĚR (${isDirOut ? 'Cizí ➔ 🇨🇿' : '🇨🇿 ➔ Cizí'}) ⇄</div>
           <div class="action-btn" onclick="if(typeof setScreen==='function') setScreen('SELECT_GAME')">ZPĚT DO MENU</div>
         </div>
