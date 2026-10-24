@@ -32,11 +32,12 @@ function speakWord(text, subjectName) {
   setTimeout(() => {
     let toSpeak = text.trim();
 
-    // 1. Pokud jde o dialog (např. "👧 Lucy: Hello!"), odřízneme ze čtení jméno postavy před dvojtečkou
+    // 1. Odstranění jmen u příběhů (před dvojtečkou) a emotikonů
     toSpeak = toSpeak.replace(/^[^:]{1,30}:\s*/, '');
-
-    // 2. Odstraníme všechny emotikony a smajlíky, aby je syntezátor nečetl slovy ("Girl", "Boy" atd.)
     toSpeak = toSpeak.replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, '').trim();
+
+    // OPRAVA: Odstranění závorek z výslovnosti (např. u němčiny "Sie (ona)")
+    toSpeak = toSpeak.replace(/\s*\([^)]*\)/g, '');
 
     toSpeak = toSpeak.replace(/ליהוה/g, 'לַאדֹנָי').replace(/יהוה/g, 'אֲדֹנָי').replace(/L'?(Jahve|Jahveh|Yahweh|Yahwe|Jehova|JHVH|YHWH|JVHV)/gi, "L'Adonaj");
     if (/read\s*-\s*read\s*-\s*read/i.test(toSpeak)) toSpeak = "read, red, red";
@@ -142,13 +143,12 @@ function getGroupMasteryPercent(groupItems, subjName) {
   return Math.min(100, Math.round((points / (vList.length * 4)) * 100));
 }
 
-// Opravené tlačítko ZPĚT, které respektuje Příběhy a Cestu
 function goBack() {
   if (typeof stopArcadeLoop === "function") stopArcadeLoop();
   if (typeof stopSnakeLoop === "function") stopSnakeLoop();
   if (typeof sendTimeHeartbeatToGoogle === "function") sendTimeHeartbeatToGoogle();
 
-  const isMinigame = (typeof isCampaignMinigame !== "undefined" && isCampaignMinigame);
+  const isMinigame = (typeof isCampaignMinigame !== "undefined" && isCampaignMinigame && selectedGame !== "PROCEDURAL_MATH");
 
   if (currentScreen === "PLAYING" && (selectedGame === "CAMPAIGN" || selectedGame === "STORY" || isMinigame)) {
     setScreen("CAMPAIGN_HUB");
@@ -181,19 +181,15 @@ function goBack() {
       setScreen("SELECT_GROUP");
     }
   }
-  else if (currentScreen === "SELECT_GROUP") {
-    setScreen("SELECT_SUBJECT");
-  }
-  else if (currentScreen === "SELECT_SUBJECT") {
-    setScreen("SELECT_USER");
-  }
+  else if (currentScreen === "SELECT_GROUP") setScreen("SELECT_SUBJECT");
+  else if (currentScreen === "SELECT_SUBJECT") setScreen("SELECT_USER");
 }
 
 function startGame(game) { 
   if (typeof stopArcadeLoop === "function") stopArcadeLoop(); 
   if (typeof stopSnakeLoop === "function") stopSnakeLoop();
   selectedGame = game; 
-  isCampaignMinigame = false; 
+  if (typeof isCampaignMinigame !== "undefined") isCampaignMinigame = false; 
   if (typeof initGameState === "function") initGameState(); 
   setScreen("PLAYING"); 
 }
@@ -282,6 +278,18 @@ function renderActiveGame() {
     const w = vItems[vCurrentWord];
     const totalWords = (isAdaptiveBatchMode && adaptiveBatchIndices && adaptiveBatchIndices.length > 0) ? adaptiveBatchIndices.length : vItems.length;
     const pct = Math.min(100, Math.round((scrambleSolvedCount / totalWords) * 100));
+
+    // OPRAVA BUGHŮ U SKLÁDÁNÍ: Kontrola konce hry zabrání nekonečné smyčce u Hebrejštiny!
+    if (scrambleSolvedCount >= totalWords && scrambleDone) {
+        main.innerHTML = `
+          <div style="text-align:center;padding:30px;">
+            <h2 style="color:var(--col-green);font-size:28px;margin-bottom:10px;">SKLÁDÁNÍ DOKONČENO! 🎉</h2>
+            <p style="font-size:18px;color:inherit;margin-bottom:20px;">Složil jsi všech ${totalWords} slov!</p>
+            <div class="action-btn green" onclick="setScreen('SELECT_GAME')">ZPĚT DO MENU</div>
+          </div>
+        `;
+        return;
+    }
 
     main.innerHTML = `
       <div class="bargraph-container">
@@ -470,9 +478,86 @@ function renderActiveGame() {
     `;
   }
 
-  // --- ZDE JE MATEMATIKA ---
+  // PŘÍBĚHY (INTERAKTIVNÍ ČTENÍ)
+  else if (selectedGame === "STORY") {
+    if (storyStep >= storyList.length) {
+      const uKey = currentUser.name.toLowerCase().trim();
+      const alreadyDone = (typeof isStoryCompleted === "function") && isStoryCompleted(selectedGroupKey, storyList);
+      
+      main.innerHTML = `
+        <div style="text-align:center;padding:30px;">
+          <h2 style="color:var(--col-green);font-size:28px;margin-bottom:10px;">PŘÍBĚH DOKONČEN! 🎉</h2>
+          <p style="font-size:18px;color:inherit;margin-bottom:20px;">Skvělá práce při čtení příběhu <b>${selectedGroupKey}</b>.</p>
+          ${!alreadyDone ? `
+            <p style="font-size:24px;color:var(--col-yellow);font-weight:bold;margin-bottom:25px;">Získáváš odměnu: +10 💰</p>
+          ` : `
+            <p style="font-size:16px;color:var(--col-text-muted);margin-bottom:25px;">Tento příběh už máš splněný (odměna již byla vyplacena).</p>
+          `}
+          <div class="action-btn green" onclick="finishStory()">${!alreadyDone ? 'VYINKASOVAT 10 💰 A ZPĚT' : 'ZPĚT NA CESTU'}</div>
+        </div>
+      `;
+      return;
+    }
+
+    const item = storyList[storyStep];
+    const pct = Math.round(((storyStep + 1) / storyList.length) * 100);
+    const hasOpts = item.options && item.options.length > 0;
+    
+    const isCzechQuestion = hasOpts && !item.question.includes('___');
+
+    let promptDisplay = formatPromptText(item.question);
+    if (hasOpts && storyAnswered && item.question.includes('___')) {
+      const fillHtml = `<span style="color:var(--col-green);font-weight:bold;text-decoration:underline;">${item.answer}</span>`;
+      promptDisplay = formatPromptText(item.question.replace(/___+/g, fillHtml));
+    }
+
+    const sentenceToRead = (item.question.includes('___') && (!hasOpts || storyAnswered))
+      ? item.question.replace(/___+/g, item.answer).replace(/[*_]/g, '').replace(/'/g, "\\'")
+      : item.question.replace(/[*_]/g, '').replace(/'/g, "\\'");
+
+    main.innerHTML = `
+      <div class="bargraph-container">
+        <div class="bargraph-header">
+          <span>📖 ${selectedGroupKey} (${storyStep + 1} / ${storyList.length})</span>
+          <span style="color:var(--col-active-tab);">${pct} %</span>
+        </div>
+        <div class="bargraph-track"><div class="bargraph-fill" style="width:${pct}%;"></div></div>
+      </div>
+
+      <div class="prompt-box" style="font-size:22px;color:inherit;margin:15px 0;line-height:1.5;padding:20px;">
+        ${promptDisplay}
+        ${!isCzechQuestion ? `<span class="audio-btn" onclick="speakWord('${sentenceToRead}', '${selectedSubject}')">🔊</span>` : ''}
+      </div>
+
+      ${!hasOpts ? `
+        ${item.answer ? `
+          <div class="prompt-box" style="font-size:18px;color:var(--col-text-muted);cursor:pointer;" onclick="storyShowTrans=!storyShowTrans;renderActiveGame();">
+            ${typeof storyShowTrans !== 'undefined' && storyShowTrans ? cleanCzechTranslation(item.answer) : '🇨🇿 Klikni pro zobrazení překladu'}
+          </div>
+        ` : ''}
+        <div class="action-btn green" style="margin-top:15px;" onclick="nextStoryStep()">POKRAČOVAT ➔</div>
+      ` : `
+        <div class="grid-2">
+          ${item.options.map((opt, idx) => {
+            let btnCls = "";
+            if (storyAnswered) {
+              if (opt === item.answer) btnCls = "correct";
+              else if (opt === storyChosenOpt) btnCls = "wrong";
+            }
+            return `<div class="opt-btn ${btnCls}" onclick="clickStoryOpt(${idx})">${opt}</div>`;
+          }).join('')}
+        </div>
+        ${storyAnswered ? `
+          ${item.help ? `<div style="text-align:center;color:var(--col-yellow);margin:12px 0;font-size:16px;font-weight:bold;">🇨🇿 ${item.help}</div>` : ''}
+          <div class="action-btn green" style="margin-top:15px;" onclick="nextStoryStep()">POKRAČOVAT ➔</div>
+        ` : ''}
+      `}
+    `;
+  }
+
   else if (selectedGame === "PROCEDURAL_MATH") {
     
+    // Nádherné formátování zlomků pro tlačítka u "Zlomky (+ a -)"
     const displayMathOpt = (opt) => {
         if (typeof opt === 'string' && opt.includes('/')) {
             let [n, d] = opt.split('/');
@@ -484,6 +569,7 @@ function renderActiveGame() {
         return opt;
     };
 
+    // --- VYKRESLENÍ: KROKOVÉ ROVNICE A VÝRAZY ---
     if (mathTask.type === "STEP_EQ" || mathTask.type === "BUILD_EXPR" || mathTask.type === "FRAC_STEP") {
         const isDone = mathTask.isDone === true;
         
@@ -493,6 +579,8 @@ function renderActiveGame() {
         
         let controlsHtml = "";
         if (!isDone) {
+            // UI 5-SLOUPCOVÁ KLÁVESNICE
+            // OPRAVA BACKSPACE: Barva pro Matrix
             controlsHtml = `
               <div id="math-keyboard-input" style="background:var(--col-card); border:1px solid var(--col-card-border); border-radius:10px; padding:10px; margin-bottom:12px; text-align:center; font-size:32px; font-family:monospace; color:var(--col-yellow); min-height:65px; display:flex; align-items:center; justify-content:center; letter-spacing:2px; box-shadow: inset 0 2px 5px rgba(0,0,0,0.2); overflow:hidden;">
                   ${mathTask.input ? mathTask.input : `<span style="color:var(--col-text-muted); font-size:14px; letter-spacing:normal;">${placeholderText}</span>`}
@@ -514,7 +602,9 @@ function renderActiveGame() {
                   <div class="opt-btn" style="height:60px; font-size:26px;" onclick="clickMathKey('1')">1</div>
                   <div class="opt-btn" style="height:60px; font-size:26px;" onclick="clickMathKey('2')">2</div>
                   <div class="opt-btn" style="height:60px; font-size:26px;" onclick="clickMathKey('3')">3</div>
-                  <div class="opt-btn" style="height:60px; font-size:24px; background:var(--col-orange); border-color:#f97316;" onclick="clickMathKey('⌫')">⌫</div>
+                  
+                  <!-- OPRAVENÝ BACKSPACE -->
+                  <div class="opt-btn" style="height:60px; font-size:24px; background:#b45309; color:#fff; border-color:#d97706;" onclick="clickMathKey('⌫')">⌫</div>
 
                   <div class="opt-btn" style="height:60px; font-size:26px;" onclick="clickMathKey('/')">/</div>
                   <div class="opt-btn" style="height:60px; font-size:26px;" onclick="clickMathKey('(')">(</div>
@@ -543,7 +633,7 @@ function renderActiveGame() {
                  ${mathTask.history.map((step, i) => `
                     <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:${i<mathTask.history.length-1 ? '1px solid var(--col-card-border)' : 'none'}; padding-bottom:${i<mathTask.history.length-1 ? '10px' : '0'}; margin-bottom:${i<mathTask.history.length-1 ? '10px' : '0'};">
                        <div style="font-size:26px; color:${i===mathTask.history.length-1 && isDone ? 'var(--col-green)' : 'inherit'}; font-weight:bold;">${step.eq}</div>
-                       ${step.op ? `<div style="background:var(--col-bg); padding:6px 12px; border-radius:6px; font-weight:bold; font-family:monospace; font-size:16px; border: 1px solid var(--col-card-border);">${step.op}</div>` : ''}
+                       ${step.op ? `<div style="background:var(--col-bg); color:var(--col-yellow); padding:6px 12px; border-radius:6px; font-weight:bold; font-family:monospace; font-size:16px; border: 1px solid var(--col-card-border);">| ${step.op}</div>` : ''}
                     </div>
                  `).join('')}
               </div>
@@ -556,6 +646,7 @@ function renderActiveGame() {
           </div>
         `;
 
+        // Automatické scrollování AŽ po kliknutí na OK (kdy se reálně vyrenderuje nová HTML struktura historie)
         setTimeout(() => {
             const histEl = document.getElementById("eq-history-container");
             if (histEl) histEl.scrollTop = histEl.scrollHeight;
@@ -737,84 +828,7 @@ function renderActiveGame() {
        setTimeout(() => { if(typeof attachSnakeTouchHandlers === 'function') attachSnakeTouchHandlers(); }, 50);
     }
   }
-  // PŘÍBĚHY (INTERAKTIVNÍ ČTENÍ)
-  // PŘÍBĚHY (INTERAKTIVNÍ ČTENÍ)
-  else if (selectedGame === "STORY") {
-    if (storyStep >= storyList.length) {
-      const uKey = currentUser.name.toLowerCase().trim();
-      const alreadyDone = (typeof isStoryCompleted === "function") && isStoryCompleted(selectedGroupKey, storyList);
-      
-      main.innerHTML = `
-        <div style="text-align:center;padding:30px;">
-          <h2 style="color:var(--col-green);font-size:28px;margin-bottom:10px;">PŘÍBĚH DOKONČEN! 🎉</h2>
-          <p style="font-size:18px;color:inherit;margin-bottom:20px;">Skvělá práce při čtení příběhu <b>${selectedGroupKey}</b>.</p>
-          ${!alreadyDone ? `
-            <p style="font-size:24px;color:var(--col-yellow);font-weight:bold;margin-bottom:25px;">Získáváš odměnu: +10 💰</p>
-          ` : `
-            <p style="font-size:16px;color:var(--col-text-muted);margin-bottom:25px;">Tento příběh už máš splněný (odměna již byla vyplacena).</p>
-          `}
-          <div class="action-btn green" onclick="finishStory()">${!alreadyDone ? 'VYINKASOVAT 10 💰 A ZPĚT' : 'ZPĚT NA CESTU'}</div>
-        </div>
-      `;
-      return;
-    }
 
-    const item = storyList[storyStep];
-    const pct = Math.round(((storyStep + 1) / storyList.length) * 100);
-    const hasOpts = item.options && item.options.length > 0;
-    
-    // OPRAVA: Detekce české kontrolní otázky (má možnosti na výběr, ale nemá '___')
-    const isCzechQuestion = hasOpts && !item.question.includes('___');
-
-    let promptDisplay = formatPromptText(item.question);
-    if (hasOpts && storyAnswered && item.question.includes('___')) {
-      const fillHtml = `<span style="color:var(--col-green);font-weight:bold;text-decoration:underline;">${item.answer}</span>`;
-      promptDisplay = formatPromptText(item.question.replace(/___+/g, fillHtml));
-    }
-
-    const sentenceToRead = (item.question.includes('___') && (!hasOpts || storyAnswered))
-      ? item.question.replace(/___+/g, item.answer).replace(/[*_]/g, '').replace(/'/g, "\\'")
-      : item.question.replace(/[*_]/g, '').replace(/'/g, "\\'");
-
-    main.innerHTML = `
-      <div class="bargraph-container">
-        <div class="bargraph-header">
-          <span>📖 ${selectedGroupKey} (${storyStep + 1} / ${storyList.length})</span>
-          <span style="color:var(--col-active-tab);">${pct} %</span>
-        </div>
-        <div class="bargraph-track"><div class="bargraph-fill" style="width:${pct}%;"></div></div>
-      </div>
-
-      <div class="prompt-box" style="font-size:22px;color:inherit;margin:15px 0;line-height:1.5;padding:20px;">
-        ${promptDisplay}
-        ${!isCzechQuestion ? `<span class="audio-btn" onclick="speakWord('${sentenceToRead}', '${selectedSubject}')">🔊</span>` : ''}
-      </div>
-
-      ${!hasOpts ? `
-        ${item.answer ? `
-          <div class="prompt-box" style="font-size:18px;color:var(--col-text-muted);cursor:pointer;" onclick="storyShowTrans=!storyShowTrans;renderActiveGame();">
-            ${typeof storyShowTrans !== 'undefined' && storyShowTrans ? cleanCzechTranslation(item.answer) : '🇨🇿 Klikni pro zobrazení překladu'}
-          </div>
-        ` : ''}
-        <div class="action-btn green" style="margin-top:15px;" onclick="nextStoryStep()">POKRAČOVAT ➔</div>
-      ` : `
-        <div class="grid-2">
-          ${item.options.map((opt, idx) => {
-            let btnCls = "";
-            if (storyAnswered) {
-              if (opt === item.answer) btnCls = "correct";
-              else if (opt === storyChosenOpt) btnCls = "wrong";
-            }
-            return `<div class="opt-btn ${btnCls}" onclick="clickStoryOpt(${idx})">${opt}</div>`;
-          }).join('')}
-        </div>
-        ${storyAnswered ? `
-          ${item.help ? `<div style="text-align:center;color:var(--col-yellow);margin:12px 0;font-size:16px;font-weight:bold;">🇨🇿 ${item.help}</div>` : ''}
-          <div class="action-btn green" style="margin-top:15px;" onclick="nextStoryStep()">POKRAČOVAT ➔</div>
-        ` : ''}
-      `}
-    `;
-  }
   else if (selectedGame === "CAMPAIGN") {
     if (cmpIdx >= cmpQueue.length) {
       launchCampaignMinigame();
