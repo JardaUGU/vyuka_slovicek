@@ -193,11 +193,12 @@ function renderScreen() {
       `;
     }
 
-    // 6. KAMPAŇ HUB (Opraveno: zobrazeny příběhy a odstraněn obchod)
+    // 6. KAMPAŇ HUB (S PŘÍBĚHY A CEFR)
     else if (currentScreen === "CAMPAIGN_HUB") {
       if(bSubj) { bSubj.style.display = "flex"; bSubj.innerText = selectedSubject; }
       if(bGroup) bGroup.style.display = "none";
       
+      const coins = typeof getUserCoins === 'function' ? getUserCoins(currentUser.name) : 0; 
       const vItems = typeof getVocabItems === 'function' ? getVocabItems() : [];
       let lessons = [...new Set(vItems.map(it => it.lesson))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
 
@@ -218,6 +219,7 @@ function renderScreen() {
       let curItems = vItems.filter(it => it.lesson === currentLesson);
       let currentPct = (typeof getGroupMasteryPercent === "function") ? getGroupMasteryPercent(curItems, selectedSubject) : 0;
 
+      // CEFR Ukazatel
       let cefrHtml = "";
       if (subjNorm.includes("angli")) {
          const curIndex = lessons.indexOf(currentLesson);
@@ -241,15 +243,32 @@ function renderScreen() {
          `;
       }
 
+      // DŮLEŽITÉ (BUGFIX): Filtrace příběhů tak, aby se zobrazily POUZE ty, do kterých už žák došel!
+      let curIndex = lessons.indexOf(currentLesson);
+      let currentLessonNum = parseInt(String(currentLesson).replace(/\D/g, '')) || 1;
+
       let storiesGroups = {};
       const userG = parseInt(currentUser.grade) || 2;
       let allSubjectItems = (appData.items || []).filter(it => it.subject === selectedSubject && (typeof isItemAllowedForGrade==='function' ? isItemAllowedForGrade(it, userG) : true));
       
       allSubjectItems.forEach(it => {
           if (it.type && it.type.toUpperCase().includes('PRIBEH')) {
-              let t = it.topic || 'Neznámý příběh';
-              if (!storiesGroups[t]) storiesGroups[t] = [];
-              storiesGroups[t].push(it);
+              let isUnlocked = true;
+              let storyIndex = lessons.indexOf(it.lesson);
+              let storyLessonNum = parseInt(String(it.lesson).replace(/\D/g, ''));
+              
+              // Odemkne se, pokud je index příběhu menší nebo roven aktuální lekci (nebo záloha přes číslo lekce)
+              if (storyIndex !== -1 && curIndex !== -1) {
+                  isUnlocked = storyIndex <= curIndex;
+              } else if (!isNaN(storyLessonNum) && !isNaN(currentLessonNum)) {
+                  isUnlocked = storyLessonNum <= currentLessonNum;
+              }
+
+              if (isUnlocked) {
+                  let t = it.topic || 'Neznámý příběh';
+                  if (!storiesGroups[t]) storiesGroups[t] = [];
+                  storiesGroups[t].push(it);
+              }
           }
       });
 
