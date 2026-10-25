@@ -4,7 +4,12 @@
 
 async function loadData() {
   checkDateRollover();
-  if (currentUser) todaySecondsStudied = loadUserStudyTime(currentUser.name);
+  if (currentUser) {
+      todaySecondsStudied = loadUserStudyTime(currentUser.name);
+      // BUGFIX: Zabezpečení proti duplicitnímu odesílání času při stisku F5 (Refresh)
+      lastCloudSyncSec = todaySecondsStudied; 
+  }
+  
   const cached = localStorage.getItem("app_data");
   if (cached) {
     try {
@@ -13,6 +18,7 @@ async function loadData() {
       if (typeof renderScreen === "function") renderScreen();
     } catch(e) { if (typeof renderScreen === "function") renderScreen(); }
   } else { if (typeof renderScreen === "function") renderScreen(); }
+  
   syncDataQuietly();
 }
 
@@ -24,6 +30,7 @@ async function syncDataQuietly() {
     
     if (json && json.items) {
       json.syncDate = getTodayDateStr(); appData = json; localStorage.setItem("app_data", JSON.stringify(json));
+      
       if (currentUser && appData.users) {
         const foundU = appData.users.find(u => u.name.toLowerCase().trim() === currentUser.name.toLowerCase().trim());
         if (foundU) {
@@ -35,15 +42,12 @@ async function syncDataQuietly() {
           currentUser.unlockedThemes = mergedThemes; currentUser.activeTheme = getUserActiveTheme(currentUser.name);
           currentUser.startLevels = foundU.startLevels || {};
           
-          // DŮLEŽITÉ (BUGFIX): Načtení spojeného času z cloudu!
           if (foundU.todayMinutes !== undefined) {
              const cloudSec = Math.round(Number(foundU.todayMinutes) * 60);
              const localSec = loadUserStudyTime(currentUser.name);
-             if (cloudSec > localSec) {
-                 todaySecondsStudied = cloudSec;
-                 lastCloudSyncSec = todaySecondsStudied; // Fix: Zabrání odeslání duplikátů z nového zařízení
-                 localStorage.setItem(getStudyTimeKey(currentUser.name), String(todaySecondsStudied));
-             }
+             todaySecondsStudied = Math.max(localSec, cloudSec);
+             lastCloudSyncSec = todaySecondsStudied; 
+             localStorage.setItem(getStudyTimeKey(currentUser.name), String(todaySecondsStudied));
           }
           localStorage.setItem("cur_user", JSON.stringify(currentUser));
         }
@@ -60,7 +64,9 @@ async function syncData() {
     const fetchUrl = API_URL + '?t=' + Date.now() + '&clientDate=' + getTodayDateStr();
     const res = await fetch(fetchUrl);
     const json = await res.json();
+
     if (json.appVersion && String(json.appVersion) !== String(APP_VERSION)) { forceHardReload(); return; }
+
     if (json && json.items) {
       json.syncDate = getTodayDateStr(); appData = json; localStorage.setItem("app_data", JSON.stringify(json));
       if (statusEl) statusEl.innerText = `OK: ${appData.items.length} úloh`;
@@ -75,13 +81,12 @@ async function syncData() {
           if (foundU.todayMinutes !== undefined) {
              const cloudSec = Math.round(Number(foundU.todayMinutes) * 60);
              const localSec = loadUserStudyTime(currentUser.name);
-             if (cloudSec > localSec) {
-                 todaySecondsStudied = cloudSec;
-                 lastCloudSyncSec = todaySecondsStudied;
-                 localStorage.setItem(getStudyTimeKey(currentUser.name), String(todaySecondsStudied));
-             }
+             todaySecondsStudied = Math.max(localSec, cloudSec);
+             lastCloudSyncSec = todaySecondsStudied; 
+             localStorage.setItem(getStudyTimeKey(currentUser.name), String(todaySecondsStudied));
           }
-          localStorage.setItem("cur_user", JSON.stringify(currentUser)); applyAppSkin(currentUser.activeTheme);
+          localStorage.setItem("cur_user", JSON.stringify(currentUser)); 
+          if(typeof applyAppSkin === 'function') applyAppSkin(currentUser.activeTheme);
         }
       }
     }
@@ -92,28 +97,28 @@ async function syncData() {
 function sendTimeHeartbeatToGoogle(deltaSec) {
   if (!currentUser || !deltaSec) return;
   try {
-    // DŮLEŽITÉ (BUGFIX): Oprava překlepu z newSearchParams na new URLSearchParams!
     const fd = new URLSearchParams(); 
     fd.append("action", "log_activity"); fd.append("user", currentUser.name);
-    fd.append("subject", selectedSubject || "Výuka"); fd.append("section", "Časomíra");
+    fd.append("subject", typeof selectedSubject!=='undefined'?selectedSubject : "Výuka"); 
+    fd.append("section", "Časomíra");
     fd.append("stars", 0); 
     fd.append("minutes", (deltaSec / 60).toFixed(3)); 
     fetch(API_URL, { method: "POST", mode: "no-cors", body: fd });
-  } catch(e) { console.error("Chyba při odesílání času:", e); }
+  } catch(e) {}
 }
 
 async function saveWordMasteryToGoogle(itemQuestion, masteryLevel, direction) {
   if (!currentUser) return;
   try {
     const uKey = currentUser.name.toLowerCase().trim();
-    const compKey = `${selectedSubject}:::${itemQuestion}:::${direction}`;
+    const compKey = `${typeof selectedSubject!=='undefined'?selectedSubject:''}:::${itemQuestion}:::${direction}`;
     if (!appData.progress) appData.progress = {};
     if (!appData.progress[uKey]) appData.progress[uKey] = {};
     appData.progress[uKey][compKey] = masteryLevel;
     localStorage.setItem("app_data", JSON.stringify(appData));
     const fd = new URLSearchParams();
     fd.append("action", "save_mastery"); fd.append("user", currentUser.name);
-    fd.append("subject", selectedSubject); fd.append("foreign", itemQuestion);
+    fd.append("subject", typeof selectedSubject!=='undefined'?selectedSubject:''); fd.append("foreign", itemQuestion);
     fd.append("mastery", masteryLevel); fd.append("direction", direction);
     fetch(API_URL, { method: "POST", mode: "no-cors", body: fd });
   } catch(e) {}
