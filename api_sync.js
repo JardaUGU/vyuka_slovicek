@@ -92,14 +92,14 @@ async function syncData() {
 function sendTimeHeartbeatToGoogle(deltaSec) {
   if (!currentUser || !deltaSec) return;
   try {
-    const fd = newSearchParams(); 
+    // DŮLEŽITÉ (BUGFIX): Oprava překlepu z newSearchParams na new URLSearchParams!
+    const fd = new URLSearchParams(); 
     fd.append("action", "log_activity"); fd.append("user", currentUser.name);
     fd.append("subject", selectedSubject || "Výuka"); fd.append("section", "Časomíra");
     fd.append("stars", 0); 
-    // DŮLEŽITÉ: Posíláme PŘÍRŮSTEK v minutách (např. 0.75 pro 45 vteřin)
     fd.append("minutes", (deltaSec / 60).toFixed(3)); 
     fetch(API_URL, { method: "POST", mode: "no-cors", body: fd });
-  } catch(e) {}
+  } catch(e) { console.error("Chyba při odesílání času:", e); }
 }
 
 async function saveWordMasteryToGoogle(itemQuestion, masteryLevel, direction) {
