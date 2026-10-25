@@ -25,7 +25,12 @@ function renderScreen() {
         <div class="grid-2">
           ${uList.map(u => {
             const g = parseInt(u.grade) || 2;
-            const uSec = typeof loadUserStudyTime === 'function' ? loadUserStudyTime(u.name) : 0;
+            
+            // DŮLEŽITÉ (BUGFIX): Dlaždice nyní zobrazuje největší hodnotu (cloud vs lokální paměť)
+            const localSec = typeof loadUserStudyTime === 'function' ? loadUserStudyTime(u.name) : 0;
+            const cloudSec = (typeof appData !== 'undefined' && appData.syncDate === getTodayDateStr()) ? Math.round(Number(u.todayMinutes || 0) * 60) : 0;
+            const uSec = Math.max(localSec, cloudSec);
+            
             const uMin = Math.floor(uSec / 60); const targetM = u.targetMinutes || 15; const isDone = uMin >= targetM;
             const streakDays = (u.streak !== undefined) ? u.streak : (typeof getUserStreak === 'function' ? getUserStreak(u.name) : 0);
             const coins = Number(u.coins || 0); const freezes = typeof getUserItemCount === 'function' ? getUserItemCount(u.name, "Zmrazeni") : 0;
