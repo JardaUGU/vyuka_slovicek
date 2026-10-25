@@ -311,7 +311,11 @@ function selectUser(name, grade, targetMinutes) {
     unlockedThemes: themesArr, activeTheme: activeTh, coins: foundU ? Number(foundU.coins || 0) : 0
   };
   localStorage.setItem("cur_user", JSON.stringify(currentUser)); applyAppSkin(currentUser.activeTheme);
+  
   todaySecondsStudied = loadUserStudyTime(currentUser.name);
+  // DŮLEŽITÉ: Resetujeme synchronizační kotvu při startu uživatele!
+  lastCloudSyncSec = todaySecondsStudied; 
+
   isTimerPaused = false; updateStudyTimerUI(); setScreen("SELECT_SUBJECT");
 }
 
@@ -347,3 +351,29 @@ window.startStory = function(topicName) {
 
 // Spouštěč při startu
 document.addEventListener("DOMContentLoaded", () => { if(typeof loadData==='function') loadData(); });
+// DŮLEŽITÉ: INTERVAL PRO ODESÍLÁNÍ PŘÍRŮSTKU
+setInterval(() => {
+  checkDateRollover();
+  const isJustGame = (currentScreen === "PLAYING" && (selectedGame === "SNAKE" || selectedGame === "ARCADE"));
+  
+  if (currentScreen === "PLAYING" && currentUser && !isJustGame) {
+    const idleTime = Date.now() - lastUserActivityTime;
+    if (idleTime < 15000) {
+      todaySecondsStudied++;
+      localStorage.setItem(getStudyTimeKey(currentUser.name), String(todaySecondsStudied));
+      isTimerPaused = false;
+      
+      const targetSec = (currentUser.targetMinutes || 15) * 60;
+      if (todaySecondsStudied >= targetSec) updateUserStreak(currentUser.name, currentUser.targetMinutes || 15);
+      
+      // Výpočet přírůstku od posledního odeslání (Delta)
+      const deltaSec = todaySecondsStudied - lastCloudSyncSec;
+      if (deltaSec >= 45) { 
+          lastCloudSyncSec = todaySecondsStudied; 
+          if(typeof sendTimeHeartbeatToGoogle==='function') sendTimeHeartbeatToGoogle(deltaSec); 
+      }
+    } else { isTimerPaused = true; }
+  } else { isTimerPaused = true; }
+  
+  updateStudyTimerUI();
+}, 1000);
