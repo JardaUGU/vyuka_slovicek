@@ -256,18 +256,26 @@ window.addEventListener('keydown', registerUserAction, true);
 
 setInterval(() => {
   checkDateRollover();
-  const isJustGame = (currentScreen === "PLAYING" && (selectedGame === "SNAKE" || selectedGame === "ARCADE"));
+  // DŮLEŽITÉ: Čas studia se nezapočítává pouze u oddechové hry Had (SNAKE)
+  const isJustGame = (currentScreen === "PLAYING" && selectedGame === "SNAKE");
+  
   if (currentScreen === "PLAYING" && currentUser && !isJustGame) {
     const idleTime = Date.now() - lastUserActivityTime;
     if (idleTime < 15000) {
       todaySecondsStudied++;
       localStorage.setItem(getStudyTimeKey(currentUser.name), String(todaySecondsStudied));
       isTimerPaused = false;
+      
       const targetSec = (currentUser.targetMinutes || 15) * 60;
       if (todaySecondsStudied >= targetSec) updateUserStreak(currentUser.name, currentUser.targetMinutes || 15);
-      if (todaySecondsStudied - lastCloudSyncSec >= 45) { lastCloudSyncSec = todaySecondsStudied; if(typeof sendTimeHeartbeatToGoogle==='function') sendTimeHeartbeatToGoogle(); }
+      
+      if (todaySecondsStudied - lastCloudSyncSec >= 30) { 
+        lastCloudSyncSec = todaySecondsStudied; 
+        if (typeof sendTimeHeartbeatToGoogle === 'function') sendTimeHeartbeatToGoogle(); 
+      }
     } else { isTimerPaused = true; }
   } else { isTimerPaused = true; }
+  
   updateStudyTimerUI();
 }, 1000);
 
