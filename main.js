@@ -303,20 +303,28 @@ function selectUser(name, grade, targetMinutes) {
      if (inputPin !== savedPin) { alert("Nesprávné heslo!"); return; }
   }
   checkDateRollover();
-  const themesArr = getUserUnlockedThemes(name); const activeTh = getUserActiveTheme(name);
+  const themesArr = typeof getUserUnlockedThemes==='function'?getUserUnlockedThemes(name):[]; 
+  const activeTh = typeof getUserActiveTheme==='function'?getUserActiveTheme(name):'default';
   currentUser = { 
     name, grade: parseInt(grade) || 2, targetMinutes: parseInt(targetMinutes) || 15, stars: 0,
     startLevels: (foundU && foundU.startLevels) ? foundU.startLevels : {},
     inventory: (foundU && foundU.inventory) ? foundU.inventory : {},
     unlockedThemes: themesArr, activeTheme: activeTh, coins: foundU ? Number(foundU.coins || 0) : 0
   };
-  localStorage.setItem("cur_user", JSON.stringify(currentUser)); applyAppSkin(currentUser.activeTheme);
+  localStorage.setItem("cur_user", JSON.stringify(currentUser)); 
+  if(typeof applyAppSkin==='function') applyAppSkin(currentUser.activeTheme);
   
-  todaySecondsStudied = loadUserStudyTime(currentUser.name);
-  // DŮLEŽITÉ: Resetujeme synchronizační kotvu při startu uživatele!
+  // DŮLEŽITÉ (BUGFIX): Načtení maximálního času z cloudu a z lokální paměti
+  let localSec = typeof loadUserStudyTime==='function'?loadUserStudyTime(currentUser.name):0;
+  let cloudSec = (foundU && appData.syncDate === getTodayDateStr()) ? Math.round(Number(foundU.todayMinutes || 0) * 60) : 0;
+  todaySecondsStudied = Math.max(localSec, cloudSec);
+  localStorage.setItem(getStudyTimeKey(currentUser.name), String(todaySecondsStudied));
+  
   lastCloudSyncSec = todaySecondsStudied; 
 
-  isTimerPaused = false; updateStudyTimerUI(); setScreen("SELECT_SUBJECT");
+  isTimerPaused = false; 
+  if(typeof updateStudyTimerUI==='function') updateStudyTimerUI(); 
+  if(typeof setScreen==='function') setScreen("SELECT_SUBJECT");
 }
 
 function chooseSubject(subj) { 
