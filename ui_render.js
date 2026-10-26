@@ -25,7 +25,12 @@ function renderScreen() {
         <div class="grid-2">
           ${uList.map(u => {
             const g = parseInt(u.grade) || 2;
-            const uSec = typeof loadUserStudyTime === 'function' ? loadUserStudyTime(u.name) : 0;
+            
+            // DŮLEŽITÉ (BUGFIX): Dlaždice nyní zobrazuje největší hodnotu (cloud vs lokální paměť)
+            const localSec = typeof loadUserStudyTime === 'function' ? loadUserStudyTime(u.name) : 0;
+            const cloudSec = (typeof appData !== 'undefined' && appData.syncDate === getTodayDateStr()) ? Math.round(Number(u.todayMinutes || 0) * 60) : 0;
+            const uSec = Math.max(localSec, cloudSec);
+            
             const uMin = Math.floor(uSec / 60); const targetM = u.targetMinutes || 15; const isDone = uMin >= targetM;
             const streakDays = (u.streak !== undefined) ? u.streak : (typeof getUserStreak === 'function' ? getUserStreak(u.name) : 0);
             const coins = Number(u.coins || 0); const freezes = typeof getUserItemCount === 'function' ? getUserItemCount(u.name, "Zmrazeni") : 0;
@@ -521,7 +526,7 @@ function renderActiveGame() {
       </div>
       ${!(typeof scrambleDone!=='undefined'&&scrambleDone) ? `
         <div class="letters-row">
-          ${(typeof scrambleTiles!=='undefined'?scrambleTiles:[]).map((t, idx) => `<div class="letter-tile ${(typeof scrambleIsWordMode!=='undefined'&&scrambleIsWordMode)?'word-tile':''} ${isHebrew ? 'hebrew' : ''} ${t.used?'used':''}" onclick="if(typeof clickScrambleTile==='function') clickScrambleTile(${idx})">${t.text}</div>`).join('')}
+          ${(typeof scrambleTiles!=='undefined'?scrambleTiles:[]).map((t, idx) => `<div class="letter-tile ${(typeof scrambleIsWordMode!=='undefined'&&scrambleIsWordMode)?'word-tile':''} ${isHebrew ? 'hebrew' : ''} ${t.used?'used':''}" onpointerdown="event.preventDefault(); if(typeof clickScrambleTile==='function') clickScrambleTile(${idx})">${t.text}</div>`).join('')}
         </div>
       ` : `
         ${w&&w.help ? `<div style="text-align:center;color:var(--col-active-tab);font-size:18px;margin-bottom:8px;font-weight:bold;">[ ${w.help} ]</div>` : ''}
@@ -1108,7 +1113,7 @@ function renderActiveGame() {
         </div>
       `;
       if (typeof cmpState !== 'undefined' && cmpState !== 'EVAL') {
-        html += `<div class="letters-row">${(task.tiles||[]).map((t, i) => `<div class="letter-tile ${task.isWordMode?'word-tile':''} ${isHebrew ? 'hebrew' : ''} ${t.used?'used':''}" onclick="if(typeof clickCmpScrambleTile==='function') clickCmpScrambleTile(${i})">${t.text}</div>`).join('')}</div>`;
+        html += `<div class="letters-row">${(typeof cmpTiles !== 'undefined' || task.tiles ? (task.tiles||[]) : []).map((t, i) => `<div class="letter-tile ${task.isWordMode?'word-tile':''} ${isHebrew ? 'hebrew' : ''} ${t.used?'used':''}" onpointerdown="event.preventDefault(); if(typeof clickCmpScrambleTile==='function') clickCmpScrambleTile(${i})">${t.text}</div>`).join('')}</div>`;
       } else {
         if (task.data.help) html += `<div style="text-align:center;color:var(--col-active-tab);font-weight:bold;margin:10px 0;">[ ${task.data.help} ]</div>`;
         html += `<div class="action-btn green" onclick="if(typeof nextCmpTask==='function') nextCmpTask()">DALŠÍ ➔</div>`;

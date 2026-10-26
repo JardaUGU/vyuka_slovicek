@@ -218,31 +218,64 @@ function updateFooter() {
 
 function getStudyTimeKey(userName) { return `study_sec_${getTodayDateStr()}_${(userName || 'user').toLowerCase().trim()}`; }
 function loadUserStudyTime(userName) { if (!userName) return 0; return Number(localStorage.getItem(getStudyTimeKey(userName)) || 0); }
-function getUserStreak(userName) { if (!userName) return 0; return Number(localStorage.getItem(`streak_${userName.toLowerCase().trim()}`) || 0); }
+function getUserStreak(userName) { 
+  if (!userName) return 0;
+  const uKey = userName.toLowerCase().trim();
+  const u = (appData.users || []).find(x => x.name.toLowerCase().trim() === uKey);
+  const cloudStreak = (u && u.streak !== undefined) ? Number(u.streak) : 0;
+  const localStreak = Number(localStorage.getItem(`streak_${uKey}`) || 0);
+  return Math.max(cloudStreak, localStreak);
+}
 
 function updateUserStreak(userName, targetMinutes) {
   if (!userName) return;
-  const uKey = userName.toLowerCase().trim(); const todayStr = getTodayDateStr();
-  const lastCompleted = localStorage.getItem(`streak_last_date_${uKey}`);
-  if (lastCompleted === todayStr) return; 
-  let streak = Number(localStorage.getItem(`streak_${uKey}`) || 0);
+  const uKey = userName.toLowerCase().trim(); 
+  const todayStr = getTodayDateStr();
+  const u = (appData.users || []).find(x => x.name.toLowerCase().trim() === uKey);
+
+  // Vezmeme nejnovější datum splnění (buď z cloudu, nebo z localStorage)
+  let cloudLast = (u && u.streakLastDate) ? String(u.streakLastDate).slice(0, 10) : "";
+  let localLast = localStorage.getItem(`streak_last_date_${uKey}`) || "";
+  let lastCompleted = (cloudLast > localLast) ? cloudLast : localLast;
+
+  if (lastCompleted === todayStr) return; // Dnes už je splněno
+
+  let streak = getUserStreak(userName);
 
   if (lastCompleted) {
-    const lastDate = new Date(lastCompleted); const todayDate = new Date(todayStr);
-    const diffDays = Math.floor((todayDate - lastDate) / (1000 * 60 * 60 * 24));
-    if (diffDays === 1) { streak += 1; } 
-    else if (diffDays > 1) {
-      const missedDays = diffDays - 1; let freezes = getUserItemCount(userName, "Zmrazeni");
+    // Převod na poledne UTC zabrání chybám při posunu zimního/letního času mezi Safari a Chrome
+    const lastDate = new Date(lastCompleted + "T12:00:00Z"); 
+    const todayDate = new Date(todayStr + "T12:00:00Z");
+    const diffDays = Math.round((todayDate - lastDate) / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 1) { 
+      streak += 1; 
+    } else if (diffDays > 1) {
+      const missedDays = diffDays - 1; 
+      let freezes = getUserItemCount(userName, "Zmrazeni");
       if (freezes >= missedDays) {
         let newFreezeCount = freezes - missedDays;
         localStorage.setItem(`item_Zmrazeni_${uKey}`, newFreezeCount);
-        const u = (appData.users || []).find(x => x.name.toLowerCase().trim() === uKey);
         if (u && u.inventory) u.inventory["Zmrazeni"] = newFreezeCount;
-        streak += 1; alert(`🧊 Tvoje série byla zachráněna! Spotřebováno zmrazení: ${missedDays}x`);
-      } else { streak = 1; alert("Tvá denní série byla přerušena, protože jsi neměl dostatek zmrazení na všechny vynechané dny."); }
+        streak += 1; 
+        alert(`🧊 Tvoje série byla zachráněna! Spotřebováno zmrazení: ${missedDays}x`);
+      } else { 
+        streak = 1; 
+        alert("Tvá denní série byla přerušena, protože jsi neměl dostatek zmrazení na všechny vynechané dny."); 
+      }
     }
-  } else { streak = 1; }
-  localStorage.setItem(`streak_${uKey}`, streak); localStorage.setItem(`streak_last_date_${uKey}`, todayStr);
+  } else { 
+    streak = 1; 
+  }
+
+  localStorage.setItem(`streak_${uKey}`, streak); 
+  localStorage.setItem(`streak_last_date_${uKey}`, todayStr);
+  if (u) {
+    u.streak = streak;
+    u.streakLastDate = todayStr;
+  }
+  // Okamžitě odešleme aktualizovaný čas na server, aby si i Google Sheets zapsal dnešní streak
+  if (typeof sendTimeHeartbeatToGoogle === "function") sendTimeHeartbeatToGoogle();
 }
 
 function registerUserAction() {
@@ -256,18 +289,26 @@ window.addEventListener('keydown', registerUserAction, true);
 
 setInterval(() => {
   checkDateRollover();
-  const isJustGame = (currentScreen === "PLAYING" && (selectedGame === "SNAKE" || selectedGame === "ARCADE"));
+  // DŮLEŽITÉ: Čas studia se nezapočítává pouze u oddechové hry Had (SNAKE)
+  const isJustGame = (currentScreen === "PLAYING" && selectedGame === "SNAKE");
+  
   if (currentScreen === "PLAYING" && currentUser && !isJustGame) {
     const idleTime = Date.now() - lastUserActivityTime;
     if (idleTime < 15000) {
       todaySecondsStudied++;
       localStorage.setItem(getStudyTimeKey(currentUser.name), String(todaySecondsStudied));
       isTimerPaused = false;
+      
       const targetSec = (currentUser.targetMinutes || 15) * 60;
       if (todaySecondsStudied >= targetSec) updateUserStreak(currentUser.name, currentUser.targetMinutes || 15);
-      if (todaySecondsStudied - lastCloudSyncSec >= 45) { lastCloudSyncSec = todaySecondsStudied; if(typeof sendTimeHeartbeatToGoogle==='function') sendTimeHeartbeatToGoogle(); }
+      
+      if (todaySecondsStudied - lastCloudSyncSec >= 30) { 
+        lastCloudSyncSec = todaySecondsStudied; 
+        if (typeof sendTimeHeartbeatToGoogle === 'function') sendTimeHeartbeatToGoogle(); 
+      }
     } else { isTimerPaused = true; }
   } else { isTimerPaused = true; }
+  
   updateStudyTimerUI();
 }, 1000);
 
@@ -303,16 +344,28 @@ function selectUser(name, grade, targetMinutes) {
      if (inputPin !== savedPin) { alert("Nesprávné heslo!"); return; }
   }
   checkDateRollover();
-  const themesArr = getUserUnlockedThemes(name); const activeTh = getUserActiveTheme(name);
+  const themesArr = typeof getUserUnlockedThemes==='function'?getUserUnlockedThemes(name):[]; 
+  const activeTh = typeof getUserActiveTheme==='function'?getUserActiveTheme(name):'default';
   currentUser = { 
     name, grade: parseInt(grade) || 2, targetMinutes: parseInt(targetMinutes) || 15, stars: 0,
     startLevels: (foundU && foundU.startLevels) ? foundU.startLevels : {},
     inventory: (foundU && foundU.inventory) ? foundU.inventory : {},
     unlockedThemes: themesArr, activeTheme: activeTh, coins: foundU ? Number(foundU.coins || 0) : 0
   };
-  localStorage.setItem("cur_user", JSON.stringify(currentUser)); applyAppSkin(currentUser.activeTheme);
-  todaySecondsStudied = loadUserStudyTime(currentUser.name);
-  isTimerPaused = false; updateStudyTimerUI(); setScreen("SELECT_SUBJECT");
+  localStorage.setItem("cur_user", JSON.stringify(currentUser)); 
+  if(typeof applyAppSkin==='function') applyAppSkin(currentUser.activeTheme);
+  
+  // DŮLEŽITÉ (BUGFIX): Načtení maximálního času z cloudu a z lokální paměti
+  let localSec = typeof loadUserStudyTime==='function'?loadUserStudyTime(currentUser.name):0;
+  let cloudSec = (foundU && appData.syncDate === getTodayDateStr()) ? Math.round(Number(foundU.todayMinutes || 0) * 60) : 0;
+  todaySecondsStudied = Math.max(localSec, cloudSec);
+  localStorage.setItem(getStudyTimeKey(currentUser.name), String(todaySecondsStudied));
+  
+  lastCloudSyncSec = todaySecondsStudied; 
+
+  isTimerPaused = false; 
+  if(typeof updateStudyTimerUI==='function') updateStudyTimerUI(); 
+  if(typeof setScreen==='function') setScreen("SELECT_SUBJECT");
 }
 
 function chooseSubject(subj) { 
