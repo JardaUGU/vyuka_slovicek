@@ -65,7 +65,7 @@ PRAVIDLA PRO ÚPRAVU KÓDU A CHOVÁNÍ APLIKACE
    - api_sync.js: komunikace s Google Sheets. Načítá a ukládá čas, sérii (streak) a datum posledního splnění (`streakLastDate`) pro všechny profily (bere maximum mezi localStorage a cloudem). Posílá celkový denní čas v minutách při intervalu 30s, při goBack() a při minimalizaci/opuštení okna (`visibilitychange`). Při návratu do okna automaticky provede tichou synchronizaci (`syncDataQuietly`).
    - audio_tts.js: zvukové efekty a syntéza řeči (TTS).
    - game_core.js: přepínání her, ukládání hvězd a mistrovství, funkce goBack().
-   - game_modes.js, game_math.js, game_snake.js, game_arcade.js, game_pexeso.js, game_campaign.js: izolované herní logiky.
+   - game_modes.js, game_math.js, game_snake.js, game_arcade.js, game_pexeso.js, game_campaign.js, game_story.js: izolované herní logiky.
    - ui_render.js: veškeré vykreslování HTML (renderScreen, renderActiveGame) – načítá se v index.html vždy jako poslední.
 7. DETAILNÍ LOGIKA HER A MECHANIKY:
 
@@ -139,7 +139,7 @@ PRAVIDLA PRO ÚPRAVU KÓDU A CHOVÁNÍ APLIKACE
      - Ostatní jazyky: 33 % Padající překlad, 33 % Pexeso, 33 % Had.
    - Odměna: po dohrání minihry hráč získá zlaťáky za udržená srdíčka z tréninku (0 až 5 💰) + bonus ze závěrečné minihry (Arkáda: skóre / 10, Had: skóre / 2, Pexeso: 1 až 3 💰 podle počtu pokusů).
 
-7.10. Interaktivní Příběhy (STORY - game_campaign.js)
+7.10. Interaktivní Příběhy (STORY - game_story.js)
    - V CAMPAIGN_HUB se vypisují pouze příběhy z lekcí, do kterých už se žák probojoval (index lekce příběhu <= index aktuální lekce).
    - Věty příběhu se NEZAMÍCHÁVAJÍ, jdou přesně po řádcích z tabulky:
      a) Čistá věta (PRIBEH bez možností): přečte anglickou větu (TTS bez jména postavy před dvojtečkou a bez smajlíků), pod větou je klikací box pro odhalení českého překladu.
