@@ -53,7 +53,18 @@ function startCampaign() {
        const isOut = task.type === 'QUIZ_OUT';
        const correctAns = isOut ? task.data.question : cleanCzechTranslation(task.data.answer);
        let localItems = [...currentVItems, ...olderVItems];
-       let pool = [...new Set(localItems.map(i => isOut ? i.question : cleanCzechTranslation(i.answer)))].filter(ans => ans !== correctAns);
+       
+       // OPRAVA: Pro jednoslovné kvízy bereme do možností pouze krátké výrazy (1-2 slova, ne celé věty)
+       let shortItems = localItems.filter(i => {
+         const qWords = i.question.replace(/\s*\([^)]*\)/g, '').trim().split(/\s+/).length;
+         const aWords = cleanCzechTranslation(i.answer).replace(/\s*\([^)]*\)/g, '').trim().split(/\s+/).length;
+         const isSentence = /[.?!]$/.test(i.question.trim());
+         return qWords <= 2 && aWords <= 3 && !isSentence;
+       });
+       // Pojistka: pokud by v lekci bylo méně než 4 krátká slova, doplníme z celé lekce
+       if (shortItems.length < 4) shortItems = localItems;
+
+       let pool = [...new Set(shortItems.map(i => isOut ? i.question : cleanCzechTranslation(i.answer)))].filter(ans => ans !== correctAns);
        
        if (pool.length > 0) { while (pool.length < 3) pool.push(pool[Math.floor(Math.random() * pool.length)]); } 
        else pool = ["...", "...", "..."];
