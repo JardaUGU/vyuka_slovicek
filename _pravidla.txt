@@ -1,20 +1,161 @@
 ======================================
-PRAVIDLA PRO ÚPRAVU KÓDU (NEZAPOMENOUT!)
+PRAVIDLA PRO ÚPRAVU KÓDU A CHOVÁNÍ APLIKACE
 ======================================
-1. AUDIO A TTS: 
+
+1. AUDIO A TTS (audio_tts.js):
    - Funkce speakWord() MUSÍ vždy odřezávat jména postav před dvojtečkou (např. "Lucy:") a mazat emotikony (jinak čte "Girl").
-   - TTS NESMÍ číst české kontrolní otázky v příbězích (ty poznáme tak, že mají options, ale chybí v nich "___").
-   - TTS NESMÍ číst obsah závorek (např. v němčině "Sie (ona)").
+   - TTS NESMÍ číst české kontrolní otázky v příbězích (mají options, ale chybí v nich "___").
+   - TTS NESMÍ číst obsah kulatých závorek (např. v němčině "Sie (ona)").
 
-2. HERNÍ LOGIKA:
-   - "Řada na čas" (SEQ) NESMÍ používat FIFO! Tlačítka se míchají jen na začátku, pak se doplní nové slovo přímo do uvolněného slotu.
-   - Skládání (Scramble) MUSÍ před rozpadem na kostičky odstranit závorky z textu.
-   - Had (Snake) a Arkáda NESMÍ započítávat čas do studyTimeru (jsou to oddechovky).
-   - Had po smrti musí nabídnout funkční Game Over obrazovku, tvrdě zastavit smyčku a po Zpět se korektně vrátit.
+2. HERNÍ LOGIKA (game_*.js):
+   - "Řada na čas" (SEQ) NESMÍ používat FIFO! Tlačítka se míchají jen jednou na začátku (s mezerami v pořadí), po kliknutí se doplní nové slovo přímo do uvolněného slotu a na konci sloty mizí.
+   - Skládání (Scramble) MUSÍ před rozpadem na kostičky odstranit závorky z textu. Po složení všech slov bloku (např. 15) se hra musí ukončit obrazovkou Dokončeno (nesmí jet do nekonečna).
+   - Had (Snake) NESMÍ započítávat čas do studyTimeru. Na startu při stisku opačného směru se had otočí a rozjede. Po vypršení štítu a odkliknutí dialogu musí znovu nastartovat herní smyčku (runSnakeLoop). Po smrti zobrazí GAME OVER s funkčními tlačítky.
+   - Padající slova (Arcade) musí padat plynule bez ohledu na stav proměnné isTimerPaused.
 
-3. MATEMATIKA A ZLOMKY:
-   - Zlomky v historii se vykreslují přes CSS flexbox vertikálně. Mínusy v rovnici se NESMÍ nahrazovat (replace) AŽ PO vygenerování HTML zlomku (jinak se rozbije CSS "inline-flex").
+3. MATEMATIKA A ZLOMKY (game_math.js):
+   - Zlomky se vykreslují přes CSS flexbox vertikálně (čitatel, čára, jmenovatel). Mínusy a plusy ve výrazu se MUSÍ nahrazovat mezerami PŘED vygenerováním HTML zlomku (jinak se rozbije CSS "inline-flex").
+   - Při stisku klávesnice v matematice se aktualizuje pouze div "#math-keyboard-input" (nesmí se volat celé renderActiveGame, jinak skáče obrazovka).
+   - Tlačítko mazání na klávesnici funguje jako Backspace (⌫ - maže poslední znak, má pevnou hnědou barvu #b45309 čitelnou i v Matrix skinu).
+   - V krokových zlomcích se mezivýsledky (i nekrácené nebo chybné) vždy zapisují do historie s komentářem (nepoužívat blokující alert).
 
-4. OBCHOD A MENU:
-   - Zmrazení série (Streak Freeze) se reálně odečítá z inventory uživatele, pokud vynechal dny.
-   - Tlačítko Zpět z her musí rozlišovat, zda jsme v kampani/příběhu (vrací do HUBu) nebo v běžném předmětu.
+4. OBCHOD, SÉRIE A NAVIGACE (main.js, game_core.js):
+   - Zmrazení série (Streak Freeze) se reálně odečítá z inventáře uživatele za každý vynechaný den.
+   - Tlačítko Zpět (goBack) musí rozlišovat kontext: z příběhu, kampaně a minihry vrací na CAMPAIGN_HUB, z matematiky na SELECT_MATH_OP, z běžné hry na SELECT_GAME.
+   - Při odchodu z obchodu jakýmkoliv způsobem se musí zrušit neuložený náhled skinu (cancelPreview).
+   - Ve světlém skinu (Arctic) nesmí být u textů úloh natvrdo "color: #fff", používá se "color: inherit".
+
+5. ZOBRAZENÍ A OBRAZOVKY (ui_render.js):
+5.1. Globální rozložení (Header a Footer)
+   - Horní lišta (Header): zleva tlačítko Zpět (<), drobečková navigace (odznaky: Uživatel -> Předmět -> Skupina), zprava přepínač automatického čtení (🔊 Auto / 🔇 Vyp), box denního času studia (do splnění cíle běžný, po splnění žlutý "★ BONUS: +mm:ss", při neaktivitě >15s oranžový s ikonou pauzy ⏸️), tlačítko ruční synchronizace (🔄).
+   - Spodní lišta (Footer): vlevo "Žák: Jméno", uprostřed stav systému ("OK: X úloh" nebo "Offline", kliknutí vynutí tvrdý reload), vpravo denní cíl ("X / 15 min ⏱️").
+
+5.2. Výběr uživatele (SELECT_USER)
+   - Dvousloupcová mřížka uživatelů.
+   - Dlaždice uživatele: Jméno, vpravo nahoře ikona 🔒 (pokud má nastaven PIN), ročník/třída, "🔥 Série: X dní", "⏱️ Dnes: X/15 min" (bere maximum z localStorage a cloudu, při splnění žlutě s ★), dole přehled "💰 zlaťáky | 🧊 zmrazení" a ikony odemčených skinů.
+   - Kliknutí na zamčeného uživatele vyžádá PIN.
+
+5.3. Výběr předmětu (SELECT_SUBJECT)
+   - Nahoře lišta filtru ročníku ("Všechny ročníky" vs. "Jen má třída").
+   - Pod filtrem velká široká dlaždice "🛒 Obchod, Vzhledy a Profil" (ukazuje zlaťáky, počet zmrazení a počet skinů).
+   - Následuje dvousloupcová mřížka předmětů: první je vždy "🔢 Matematika", dále předměty z tabulky (kampaně mají zelený rámeček a ikonu 🚀).
+
+5.4. Obchod (SHOP)
+   - Sekce Ochrana profilu: nastavení nebo zrušení číselného PINu (ukládá se do sloupce PIN v Google Sheets).
+   - Sekce Zmrazení série: zobrazení počtu kusů a tlačítko nákupu (20 💰).
+   - Sekce Vzhledy: seznam skinů, tlačítka "👁️ Náhled", "Koupit (X 💰)", "Nasadit" nebo štítek "✅ Aktivní".
+
+5.5. Kampaň / Cesta (CAMPAIGN_HUB)
+   - Zobrazuje název aktuální lekce (první lekce s postupem < 95 %), bargraf postupu lekce a velké zelené tlačítko "▶️ SPUSTIT DNEŠNÍ TRÉNINK".
+   - U angličtiny zobrazuje pod tlačítkem ukazatel úrovně CEFR (A1, A2, B1, B2) s bargrafem celkového postupu kurzem.
+   - Dole sekce "📚 Příběhy k přečtení": vypisuje POUZE příběhy z aktuální nebo již dokončených lekcí. Nové příběhy mají žlutý rámeček a "🎁 +10 💰", přečtené zelený rámeček a "✅ Přečteno". Obchod na této obrazovce NENÍ.
+
+5.6. Výběr lekce/tématu (SELECT_GROUP) a Výběr hry (SELECT_GAME)
+   - SELECT_GROUP: přepínač "Lekce / Témata", pod ním seznam kapitol s bargrafem zvládnutí slovíček (%).
+   - SELECT_GAME: dvousloupcová mřížka dostupných her pro danou lekci (1. Karty, 2. Zkoušení, 3. Skládání, Pexeso, Had, případně Padající slova, Kvíz, Řada na čas).
+
+5.7. Aktivní hra (PLAYING)
+   - Nahoře vždy bargraf postupu aktuální úlohy (nebo série správných odpovědí u matematiky / počet srdíček ❤️ u kampaně).
+   - Uprostřed zadání úlohy (prompt-box) s ikonou reproduktoru 🔊 (kromě českých kontrolních otázek v příbězích).
+   - Dole ovládací prvky podle typu hry (u krokové matematiky 5sloupcová klávesnice ukotvená dole přes position: sticky a nad ní scrollovací historie kroků).
+
+6. ARCHITEKTURA SOUBORŮ A SYNCHRONIZACE:
+   - main.js: globální stav, časovač, ekonomika, správa uživatelů a skinů.
+   - api_sync.js: komunikace s Google Sheets (načítá a ukládá čas pro všechny profily, posílá celkový denní čas v minutách při intervalu 30s a při goBack).
+   - audio_tts.js: zvukové efekty a syntéza řeči (TTS).
+   - game_core.js: přepínání her, ukládání hvězd a mistrovství, funkce goBack().
+   - game_modes.js, game_math.js, game_snake.js, game_arcade.js, game_pexeso.js, game_campaign.js: izolované herní logiky.
+   - ui_render.js: veškeré vykreslování HTML (renderScreen, renderActiveGame) – načítá se v index.html vždy jako poslední.
+7. DETAILNÍ LOGIKA HER A MECHANIKY:
+
+7.1. Karty (CARDS - game_modes.js)
+   - Slouží k prvnímu seznámení s látkou. Filtruje položky typu "SLOVO".
+   - Zobrazuje cizí výraz (s automatickým čtením TTS a ikonou 🔊), český překlad a případnou výslovnost/nápovědu v hranatých závorkách [help].
+   - Ovládání: tlačítka "Předchozí" a "Další ➔" (prochází seznam cyklicky dokola).
+
+7.2. Zkoušení z hlavy (ADAPTIVE / Leitner systém - game_modes.js)
+   - Pracuje s položkami typu "SLOVO". Ukládá úroveň zvládnutí (Mastery: 0, 1 nebo 2 ★) pro každé slovo a každý směr zvlášť (DIR_OUT: CZ ➔ Cizí, DIR_IN: Cizí ➔ CZ).
+   - Dávkování (Batch mode): pokud má lekce > 15 slov, vybere se blok max 15 slov, která ještě nemají 2 ★ (přednost mají slova s 0 ★, poté s 1 ★).
+   - Průběh: zobrazí zadání, odpověď je skrytá pod "[ ? ? ? ]". Po kliknutí na "ZKONTROLOVAT" se odhalí odpověď a přečte se cizí slovo (TTS).
+   - Sebehodnocení: hráč volí "Věděl jsem (+1 ★)" (zvýší mastery o 1, max na 2 ★, připíše hvězdu) nebo "Nevěděl jsem (0 ★)" (shodí mastery slova na 0 ★).
+   - Losování dalšího slova: vybírá ze slov v bloku s mastery < 2 ★ (nikdy neopakuje stejné slovo dvakrát po sobě, pokud zbývá víc slov). Slova s 0 ★ mají 75% pravděpodobnost vylosování.
+   - Po dosažení 2 ★ u všech slov bloku zobrazí souhrn s možností: "Skládat těchto 15 slov 🧩", "Další blok (15 slov) ➔" nebo přepnout směr zkoušení.
+
+7.3. Skládání (SCRAMBLE - game_modes.js)
+   - Trénuje pravopis cizího výrazu podle českého zadání. Před rozpadem na kostičky se z cílového textu odstraní vše v kulatých závorkách.
+   - Dva režimy rozpadu:
+     a) Po slovech (word-mode): pokud má výraz >= 3 slova, > 15 znaků nebo obsahuje pomlčku, rozpadne se na celá slova/části.
+     b) Po písmenech (letter-mode): kratší výrazy se rozpadnou na jednotlivé znaky/grafémy (Intl.Segmenter kvůli hebrejštině a diakritice).
+   - Hráč kliká na zamíchané kostičky v přesném pořadí. Chybné kliknutí přehraje chybový tón a označí úlohu jako chybovou (scrambleHadMistake = true), ale dovolí slovo doskládat.
+   - Po složení celého výrazu se slovo přečte (TTS). Pokud bylo složeno bez jediné chyby, hráč získá hvězdu. Po vyčerpání balíčku (např. 15 slov) hra končí obrazovkou "Skládání dokončeno!".
+
+7.4. Pexeso (PEXESO - game_pexeso.js)
+   - Před hrou výběr velikosti: 6 karet (3 dvojice), 8 karet (4 dvojice), 12 karet (6 dvojic), 16 karet (8 dvojic). V minihře kampaně fixně 6 dvojic.
+   - Vylosuje příslušný počet položek typu "SLOVO" a vytvoří dvojice karet (cizí slovo + český překlad) v mřížce 4 sloupců.
+   - Při otočení karty s cizím slovem se výraz přečte (TTS). Při shodě zůstávají karty odkryté (zelené), při neshodě se po 900 ms otočí zpět. Počítá se celkový počet pokusů.
+
+7.5. Had (SNAKE - game_snake.js)
+   - Hrací plocha: mřížka 17x17 buněk. Had projíždí zdmi na opačnou stranu obrazovky. Čas strávený v Hadovi se NEZAPOČÍTÁVÁ do denního času studia.
+   - Výběr slov: filtruje pouze jednoslovné položky typu "SLOVO" (po odříznutí členů der/die/das/ein/el/la...) o délce 2 až 10 znaků bez teček.
+   - při zobrazení nového slova se slovo přečte
+   - Mechanika: nahoře svítí české zadání a políčka pro písmena (aktuální hledané písmeno pulzuje žlutě). Na ploše jsou rozmístěna všechna zbývající písmena slova. Od 2. levelu přibývají na plochu i falešná písmena (distraktory, max 3).
+   - Pohyb a rychlost: na startu had stojí a čeká na první tah (pokud hráč stiskne směr dozadu, had se na startu otočí a vyjede). Výchozí rychlost 220 ms/krok. Každá 3 složená slova zvýší level a zrychlí pohyb o 15 ms (maximálně na 110 ms/krok). Po složení slova se výraz přečte (TTS s mírným zpožděním).
+   - Životy a smrt: start se 3 ❤️. Náraz do vlastního těla nebo snězení špatného písmene ubere 1 ❤️, zastaví hada na místě nehody a čeká na změnu směru. Při ztrátě posledního ❤️ se smyčka zastaví a zobrazí se GAME OVER.
+   - Štít (🛡️): chrání hada po dobu 20 sebraných písmen před nárazem do vlastního ocasu i před snězením špatného písmene (při nárazu do špatného písmene hada pouze zastaví a vypíše varování). Štít lze koupit za 1 ❤️ (pokud má hráč > 1 ❤️) nebo při posledním ❤️ za 15 💰. Jakmile štít vyprší na 0, hra se pozastaví a zobrazí překryvný dialog s možností koupit další štít nebo pokračovat bez štítu.
+
+7.6. Padající slova (ARCADE - game_arcade.js)
+   - Akční hra: shora padá kartička se slovem, dole jsou velká tlačítka rychlé volby. Hráč má 3 ❤️.
+   - Režimy v klasických předmětech (odemknou se, pokud jsou v lekci aspoň 3 vhodné položky):
+     a) Němčina (DER_DIE_DAS): padá podstatné jméno zbavené členu (+ český překlad pod ním), hráč volí mezi tlačítky [DER], [DIE], [DAS].
+     b) Angličtina (A_AN): padá slovo zbavené členu, hráč volí [A], [AN].
+     c) Čeština (I_Y): padá slovo s vynechaným písmenem "_", hráč volí [I / Í], [Y / Ý].
+   - Režimy v minihře kampaně: buď určování členů (ARTICLES v němčině), nebo rychlý překlad (TRANSLATE – padá české slovo, dole jsou 3 tlačítka s cizími slovy; vybírají se jen krátká slova max o 2 slovech bez teček).
+   - Rychlost: výchozí rychlost pádu 0.8 px/snímek. Každých 7 bodů se zvýší level a rychlost vzroste o 0.35. Při chybě nebo dopadu na spodní červenou čáru hráč ztrácí 1 ❤️, kartička zčervená, ukáže správnou odpověď a přečte ji (TTS).
+
+7.7. Kvíz (QUIZ - game_modes.js)
+   - Vylosuje náhodně max 10 položek typu "KVIZ" z vybrané lekce.
+   - Zadání podporuje zvýraznění textu mezi hvězdičkami *text* (vykreslí se žlutě a podtrženě) a doplňovací mezeru "___".
+   - Hráč vybírá ze 4 možností. Po kliknutí se ukáže správná (zeleně) a případná chybná volba (červeně), mezera "___" v zadání se vyplní správnou odpovědí, zobrazí se vysvětlení [help] a celá doplněná věta se přečte (TTS).
+
+7.8. Řada na čas (SEQ - game_modes.js)
+   - Určeno pro položky typu "RADA" (v tabulce jsou jednotlivé kroky posloupnosti oddělené svislítkem "|", např. "Leden|Únor|Březen...").
+   - Anti-FIFO algoritmus: na začátku se do 4 tlačítek nasadí první položka (index 0) a 3 náhodně vybrané položky z blízké budoucnosti (z indexů 1 až 6) a tlačítka se zamíchají.
+   - Po kliknutí na správnou položku se slovo přečte (TTS), připíše se do skládané řady nahoře a přímo na uvolněné tlačítko se nasadí nejnižší dosud nevyložená položka z řady (ostatní 3 tlačítka zůstávají na svých místech kvůli prostorové paměti). Ke konci řady uvolněná tlačítka postupně mizí.
+   - Běží časomíra. Pokud hráč udělá chybu nebo neklikne po dobu 3 sekund, aktivuje se žlutá nápověda, která ukáže hledané slovo a zvýrazní správné tlačítko.
+
+7.9. Spirálová výuka / Kampaň (CAMPAIGN - game_campaign.js)
+   - Spouští se pro předměty obsahující v názvu "cesta", "postupn" nebo "inteligentn".
+   - Automatický výběr lekce: najde první lekci (počínaje nastaveným Start_Předmět uživatele), ve které je celkové zvládnutí slovíček < 95 %.
+   - Sestavení tréninkové fronty (max 40 úloh) v pevném pedagogickém pořadí:
+     1) Opakování (qRevision): max 5 náhodných slov ze starších lekcí (jednoslovné jako kvíz Cizí ➔ CZ, víceslovné jako Skládání).
+     2) Nová slovíčka pasivně (qNewPassive): jednoslovné z aktuální lekce (výběr ze 4 možností Cizí ➔ CZ).
+     3) Nová slovíčka aktivně (qNewActive): jednoslovné z aktuální lekce (výběr ze 4 možností CZ ➔ Cizí).
+     4) Gramatika (qGrammar): všechny úlohy typu "KVIZ" z aktuální lekce.
+     5) Pravopis a věty (qSentences): skládání (SCRAMBLE) všech jednoslovných i víceslovných položek aktuální lekce.
+   - Životy a oprava chyb: hráč začíná trénink s 5 ❤️. Při každé chybě (špatná volba v kvízu nebo špatné písmeno/slovo ve skládání) ztratí 1 ❤️, mistrovství daného slova spadne na 0 ★ a zkažená úloha se naklonuje a zařadí znovu na konec fronty (trénink neskončí, dokud hráč vše nesplní správně). Správná odpověď napoprvé zvýší mistrovství (+1 ★, max 2 ★).
+   - Závěrečná bonusová minihra: po vyčerpání fronty úloh se automaticky spustí minihra z krátkých slov (max 2 slova bez teček) z aktuální a starších lekcí:
+     - Němčina (pokud je >= 8 slov se členem): 25 % Padající členy, 25 % Padající překlad, 25 % Pexeso, 25 % Had.
+     - Ostatní jazyky: 33 % Padající překlad, 33 % Pexeso, 33 % Had.
+   - Odměna: po dohrání minihry hráč získá zlaťáky za udržená srdíčka z tréninku (0 až 5 💰) + bonus ze závěrečné minihry (Arkáda: skóre / 10, Had: skóre / 2, Pexeso: 1 až 3 💰 podle počtu pokusů).
+
+7.10. Interaktivní Příběhy (STORY - game_campaign.js)
+   - V CAMPAIGN_HUB se vypisují pouze příběhy z lekcí, do kterých už se žák probojoval (index lekce příběhu <= index aktuální lekce).
+   - Věty příběhu se NEZAMÍCHÁVAJÍ, jdou přesně po řádcích z tabulky:
+     a) Čistá věta (PRIBEH bez možností): přečte anglickou větu (TTS bez jména postavy před dvojtečkou a bez smajlíků), pod větou je klikací box pro odhalení českého překladu.
+     b) Doplňovací věta (PRIBEH_DOPLN s "___" a možnostmi): po volbě možnosti doplní slovo do věty a přečte celou větu (TTS).
+     c) Kontrolní otázka (PRIBEH_KVIZ s možnostmi, ale bez "___"): česká otázka na porozumění, TTS mlčí a ikona 🔊 je skrytá.
+   - Odměna: za první dokončení příběhu získá hráč +10 💰 a příběh se uloží do tabulky Pokrok (směr "STORY", úroveň 2). Další čtení stejného příběhu je již označeno "✅ Přečteno" bez zlaťáků.
+
+7.11. Procedurální Matematika a Algebra (PROCEDURAL_MATH - game_math.js)
+   - Generuje příklady dynamicky v kódu:
+     a) Klasické volby (4 tlačítka): Sčítání/odčítání do 20, Malá násobilka, Sčítání zlomků se stejným jmenovatelem, Procenta.
+     b) Zlomky krokově (FRACTIONS_STEP): generuje sčítání/odčítání zlomků s různými jmenovateli. Hráč na 5sloupcové klávesnici zadává mezikroky (např. "4/12+3/12"). Systém vyhodnotí matematickou rovnost se zadáním, zformátuje vstup do vertikálních zlomků a zapíše do historie. Úloha končí až po zadání jednoho zlomku v základním tvaru (kontrola přes největší společný dělitel gcd === 1; při nekráceném zlomku např. "6/6" zapíše krok do historie s oranžovou výzvou "Zkrať na základní tvar!").
+     c) Algebraické výrazy (EXPR_QUADRATIC): zadá např. "(x - 5)² = ?". Hráč zadává mezikroky roznásobení (např. "(x-5)*(x-5)" nebo "x²-5x-5x+25"). Systém ověřuje rovnost dosazením testovacích čísel (x = 10 a x = -7). Končí po zadání zjednodušeného kanonického tvaru "x²-10x+25".
+     d) Krokové rovnice (EQ_KEYBOARD / EQ_FRACTIONS): algebraický řešič rovnic ax + b = c (včetně zlomkových koeficientů). Hráč zadává operaci aplikovanou na obě strany rovnice (např. "-5", "/3", "*6", "-2x"). Systém operaci skutečně provede na levé i pravé straně (včetně krácení zlomků) a vypíše novou rovnici do historie, dokud neosamostatní "x = číslo".
+
+8. STRUKTURA DAT V GOOGLE SHEETS (kod.gs):
+   - List "Uzivatele": Jmeno | Trida | DenniCilMinut | Streak | StreakLastDate | Zlataky | Item_Zmrazeni | Start_Angli... | Skiny | AktivniSkin | PIN (sloupce od 7. dál se hledají dynamicky podle názvu hlavičky).
+   - List "Pokrok": Uzivatel | Predmet | Lekce | Tema | Polozka | Uroven (0-2) | Datum | Smer (DIR_OUT, DIR_IN, STORY).
+   - List "Aktivita": Datum | Uzivatel | Predmet | Sekce | Minuty (celkový denní čas zařízení) | Hvezdy. Backend z tohoto listu bere nejvyšší dosaženou denní hodnotu minut uživatele a při překročení DenniCilMinut aktualizuje Streak v listu Uzivatele.
+   - Listy předmětů (Anglictina, Anglictina cesta, Nemcina...): MinTrida | Lekce | Tema | Typ (SLOVO, KVIZ, RADA, PRIBEH, PRIBEH_DOPLN, PRIBEH_KVIZ) | Otazka | Odpoved | Moznosti (oddělené "|") | Pomucka.
+======================================
