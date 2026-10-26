@@ -54,7 +54,8 @@ footer { height: 32px; background-color: var(--col-card); border-top: 1px solid 
 .letter-slot { min-width: 50px; height: 52px; padding: 0 10px; background: var(--col-card); border: 2px solid var(--col-active-tab); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: bold; }
 .letter-slot.word-slot { min-width: 80px; font-size: 19px; }
 .letter-slot.filled { background: #143c28; border-color: var(--col-green); color: var(--col-green); }
-.letter-tile { min-width: 50px; height: 52px; padding: 0 10px; background: var(--col-card); border: 2px solid var(--col-active-tab); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: bold; cursor: pointer; box-shadow: 0 3px 6px rgba(0,0,0,0.3); }
+.letter-tile { min-width: 50px; height: 52px; padding: 0 10px; background: var(--col-card); border: 2px solid var(--col-active-tab); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: bold; cursor: pointer; box-shadow: 0 3px 6px rgba(0,0,0,0.3); touch-action: manipulation; user-select: none; -webkit-tap-highlight-color: transparent; }
+.letter-tile:active:not(.used) { transform: scale(0.93); background: var(--col-active-tab); color: #fff; }
 .letter-tile.word-tile { min-width: 80px; font-size: 19px; padding: 6px 12px; }
 .letter-tile.used { background: #181c24; border-color: #282d37; color: #4b5563; cursor: default; box-shadow: none; }
 .pexeso-grid { display: grid; gap: 10px; width: 100%; flex: 1; min-height: 340px; margin: 4px 0; }
