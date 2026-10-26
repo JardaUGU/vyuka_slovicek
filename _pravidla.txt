@@ -20,7 +20,8 @@ PRAVIDLA PRO ÚPRAVU KÓDU A CHOVÁNÍ APLIKACE
    - V krokových zlomcích se mezivýsledky (i nekrácené nebo chybné) vždy zapisují do historie s komentářem (nepoužívat blokující alert).
 
 4. OBCHOD, SÉRIE A NAVIGACE (main.js, game_core.js):
-   - Zmrazení série (Streak Freeze) se reálně odečítá z inventáře uživatele za každý vynechaný den.
+   - Zmrazení série (Streak Freeze) se reálně odečítá z inventáře uživatele za každý vynechaný den (jak na frontendu v main.js, tak na backendu v kod.gs).
+   - Kontrola denní série (Streak) vždy porovnává dnešek s nejnovějším datem splnění z obou zdrojů (Cloud `streakLastDate` vs. localStorage), aby při přechodu mezi zařízeními (např. iPhone -> Win11) nedocházelo k falešnému přerušení série. Výpočet rozdílu dnů používá fixní čas `T12:00:00Z` kvůli odolnosti vůči posunu času.
    - Tlačítko Zpět (goBack) musí rozlišovat kontext: z příběhu, kampaně a minihry vrací na CAMPAIGN_HUB, z matematiky na SELECT_MATH_OP, z běžné hry na SELECT_GAME.
    - Při odchodu z obchodu jakýmkoliv způsobem se musí zrušit neuložený náhled skinu (cancelPreview).
    - Ve světlém skinu (Arctic) nesmí být u textů úloh natvrdo "color: #fff", používá se "color: inherit".
@@ -61,7 +62,7 @@ PRAVIDLA PRO ÚPRAVU KÓDU A CHOVÁNÍ APLIKACE
 
 6. ARCHITEKTURA SOUBORŮ A SYNCHRONIZACE:
    - main.js: globální stav, časovač, ekonomika, správa uživatelů a skinů.
-   - api_sync.js: komunikace s Google Sheets (načítá a ukládá čas pro všechny profily, posílá celkový denní čas v minutách při intervalu 30s a při goBack).
+   - api_sync.js: komunikace s Google Sheets. Načítá a ukládá čas, sérii (streak) a datum posledního splnění (`streakLastDate`) pro všechny profily (bere maximum mezi localStorage a cloudem). Posílá celkový denní čas v minutách při intervalu 30s, při goBack() a při minimalizaci/opuštení okna (`visibilitychange`). Při návratu do okna automaticky provede tichou synchronizaci (`syncDataQuietly`).
    - audio_tts.js: zvukové efekty a syntéza řeči (TTS).
    - game_core.js: přepínání her, ukládání hvězd a mistrovství, funkce goBack().
    - game_modes.js, game_math.js, game_snake.js, game_arcade.js, game_pexeso.js, game_campaign.js: izolované herní logiky.
@@ -128,8 +129,8 @@ PRAVIDLA PRO ÚPRAVU KÓDU A CHOVÁNÍ APLIKACE
    - Automatický výběr lekce: najde první lekci (počínaje nastaveným Start_Předmět uživatele), ve které je celkové zvládnutí slovíček < 95 %.
    - Sestavení tréninkové fronty (max 40 úloh) v pevném pedagogickém pořadí:
      1) Opakování (qRevision): max 5 náhodných slov ze starších lekcí (jednoslovné jako kvíz Cizí ➔ CZ, víceslovné jako Skládání).
-     2) Nová slovíčka pasivně (qNewPassive): jednoslovné z aktuální lekce (výběr ze 4 možností Cizí ➔ CZ).
-     3) Nová slovíčka aktivně (qNewActive): jednoslovné z aktuální lekce (výběr ze 4 možností CZ ➔ Cizí).
+     2) Nová slovíčka pasivně (qNewPassive): jednoslovné (bez mezer a pomlček) z aktuální lekce (výběr ze 4 možností Cizí ➔ CZ).
+     3) Nová slovíčka aktivně (qNewActive): jednoslovné (bez mezer a pomlček) z aktuální lekce (výběr ze 4 možností CZ ➔ Cizí).
      4) Gramatika (qGrammar): všechny úlohy typu "KVIZ" z aktuální lekce.
      5) Pravopis a věty (qSentences): skládání (SCRAMBLE) všech jednoslovných i víceslovných položek aktuální lekce.
    - Životy a oprava chyb: hráč začíná trénink s 5 ❤️. Při každé chybě (špatná volba v kvízu nebo špatné písmeno/slovo ve skládání) ztratí 1 ❤️, mistrovství daného slova spadne na 0 ★ a zkažená úloha se naklonuje a zařadí znovu na konec fronty (trénink neskončí, dokud hráč vše nesplní správně). Správná odpověď napoprvé zvýší mistrovství (+1 ★, max 2 ★).
@@ -148,7 +149,7 @@ PRAVIDLA PRO ÚPRAVU KÓDU A CHOVÁNÍ APLIKACE
 
 7.11. Procedurální Matematika a Algebra (PROCEDURAL_MATH - game_math.js)
    - Generuje příklady dynamicky v kódu:
-     a) Klasické volby (4 tlačítka): Sčítání/odčítání do 20, Malá násobilka, Sčítání zlomků se stejným jmenovatelem, Procenta.
+     a) Klasické volby (4 tlačítka): Sčítání/odčítání do 20 (ADD_SUB_20_NO) a Malá násobilka (MUL_SMALL).
      b) Zlomky krokově (FRACTIONS_STEP): generuje sčítání/odčítání zlomků s různými jmenovateli. Hráč na 5sloupcové klávesnici zadává mezikroky (např. "4/12+3/12"). Systém vyhodnotí matematickou rovnost se zadáním, zformátuje vstup do vertikálních zlomků a zapíše do historie. Úloha končí až po zadání jednoho zlomku v základním tvaru (kontrola přes největší společný dělitel gcd === 1; při nekráceném zlomku např. "6/6" zapíše krok do historie s oranžovou výzvou "Zkrať na základní tvar!").
      c) Algebraické výrazy (EXPR_QUADRATIC): zadá např. "(x - 5)² = ?". Hráč zadává mezikroky roznásobení (např. "(x-5)*(x-5)" nebo "x²-5x-5x+25"). Systém ověřuje rovnost dosazením testovacích čísel (x = 10 a x = -7). Končí po zadání zjednodušeného kanonického tvaru "x²-10x+25".
      d) Krokové rovnice (EQ_KEYBOARD / EQ_FRACTIONS): algebraický řešič rovnic ax + b = c (včetně zlomkových koeficientů). Hráč zadává operaci aplikovanou na obě strany rovnice (např. "-5", "/3", "*6", "-2x"). Systém operaci skutečně provede na levé i pravé straně (včetně krácení zlomků) a vypíše novou rovnici do historie, dokud neosamostatní "x = číslo".
@@ -157,5 +158,6 @@ PRAVIDLA PRO ÚPRAVU KÓDU A CHOVÁNÍ APLIKACE
    - List "Uzivatele": Jmeno | Trida | DenniCilMinut | Streak | StreakLastDate | Zlataky | Item_Zmrazeni | Start_Angli... | Skiny | AktivniSkin | PIN (sloupce od 7. dál se hledají dynamicky podle názvu hlavičky).
    - List "Pokrok": Uzivatel | Predmet | Lekce | Tema | Polozka | Uroven (0-2) | Datum | Smer (DIR_OUT, DIR_IN, STORY).
    - List "Aktivita": Datum | Uzivatel | Predmet | Sekce | Minuty (celkový denní čas zařízení) | Hvezdy. Backend z tohoto listu bere nejvyšší dosaženou denní hodnotu minut uživatele a při překročení DenniCilMinut aktualizuje Streak v listu Uzivatele.
+   - Noční údržba (cleanupOldActivity v kod.gs): Časový spouštěč (Trigger) každou noc automaticky maže z listu 
    - Listy předmětů (Anglictina, Anglictina cesta, Nemcina...): MinTrida | Lekce | Tema | Typ (SLOVO, KVIZ, RADA, PRIBEH, PRIBEH_DOPLN, PRIBEH_KVIZ) | Otazka | Odpoved | Moznosti (oddělené "|") | Pomucka.
 ======================================
