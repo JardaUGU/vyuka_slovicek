@@ -75,8 +75,13 @@ function buySkin(skinId, cost) {
   previewingSkin = null; if (!currentUser) return;
   const currentCoins = getUserCoins(currentUser.name);
   if (currentCoins >= cost) {
-    addCoins(currentUser.name, -cost);
     const uKey = currentUser.name.toLowerCase().trim();
+    // Odečteme pouze lokálně (v Google Sheets odečítá přímo akce "buy_theme"!)
+    const u = (appData.users || []).find(x => x.name.toLowerCase().trim() === uKey);
+    if (u) u.coins = Math.max(0, Number(u.coins || 0) - cost);
+    currentUser.coins = u ? u.coins : Math.max(0, currentCoins - cost);
+    localStorage.setItem(`coins_${uKey}`, String(currentUser.coins));
+
     let themes = getUserUnlockedThemes(currentUser.name);
     if (!themes.includes(skinId)) themes.push(skinId);
     saveUserUnlockedThemes(currentUser.name, themes);
@@ -84,7 +89,6 @@ function buySkin(skinId, cost) {
     currentUser.activeTheme = skinId;
     localStorage.setItem("cur_user", JSON.stringify(currentUser));
     applyAppSkin(skinId);
-    const u = (appData.users || []).find(x => x.name.toLowerCase().trim() === uKey);
     if (u) { u.unlockedThemes = themes; u.activeTheme = skinId; }
     
     try {
@@ -159,9 +163,8 @@ function isItemAllowedForGrade(it, userG) {
 function getUserCoins(userName) {
   if (!userName) return 0;
   const u = (appData.users || []).find(x => x.name.toLowerCase().trim() === userName.toLowerCase().trim());
-  const cloudCoins = u ? Number(u.coins || 0) : 0;
-  const localCoins = Number(localStorage.getItem(`coins_${userName.toLowerCase().trim()}`) || 0);
-  return Math.max(cloudCoins, localCoins);
+  if (u && u.coins !== undefined) return Math.max(0, Number(u.coins));
+  return Math.max(0, Number(localStorage.getItem(`coins_${userName.toLowerCase().trim()}`) || 0));
 }
 
 function getUserItemCount(userName, itemKey) {
@@ -173,8 +176,16 @@ function getUserItemCount(userName, itemKey) {
 
 function addCoins(userName, amount) {
   if (!userName) return;
-  const u = (appData.users || []).find(x => x.name.toLowerCase().trim() === userName.toLowerCase().trim());
-  if (u) u.coins = Math.max(0, (u.coins || 0) + amount);
+  const uKey = userName.toLowerCase().trim();
+  const u = (appData.users || []).find(x => x.name.toLowerCase().trim() === uKey);
+  if (u) {
+    u.coins = Math.max(0, Number(u.coins || 0) + amount);
+    localStorage.setItem(`coins_${uKey}`, String(u.coins));
+  }
+  if (currentUser && currentUser.name.toLowerCase().trim() === uKey) {
+    currentUser.coins = u ? u.coins : Math.max(0, Number(currentUser.coins || 0) + amount);
+    localStorage.setItem("cur_user", JSON.stringify(currentUser));
+  }
   try {
     const fd = new URLSearchParams(); fd.append("action", "add_coins"); fd.append("user", userName); fd.append("amount", amount);
     fetch(API_URL, { method: "POST", mode: "no-cors", body: fd });
@@ -185,11 +196,20 @@ function buyShopItem(itemKey, cost) {
   if (!currentUser) return;
   const currentCoins = getUserCoins(currentUser.name); const uKey = currentUser.name.toLowerCase().trim();
   if (currentCoins >= cost) {
+    // Odečteme pouze lokálně (v Google Sheets odečítá přímo akce "buy_item"!)
     const u = (appData.users || []).find(x => x.name.toLowerCase().trim() === uKey);
-    if (u) { u.coins -= cost; if (!u.inventory) u.inventory = {}; u.inventory[itemKey] = (u.inventory[itemKey] || 0) + 1; }
+    if (u) { 
+      u.coins = Math.max(0, Number(u.coins || 0) - cost); 
+      if (!u.inventory) u.inventory = {}; 
+      u.inventory[itemKey] = (u.inventory[itemKey] || 0) + 1; 
+    }
+    currentUser.coins = u ? u.coins : Math.max(0, currentCoins - cost);
+    localStorage.setItem(`coins_${uKey}`, String(currentUser.coins));
+    localStorage.setItem("cur_user", JSON.stringify(currentUser));
+
     let curCount = Number(localStorage.getItem(`item_${itemKey}_${uKey}`) || 0);
     localStorage.setItem(`item_${itemKey}_${uKey}`, curCount + 1);
-    addCoins(currentUser.name, -cost);
+
     try {
       const fd = new URLSearchParams(); fd.append("action", "buy_item"); fd.append("user", currentUser.name); fd.append("itemKey", itemKey); fd.append("cost", cost);
       fetch(API_URL, { method: "POST", mode: "no-cors", body: fd });
