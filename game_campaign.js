@@ -30,12 +30,23 @@ function startCampaign() {
       });
   }
 
-  currentVItems.forEach(it => {
+  // Upřednostníme slova, která ještě nemají plné mistrovství (2 hvězdy v obou směrech)
+  let unmasteredVItems = currentVItems.filter(it => 
+    getSavedMastery(it.question, 'DIR_IN') < 2 || getSavedMastery(it.question, 'DIR_OUT') < 2
+  );
+  let targetVItems = unmasteredVItems.length > 0 ? unmasteredVItems : currentVItems;
+
+  // Aby se stihly všechny fáze (Kvíz + Skládání) do limitu, vezmeme max 12 slov na jeden zátah
+  if (targetVItems.length > 12) {
+    targetVItems = [...targetVItems].sort(() => Math.random() - 0.5).slice(0, 12);
+  }
+
+  targetVItems.forEach(it => {
       if (it.question.trim().includes(' ') || it.question.trim().includes('-')) {
           qSentences.push({ type: 'SCRAMBLE', data: it });
       } else {
-          qNewPassive.push({ type: 'QUIZ_IN', data: it });
-          qNewActive.push({ type: 'QUIZ_OUT', data: it });
+          if (getSavedMastery(it.question, 'DIR_IN') < 2) qNewPassive.push({ type: 'QUIZ_IN', data: it });
+          if (getSavedMastery(it.question, 'DIR_OUT') < 2) qNewActive.push({ type: 'QUIZ_OUT', data: it });
           qSentences.push({ type: 'SCRAMBLE', data: it });
       }
   });
@@ -127,9 +138,12 @@ function clickCmpScrambleTile(idx) {
     if (task.placed.length === task.tokens.length) { 
       cmpState = 'EVAL'; if (isAutoTTS) speakWord(task.data.question, selectedSubject); 
       if (!task.hadMistake) {
-        const mIn = getSavedMastery(task.data.question, 'DIR_IN'); const mOut = getSavedMastery(task.data.question, 'DIR_OUT');
-        if (mIn < 2) saveWordMasteryToGoogle(task.data.question, mIn + 1, 'DIR_IN');
-        if (mOut < 2) saveWordMasteryToGoogle(task.data.question, mOut + 1, 'DIR_OUT');
+        const isMultiWord = task.data.question.trim().includes(' ') || task.data.question.trim().includes('-');
+        const step = isMultiWord ? 2 : 1;
+        const mIn = getSavedMastery(task.data.question, 'DIR_IN'); 
+        const mOut = getSavedMastery(task.data.question, 'DIR_OUT');
+        if (mIn < 2) saveWordMasteryToGoogle(task.data.question, Math.min(2, mIn + step), 'DIR_IN');
+        if (mOut < 2) saveWordMasteryToGoogle(task.data.question, Math.min(2, mOut + step), 'DIR_OUT');
       }
     }
   } else {
@@ -157,7 +171,13 @@ function launchCampaignMinigame() {
     }).sort(() => Math.random() - 0.5);
 
     campaignMinigamePool = [...currentSingle, ...olderSingle].slice(0, 30);
-    isCampaignMinigame = true; campaignMinigameCoins = cmpHearts;
+    // OKAMŽITÉ PŘIPSÁNÍ ZLAŤÁKŮ ZA DOKONČENÝ TRÉNINK (i kdyby hráč z minihry odešel)
+    if (cmpHearts > 0) {
+      addCoins(currentUser.name, cmpHearts);
+    }
+    addReward(1, "Trénink: " + selectedGroupKey);
+    isCampaignMinigame = true; 
+    campaignMinigameCoins = 0; // Zlaťáky za srdíčka už jsou v kapse, v minihře se hraje jen o bonus
 
     if (campaignMinigamePool.length > 0 && campaignMinigamePool.length < 10) {
         let tempPool = [...campaignMinigamePool];
@@ -181,7 +201,10 @@ function launchCampaignMinigame() {
     }
 }
 
-function finishCampaign(coins) {
-  addCoins(currentUser.name, coins); addReward(1, "Trénink: " + selectedGroupKey); setScreen("CAMPAIGN_HUB");
+function finishCampaign(bonusCoins) {
+  if (bonusCoins > 0) {
+    addCoins(currentUser.name, bonusCoins);
+  }
+  setScreen("CAMPAIGN_HUB");
 }
 
