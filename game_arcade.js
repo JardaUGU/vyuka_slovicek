@@ -72,22 +72,20 @@ function spawnArcadeWord() {
 function runArcadeLoop() {
   stopArcadeLoop();
   function step() {
-    if (typeof currentScreen !== "undefined" && currentScreen !== "PLAYING") return;
-    if (typeof selectedGame !== "undefined" && selectedGame !== "ARCADE") return;
-    if (arcadeState !== "PLAYING") return;
-    
-    if (typeof isTimerPaused !== "undefined" && !isTimerPaused) {
-      arcadeY += arcadeSpeed;
-      const el = document.getElementById("arcade-falling-elem");
-      const playfield = document.getElementById("arcade-field");
-      if (el && playfield && arcadeY >= playfield.clientHeight - el.clientHeight - 8) {
-        handleArcadeMiss();
-        return;
-      }
-      if (el) el.style.top = arcadeY + "px";
-    }
-    arcadeAnimId = requestAnimationFrame(step);
+  if (typeof currentScreen !== "undefined" && currentScreen !== "PLAYING") return;
+  if (typeof selectedGame !== "undefined" && selectedGame !== "ARCADE") return;
+  if (arcadeState !== "PLAYING") return;
+  
+  arcadeY += arcadeSpeed;
+  const el = document.getElementById("arcade-falling-elem");
+  const playfield = document.getElementById("arcade-field");
+  if (el && playfield && arcadeY >= playfield.clientHeight - el.clientHeight - 8) {
+    handleArcadeMiss();
+    return;
   }
+  if (el) el.style.top = arcadeY + "px";
+  arcadeAnimId = requestAnimationFrame(step);
+}
   arcadeAnimId = requestAnimationFrame(step);
 }
 
