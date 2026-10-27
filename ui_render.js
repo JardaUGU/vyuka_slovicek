@@ -700,6 +700,7 @@ function renderActiveGame() {
   }
 
   // PŘÍBĚHY (INTERAKTIVNÍ ČTENÍ)
+ // PŘÍBĚHY (INTERAKTIVNÍ ČTENÍ S HISTORIÍ)
   else if (selectedGame === "STORY") {
     if (typeof storyStep === 'undefined' || typeof storyList === 'undefined') return;
     
@@ -725,13 +726,12 @@ function renderActiveGame() {
     const hasOpts = item.options && item.options.length > 0;
     const isCzechQuestion = hasOpts && !item.question.includes('___');
 
-    // Vygenerování historie předchozích vět (0 až storyStep - 1)
     let historyHtml = "";
     for (let i = 0; i < storyStep; i++) {
       const hItem = storyList[i];
       const hHasOpts = hItem.options && hItem.options.length > 0;
       const hIsCzQuiz = hHasOpts && !hItem.question.includes('___');
-      if (hIsCzQuiz) continue; // Kontrolní české otázky v historii dialogu vynecháme, ať neruší čtení
+      if (hIsCzQuiz) continue;
 
       let hText = hItem.question.includes('___')
         ? hItem.question.replace(/___+/g, `<b style="color:var(--col-green);">${hItem.answer}</b>`)
@@ -812,7 +812,6 @@ function renderActiveGame() {
   else if (selectedGame === "PROCEDURAL_MATH") {
     if (typeof mathTask === 'undefined') return;
     
-    // DŮLEŽITÉ (BUGFIX): HTML formátování tlačítek možností (jen pokud text obsahuje "/")
     const displayMathOpt = (opt) => {
         if (typeof opt === 'string' && opt.includes('/')) {
             let [n, d] = opt.split('/');
@@ -879,7 +878,6 @@ function renderActiveGame() {
               
               ${mathTask.q ? `<div style="text-align:center; font-size:28px; font-weight:bold; color:inherit; margin-top:12px; margin-bottom:4px; letter-spacing:1px;">${mathTask.q}</div>` : ''}
 
-              <!-- DŮLEŽITÉ (BUGFIX): HTML pro historii s vertikálními zlomky nevyžaduje nic navíc, je už zformátované z game_math.js -->
               <div id="eq-history-container" style="background:var(--col-card); border:1px solid var(--col-card-border); border-radius:10px; padding:15px; margin:10px 0; max-height:38vh; overflow-y:auto; flex-shrink:0;">
                  ${(mathTask.history||[]).map((step, i) => `
                     <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:${i<mathTask.history.length-1 ? '1px solid var(--col-card-border)' : 'none'}; padding-bottom:${i<mathTask.history.length-1 ? '10px' : '0'}; margin-bottom:${i<mathTask.history.length-1 ? '10px' : '0'};">
@@ -904,10 +902,7 @@ function renderActiveGame() {
             if (mainEl) mainEl.scrollTop = mainEl.scrollHeight;
         }, 50);
 
-    } 
-    
-    // --- VYKRESLENÍ: STANDARDNÍ VÝPOČTY (+ a -, Násobilka atd.) ---
-    else {
+    } else {
         const isAns = (typeof mathChosenAnswer !== "undefined" && mathChosenAnswer !== null);
         main.innerHTML = `
           <div class="bargraph-container">
@@ -1132,10 +1127,10 @@ function renderActiveGame() {
         </div>
       `;
       if (typeof cmpState !== 'undefined' && cmpState !== 'EVAL') {
-        html += `<div class="letters-row">${(typeof cmpTiles !== 'undefined' || task.tiles ? (task.tiles||[]) : []).map((t, i) => `<div class="letter-tile ${task.isWordMode?'word-tile':''} ${isHebrew ? 'hebrew' : ''} ${t.used?'used':''}" onpointerdown="event.preventDefault(); if(typeof clickCmpScrambleTile==='function') clickCmpScrambleTile(${i})">${t.text}</div>`).join('')}</div>`;
+        html += `<div class="letters-row">${(task.tiles||[]).map((t, i) => `<div class="letter-tile ${task.isWordMode?'word-tile':''} ${isHebrew ? 'hebrew' : ''} ${t.used?'used':''}" onpointerdown="event.preventDefault(); if(typeof clickCmpScrambleTile==='function') clickCmpScrambleTile(${i})">${t.text}</div>`).join('')}</div>`;
       } else {
         if (task.data.help) html += `<div style="text-align:center;color:var(--col-active-tab);font-weight:bold;margin:10px 0;">[ ${task.data.help} ]</div>`;
-        html += `<div class="action-btn green" onclick="if(typeof nextCmpTask==='function') nextCmpTask()">DALŠÍ ➔</div>`;
+        html += `<div class="action-btn green" style="margin-top:15px;" onclick="if(typeof nextCmpTask==='function') nextCmpTask()">DALŠÍ ➔</div>`;
       }
     }
     main.innerHTML = html;
