@@ -41,21 +41,28 @@ function initGameState() {
   if (vItems.length > 0) {
     vMastery = {};
     vItems.forEach((w, i) => { vMastery[i] = getSavedMastery(w.question, testingDirection); });
-    if (vItems.length > 15) {
-      isAdaptiveBatchMode = true; let unmastered = [];
-      vItems.forEach((_, i) => { if ((vMastery[i] || 0) < 2) unmastered.push(i); });
+    
+    let unmastered = [];
+    vItems.forEach((_, i) => { if ((vMastery[i] || 0) < 2) unmastered.push(i); });
+
+    if (unmastered.length === 0) {
+      // VŠECHNA SLOVA UŽ MAJÍ 2 ★ -> Vybereme max 15 náhodných slov k přezkoušení
+      isAdaptiveBatchMode = vItems.length > 15;
+      adaptiveBatchIndices = vItems.map((_, i) => i).sort(() => Math.random() - 0.5).slice(0, 15);
+      // Nastavíme jim lokálně v relaci 1 ★, aby se z nich zkoušelo (při chybě v answerAdaptive spadnou v cloudu na 0 ★)
+      adaptiveBatchIndices.forEach(i => { vMastery[i] = 1; });
+    } else if (vItems.length > 15) {
+      isAdaptiveBatchMode = true;
       let m0 = unmastered.filter(i => (vMastery[i] || 0) === 0).sort(() => Math.random() - 0.5);
       let m1 = unmastered.filter(i => (vMastery[i] || 0) === 1).sort(() => Math.random() - 0.5);
       let candidates = [...m0, ...m1];
-      let batchSize = Math.min(15, unmastered.length > 0 ? unmastered.length : 15);
+      let batchSize = Math.min(15, candidates.length);
       adaptiveBatchIndices = candidates.slice(0, batchSize);
-      if (adaptiveBatchIndices.length < batchSize) {
-        let remaining = vItems.map((_, i) => i).filter(i => !adaptiveBatchIndices.includes(i)).sort(() => Math.random() - 0.5);
-        adaptiveBatchIndices.push(...remaining.slice(0, batchSize - adaptiveBatchIndices.length));
-      }
     } else {
-      isAdaptiveBatchMode = false; adaptiveBatchIndices = vItems.map((_, i) => i);
+      isAdaptiveBatchMode = false; 
+      adaptiveBatchIndices = vItems.map((_, i) => i);
     }
+
     let masteredInBatch = 0;
     adaptiveBatchIndices.forEach(i => { if ((vMastery[i] || 0) >= 2) masteredInBatch++; });
     vActivePool = Math.min(adaptiveBatchIndices.length, Math.max(getAdaptiveWindowSize(currentUser ? currentUser.grade : 2), masteredInBatch + 3));
@@ -131,13 +138,17 @@ function initScramble() {
   }
 }
 
+let lastScrambleClickTime = 0;
 function clickScrambleTile(idx) {
   if (scrambleDone) return;
+  const now = Date.now();
+  if (now - lastScrambleClickTime < 120) return; // Ochrana proti dvojdotyku
+  lastScrambleClickTime = now;
+
   const item = scrambleTiles[idx];
   if (item.used) return;
   const w = getVocabItems()[vCurrentWord];
   
-  // OPRAVA: Odřízne závorky i z cílového slova pro porovnávání
   const cleanTarget = w.question.replace(/\s*\([^)]*\)/g, '').trim();
   const target = scrambleIsWordMode ? (cleanTarget.includes('-') ? cleanTarget.split('-').map(s=>s.trim()) : cleanTarget.split(/\s+/)) : getGraphemes(cleanTarget);
 
