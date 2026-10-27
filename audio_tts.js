@@ -41,6 +41,9 @@ function speakWord(text, subjectName) {
     toSpeak = toSpeak.replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, '').trim(); // Odstranění smajlíků
     toSpeak = toSpeak.replace(/\s*\([^)]*\)/g, ''); // Odstranění závorek z výslovnosti
 
+    // Zabrání čtení velkého "No" jako "Number" a u "Oh no" vylepší intonaci
+    toSpeak = toSpeak.replace(/\bNo\b/g, 'no').replace(/\bOh no\b/gi, 'oh nou');
+
     toSpeak = toSpeak.replace(/ליהוה/g, 'לַאדֹנָי').replace(/יהוה/g, 'אֲדֹנָי').replace(/L'?(Jahve|Jahveh|Yahweh|Yahwe|Jehova|JHVH|YHWH|JVHV)/gi, "L'Adonaj");
     if (/read\s*-\s*read\s*-\s*read/i.test(toSpeak)) toSpeak = "read, red, red";
     else toSpeak = toSpeak.replace(/\//g, ' or ').replace(/\s*-\s*/g, ', ');
