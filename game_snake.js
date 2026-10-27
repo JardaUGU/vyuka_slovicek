@@ -92,7 +92,7 @@ function resizeSnakeCanvas() {
 function startSnakeGame() {
   if (typeof stopArcadeLoop === "function") stopArcadeLoop();
   stopSnakeLoop();
-  isCampaignMinigame = false;
+  if (typeof isCampaignMinigame !== "undefined") isCampaignMinigame = false;
   
   const vItems = getVocabItems();
   snakeDeck = vItems.filter(it => {
@@ -357,7 +357,6 @@ function runSnakeLoop() {
 function setSnakeDirection(dx, dy) {
   if (typeof registerUserAction === "function") registerUserAction();
   
-  // Detekce pohybu proti směru hada
   if ((snakeDir.x !== 0 && snakeDir.x === -dx) || (snakeDir.y !== 0 && snakeDir.y === -dy)) {
       if (isSnakeWaitingForInput) {
           snakeBody.reverse();
@@ -433,10 +432,8 @@ function updateSnake() {
         const shieldEl = document.getElementById("snake-shield-indicator");
         if (shieldEl) shieldEl.innerText = `🛡️ Štít: ${snakeShieldLetters} p.`;
 
-        // OPRAVA BUGU S UNDEFINED:
         if (snakeShieldLetters === 0) {
           if (isWordDone) {
-             // Pokud se slovo dokončilo, ignorujeme dialog o štítu a dáme rovnou další slovo
              handleSnakeWordComplete(); 
           } else {
              handleShieldExpired();
@@ -644,7 +641,4 @@ function attachSnakeTouchHandlers() {
       snakeTouchStartY = e.touches[0].clientY;
     }
   }, { passive: false });
-}
-
-  wrap.addEventListener("touchend", preventDefaultTouch, { passive: false });
 }
