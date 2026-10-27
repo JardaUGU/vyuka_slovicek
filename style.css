@@ -169,9 +169,9 @@ footer { height: 32px; background-color: var(--col-card); border-top: 1px solid 
 .arcade-top-bar { height: 40px; display: flex; align-items: center; justify-content: space-between; padding: 0 14px; background: rgba(11, 21, 40, 0.85); color: #ffffff; border-bottom: 1px solid var(--col-card-border); font-size: 14px; font-weight: bold; z-index: 10; }
 .arcade-playfield { flex: 1; position: relative; overflow: hidden; width: 100%; }
 .arcade-danger-line { position: absolute; bottom: 0; left: 0; right: 0; height: 6px; background: repeating-linear-gradient(45deg, #ef4444, #ef4444 10px, #7f1d1d 10px, #7f1d1d 20px); opacity: 0.8; }
-.falling-item { position: absolute; transform: translateX(-50%); background: var(--col-card); border: 1.5px solid var(--col-active-tab); box-shadow: 0 4px 10px rgba(0, 0, 0, 0.35); border-radius: 7px; padding: 3px 9px; text-align: center; white-space: nowrap; pointer-events: none; transition: transform 0.15s, background-color 0.15s; }
-.falling-main-word { font-size: 26px; line-height: 1.15; font-weight: bold; color: var(--col-text); }
-.falling-sub-word { font-size: 12px; line-height: 1.1; color: var(--col-yellow); margin-top: 1px; }
+.falling-item { position: absolute; transform: translateX(-50%); background: var(--col-card); border: 1.5px solid var(--col-active-tab); box-shadow: 0 3px 8px rgba(0, 0, 0, 0.35); border-radius: 6px; padding: 1px 7px; text-align: center; white-space: nowrap !important; pointer-events: none; transition: transform 0.15s, background-color 0.15s; }
+.falling-main-word { font-size: 24px; line-height: 1.05; font-weight: bold; color: var(--col-text); margin: 0; padding: 0; }
+.falling-sub-word { font-size: 11px; line-height: 1.05; color: var(--col-yellow); margin: 1px 0 0 0; padding: 0; }
 .falling-item.hit { background-color: var(--col-green) !important; border-color: #ffffff !important; transform: translateX(-50%) scale(1.15) !important; }
 .falling-item.hit .falling-main-word, .falling-item.hit .falling-sub-word { color: var(--col-on-green) !important; }
 .falling-item.miss { background-color: var(--col-red) !important; border-color: #ffffff !important; transform: translateX(-50%) scale(1.05) !important; }
@@ -196,7 +196,7 @@ footer { height: 32px; background-color: var(--col-card); border-top: 1px solid 
 .snake-slot.done { background: var(--col-success-bg); border-color: var(--col-green); color: var(--col-green); }
 @keyframes pulseSlot { from { transform: scale(1); } to { transform: scale(1.08); } }
 
-.snake-canvas-wrap { position: relative; width: 100%; max-width: min(100%, 52vh); aspect-ratio: 1/1; margin: 0 auto 4px auto; border: 2px solid var(--col-card-border); border-radius: 10px; overflow: hidden; background: #08101e; touch-action: none !important; }
+.snake-canvas-wrap { position: relative; width: 100%; max-width: 440px; aspect-ratio: 1/1; margin: 0 auto 4px auto; border: 2px solid var(--col-card-border); border-radius: 10px; overflow: hidden; background: #08101e; touch-action: none !important; }
 #snake-canvas { width: 100% !important; height: 100% !important; display: block; touch-action: none !important; }
 .snake-overlay { position: absolute; inset: 0; background: rgba(8, 16, 30, 0.88); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 15px; text-align: center; z-index: 50; backdrop-filter: blur(2px); }
 
