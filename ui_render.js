@@ -591,11 +591,9 @@ function renderActiveGame() {
           <span style="color:var(--col-active-tab);">Body: ${typeof arcadeScore !== 'undefined' ? arcadeScore : 0}</span>
         </div>
         <div class="arcade-playfield" id="arcade-field">
-          ${typeof arcadeCurrent !== 'undefined' && arcadeCurrent ? `
-            <div id="arcade-falling-elem" class="falling-item" style="top:${typeof arcadeY!=='undefined'?arcadeY:0}px; left:${typeof arcadeX!=='undefined'?arcadeX:50}%; max-width:90vw; white-space:pre-wrap; word-break:break-word;">
-              <div class="falling-main-word">${disp}</div>
-              ${subDisp ? `<div class="falling-sub-word">${subDisp}</div>` : ''}
-            </div>
+          ${typeof arcadeCurrent !== 'undefined' && arcadeCurrent ? `<div id="arcade-falling-elem" class="falling-item" style="top:${typeof arcadeY!=='undefined'?arcadeY:0}px; left:${typeof arcadeX!=='undefined'?arcadeX:50}%;"><div class="falling-main-word">${disp}</div>${subDisp ? `<div class="falling-sub-word">${subDisp}</div>` : ''}</div>` : ''}
+          <div class="arcade-danger-line"></div>
+        </div>
           ` : ''}
           <div class="arcade-danger-line"></div>
         </div>
