@@ -706,9 +706,7 @@ function renderActiveGame() {
     if (typeof storyStep === 'undefined' || typeof storyList === 'undefined') return;
     
     if (storyStep >= storyList.length) {
-      const uKey = currentUser.name.toLowerCase().trim();
       const alreadyDone = (typeof isStoryCompleted === "function") && isStoryCompleted(selectedGroupKey, storyList);
-      
       main.innerHTML = `
         <div style="text-align:center;padding:30px;">
           <h2 style="color:var(--col-green);font-size:28px;margin-bottom:10px;">PŘÍBĚH DOKONČEN! 🎉</h2>
@@ -727,8 +725,31 @@ function renderActiveGame() {
     const item = storyList[storyStep];
     const pct = Math.round(((storyStep + 1) / storyList.length) * 100);
     const hasOpts = item.options && item.options.length > 0;
-    
     const isCzechQuestion = hasOpts && !item.question.includes('___');
+
+    // Vygenerování historie předchozích vět (0 až storyStep - 1)
+    let historyHtml = "";
+    for (let i = 0; i < storyStep; i++) {
+      const hItem = storyList[i];
+      const hHasOpts = hItem.options && hItem.options.length > 0;
+      const hIsCzQuiz = hHasOpts && !hItem.question.includes('___');
+      if (hIsCzQuiz) continue; // Kontrolní české otázky v historii dialogu vynecháme, ať neruší čtení
+
+      let hText = hItem.question.includes('___')
+        ? hItem.question.replace(/___+/g, `<b style="color:var(--col-green);">${hItem.answer}</b>`)
+        : hItem.question;
+      hText = typeof formatPromptText === 'function' ? formatPromptText(hText) : hText;
+      const hSpeech = (hItem.question.includes('___') ? hItem.question.replace(/___+/g, hItem.answer) : hItem.question).replace(/[*_]/g, '').replace(/'/g, "\\'");
+      const hTrans = !hHasOpts ? hItem.answer : (hItem.help || "");
+
+      historyHtml += `
+        <div class="prompt-box" style="font-size:17px;color:inherit;margin:0 0 8px 0;padding:10px 38px 10px 12px;text-align:left;opacity:0.82;border-left:4px solid var(--col-active-tab);">
+          <div>${hText}</div>
+          ${hTrans ? `<div style="font-size:13px;color:var(--col-text-muted);margin-top:4px;">🇨🇿 ${hTrans}</div>` : ''}
+          <span class="audio-btn" style="top:8px;right:8px;font-size:16px;" onclick="if(typeof speakWord==='function') speakWord('${hSpeech}', '${selectedSubject}')">🔊</span>
+        </div>
+      `;
+    }
 
     let promptDisplay = typeof formatPromptText==='function'?formatPromptText(item.question):item.question;
     if (hasOpts && typeof storyAnswered!=='undefined'&&storyAnswered && item.question.includes('___')) {
@@ -741,7 +762,7 @@ function renderActiveGame() {
       : item.question.replace(/[*_]/g, '').replace(/'/g, "\\'");
 
     main.innerHTML = `
-      <div class="bargraph-container">
+      <div class="bargraph-container" style="flex-shrink:0;">
         <div class="bargraph-header">
           <span>📖 ${selectedGroupKey} (${storyStep + 1} / ${storyList.length})</span>
           <span style="color:var(--col-active-tab);">${pct} %</span>
@@ -749,35 +770,44 @@ function renderActiveGame() {
         <div class="bargraph-track"><div class="bargraph-fill" style="width:${pct}%;"></div></div>
       </div>
 
-      <div class="prompt-box" style="font-size:22px;color:inherit;margin:15px 0;line-height:1.5;padding:20px;">
-        ${promptDisplay}
-        ${!isCzechQuestion ? `<span class="audio-btn" onclick="if(typeof speakWord==='function') speakWord('${sentenceToRead}', '${selectedSubject}')">🔊</span>` : ''}
-      </div>
+      <div id="story-scroll-wrap" style="flex:1;overflow-y:auto;padding-right:2px;">
+        ${historyHtml}
 
-      ${!hasOpts ? `
-        ${item.answer ? `
-          <div class="prompt-box" style="font-size:18px;color:var(--col-text-muted);cursor:pointer;" onclick="if(typeof storyShowTrans!=='undefined') storyShowTrans=!storyShowTrans; renderActiveGame();">
-            ${(typeof storyShowTrans!=='undefined'&&storyShowTrans) ? (typeof cleanCzechTranslation==='function'?cleanCzechTranslation(item.answer):item.answer) : '🇨🇿 Klikni pro zobrazení překladu'}
-          </div>
-        ` : ''}
-        <div class="action-btn green" style="margin-top:15px;" onclick="if(typeof nextStoryStep==='function') nextStoryStep()">POKRAČOVAT ➔</div>
-      ` : `
-        <div class="grid-2">
-          ${item.options.map((opt, idx) => {
-            let btnCls = "";
-            if (typeof storyAnswered!=='undefined'&&storyAnswered) {
-              if (opt === item.answer) btnCls = "correct";
-              else if (opt === (typeof storyChosenOpt!=='undefined'?storyChosenOpt:null)) btnCls = "wrong";
-            }
-            return `<div class="opt-btn ${btnCls}" onclick="if(typeof clickStoryOpt==='function') clickStoryOpt(${idx})">${opt}</div>`;
-          }).join('')}
+        <div id="story-current-box" class="prompt-box" style="font-size:21px;color:inherit;margin:8px 0 12px 0;line-height:1.45;padding:16px 38px 16px 14px;text-align:left;border:2px solid var(--col-yellow);">
+          ${promptDisplay}
+          ${!isCzechQuestion ? `<span class="audio-btn" onclick="if(typeof speakWord==='function') speakWord('${sentenceToRead}', '${selectedSubject}')">🔊</span>` : ''}
         </div>
-        ${(typeof storyAnswered!=='undefined'&&storyAnswered) ? `
-          ${item.help ? `<div style="text-align:center;color:var(--col-yellow);margin:12px 0;font-size:16px;font-weight:bold;">🇨🇿 ${item.help}</div>` : ''}
-          <div class="action-btn green" style="margin-top:15px;" onclick="if(typeof nextStoryStep==='function') nextStoryStep()">POKRAČOVAT ➔</div>
-        ` : ''}
-      `}
+
+        ${!hasOpts ? `
+          ${item.answer ? `
+            <div class="prompt-box" style="font-size:16px;padding:10px;color:var(--col-text-muted);cursor:pointer;" onclick="if(typeof storyShowTrans!=='undefined') storyShowTrans=!storyShowTrans; renderActiveGame();">
+              ${(typeof storyShowTrans!=='undefined'&&storyShowTrans) ? '🇨🇿 ' + (typeof cleanCzechTranslation==='function'?cleanCzechTranslation(item.answer):item.answer) : '🇨🇿 Klikni pro zobrazení překladu'}
+            </div>
+          ` : ''}
+          <div class="action-btn green" style="margin-top:10px;" onclick="if(typeof nextStoryStep==='function') nextStoryStep()">POKRAČOVAT ➔</div>
+        ` : `
+          <div class="grid-2">
+            ${item.options.map((opt, idx) => {
+              let btnCls = "";
+              if (typeof storyAnswered!=='undefined'&&storyAnswered) {
+                if (opt === item.answer) btnCls = "correct";
+                else if (opt === (typeof storyChosenOpt!=='undefined'?storyChosenOpt:null)) btnCls = "wrong";
+              }
+              return `<div class="opt-btn ${btnCls}" onclick="if(typeof clickStoryOpt==='function') clickStoryOpt(${idx})">${opt}</div>`;
+            }).join('')}
+          </div>
+          ${(typeof storyAnswered!=='undefined'&&storyAnswered) ? `
+            ${item.help ? `<div style="text-align:center;color:var(--col-yellow);margin:10px 0;font-size:16px;font-weight:bold;">🇨🇿 ${item.help}</div>` : ''}
+            <div class="action-btn green" style="margin-top:12px;" onclick="if(typeof nextStoryStep==='function') nextStoryStep()">POKRAČOVAT ➔</div>
+          ` : ''}
+        `}
+      </div>
     `;
+
+    setTimeout(() => {
+      const curBox = document.getElementById("story-current-box");
+      if (curBox) curBox.scrollIntoView({ behavior: "smooth", block: "end" });
+    }, 40);
   }
 
   // --- MATEMATIKA ---
@@ -933,44 +963,21 @@ function renderActiveGame() {
 
   else if (selectedGame === "SNAKE") {
     if (typeof snakeState === "undefined") {
-      main.innerHTML = `<div style="text-align:center;padding:30px;color:var(--col-red);">Chyba: Soubor snake.js chybí nebo se nenačetl!</div>`;
+      main.innerHTML = `<div style="text-align:center;padding:30px;color:var(--col-red);">Chyba: Soubor game_snake.js chybí!</div>`;
       return;
     }
 
-    if (snakeState === "GAMEOVER") {
-      if (typeof isCampaignMinigame !== 'undefined' && isCampaignMinigame) {
-        let bonusCoins = Math.floor((typeof snakeScore!=='undefined'?snakeScore:0) / 2);
-        main.innerHTML = `
-          <div style="text-align:center;padding:35px;">
-            <h2 style="color:var(--col-green);font-size:28px;">GAME OVER! (Trénink dokončen) 🎉</h2>
-            <p style="font-size:20px;color:inherit;margin:10px 0;">Had poskládal: <b>${typeof snakeScore!=='undefined'?snakeScore:0} slov</b> (Bonus: +${bonusCoins} 💰)</p>
-            <p style="font-size:24px;color:var(--col-yellow);margin-bottom:25px;">Celkem získáváš: +${(typeof campaignMinigameCoins!=='undefined'?campaignMinigameCoins:0) + bonusCoins} 💰</p>
-            <div class="action-btn green" ontouchstart="if(typeof finishCampaign === 'function') finishCampaign(${(typeof campaignMinigameCoins!=='undefined'?campaignMinigameCoins:0) + bonusCoins})" onclick="if(typeof finishCampaign === 'function') finishCampaign(${(typeof campaignMinigameCoins!=='undefined'?campaignMinigameCoins:0) + bonusCoins})">PŘIPSAT ZLAŤÁKY A ZPĚT</div>
-          </div>
-        `;
-      } else {
-        main.innerHTML = `
-          <div style="text-align:center;padding:35px;">
-            <h2 style="color:var(--col-red);font-size:32px;font-weight:bold;">GAME OVER! 💔</h2>
-            <p style="font-size:20px;color:inherit;margin:12px 0;">Správně složeno: <b>${typeof snakeScore!=='undefined'?snakeScore:0} slov</b></p>
-            <div class="action-btn green" ontouchstart="if(typeof startSnakeGame === 'function') startSnakeGame()" onclick="if(typeof startSnakeGame === 'function') startSnakeGame()">HRÁT ZNOVU ➔</div>
-            <div class="action-btn" ontouchstart="if(typeof setScreen === 'function') setScreen('SELECT_GAME')" onclick="if(typeof setScreen === 'function') setScreen('SELECT_GAME')">ZPĚT</div>
-          </div>
-        `;
-      }
-      return;
-    }
-
-    const canBuyShield = (typeof snakeLives!=='undefined'?snakeLives:0) > 1 && (typeof snakeShieldLetters!=='undefined'?snakeShieldLetters:0) <= 0;
+    const isGameOver = (snakeState === "GAMEOVER");
+    const canBuyShield = !isGameOver && (typeof snakeLives!=='undefined'?snakeLives:0) > 1 && (typeof snakeShieldLetters!=='undefined'?snakeShieldLetters:0) <= 0;
     const coins = typeof getUserCoins === 'function' && typeof currentUser !== 'undefined' && currentUser ? getUserCoins(currentUser.name) : 0;
-    const canBuyShieldCoins = (typeof snakeLives!=='undefined'?snakeLives:0) === 1 && (typeof snakeShieldLetters!=='undefined'?snakeShieldLetters:0) <= 0 && coins >= 15;
-    let targetLetterChar = (typeof snakeTargetLetters !== "undefined" && snakeTargetLetters && snakeTargetLetters[typeof snakeCurrentIdx!=='undefined'?snakeCurrentIdx:0]) ? snakeTargetLetters[typeof snakeCurrentIdx!=='undefined'?snakeCurrentIdx:0] : '';
+    const canBuyShieldCoins = !isGameOver && (typeof snakeLives!=='undefined'?snakeLives:0) === 1 && (typeof snakeShieldLetters!=='undefined'?snakeShieldLetters:0) <= 0 && coins >= 15;
+    const bonusCoins = Math.floor((typeof snakeScore!=='undefined'?snakeScore:0) / 2);
 
     main.innerHTML = `
       <div class="snake-container">
         <div class="snake-header-box">
           <div class="snake-stats">
-            <span>${"❤️".repeat(typeof snakeLives!=='undefined'?snakeLives:0)}</span>
+            <span>${isGameOver ? '💔 GAME OVER' : "❤️".repeat(typeof snakeLives!=='undefined'?snakeLives:0)}</span>
             
             ${(typeof snakeShieldLetters!=='undefined'?snakeShieldLetters:0) > 0 ? `
               <span id="snake-shield-indicator" class="snake-shield-btn active">🛡️ Štít: ${snakeShieldLetters} p.</span>
@@ -986,7 +993,7 @@ function renderActiveGame() {
               <span class="snake-shield-btn" style="opacity:0.4;">🛡️ Štít</span>
             `))}
 
-            <span style="color:var(--col-active-tab);">Body: ${typeof snakeScore!=='undefined'?snakeScore:0}</span>
+            <span style="color:var(--col-active-tab);">Slova: ${typeof snakeScore!=='undefined'?snakeScore:0} | Délka: ${typeof snakeBody!=='undefined'?snakeBody.length:3}</span>
           </div>
 
           ${typeof snakeCurrentWord!=='undefined' && snakeCurrentWord ? `
@@ -1006,9 +1013,8 @@ function renderActiveGame() {
         </div>
 
         <div class="snake-canvas-wrap">
-          <canvas id="snake-canvas" width="340" height="340"></canvas>
+          <canvas id="snake-canvas" width="400" height="400"></canvas>
 
-          <!-- DIALOG PŘI VYPRŠENÍ ŠTÍTU -->
           ${typeof snakeState!=='undefined' && snakeState === "SHIELD_EXPIRED_PAUSE" ? `
             <div class="snake-overlay">
               <h3 style="color:var(--col-yellow);font-size:22px;margin-bottom:6px;">🛡️ ŠTÍT VYPRŠEL!</h3>
@@ -1032,23 +1038,38 @@ function renderActiveGame() {
           ` : ''}
         </div>
 
-        <div class="snake-dpad">
-          <div class="dpad-row">
-            <button class="dpad-btn" ontouchstart="event.preventDefault(); if(typeof setSnakeDirection === 'function') setSnakeDirection(0, -1);" onclick="if(typeof setSnakeDirection === 'function') setSnakeDirection(0, -1)">▲</button>
+        ${isGameOver ? `
+          <div style="width:100%; text-align:center; padding:8px 0;">
+            ${typeof isCampaignMinigame !== 'undefined' && isCampaignMinigame ? `
+              <p style="font-size:16px;color:var(--col-yellow);font-weight:bold;margin-bottom:6px;">Složeno: ${snakeScore} slov (Bonus: +${bonusCoins} 💰)</p>
+              <div class="action-btn green" onclick="if(typeof finishCampaign === 'function') finishCampaign(${(typeof campaignMinigameCoins!=='undefined'?campaignMinigameCoins:0) + bonusCoins})">DOKONČIT TRÉNINK ➔</div>
+            ` : `
+              <div class="grid-2" style="width:100%;">
+                <div class="action-btn green" style="margin-top:0;" onclick="if(typeof startSnakeGame === 'function') startSnakeGame()">HRÁT ZNOVU ➔</div>
+                <div class="action-btn" style="margin-top:0;" onclick="if(typeof setScreen === 'function') setScreen('SELECT_GAME')">ZPĚT DO MENU</div>
+              </div>
+            `}
           </div>
-          <div class="dpad-row">
-            <button class="dpad-btn" ontouchstart="event.preventDefault(); if(typeof setSnakeDirection === 'function') setSnakeDirection(-1, 0);" onclick="if(typeof setSnakeDirection === 'function') setSnakeDirection(-1, 0)">◄</button>
-            <button class="dpad-btn" ontouchstart="event.preventDefault(); if(typeof setSnakeDirection === 'function') setSnakeDirection(0, 1);" onclick="if(typeof setSnakeDirection === 'function') setSnakeDirection(0, 1)">▼</button>
-            <button class="dpad-btn" ontouchstart="event.preventDefault(); if(typeof setSnakeDirection === 'function') setSnakeDirection(1, 0);" onclick="if(typeof setSnakeDirection === 'function') setSnakeDirection(1, 0)">►</button>
+        ` : `
+          <div class="snake-dpad">
+            <div class="dpad-row">
+              <button class="dpad-btn" ontouchstart="event.preventDefault(); if(typeof setSnakeDirection === 'function') setSnakeDirection(0, -1);" onclick="if(typeof setSnakeDirection === 'function') setSnakeDirection(0, -1)">▲</button>
+            </div>
+            <div class="dpad-row">
+              <button class="dpad-btn" ontouchstart="event.preventDefault(); if(typeof setSnakeDirection === 'function') setSnakeDirection(-1, 0);" onclick="if(typeof setSnakeDirection === 'function') setSnakeDirection(-1, 0)">◄</button>
+              <button class="dpad-btn" ontouchstart="event.preventDefault(); if(typeof setSnakeDirection === 'function') setSnakeDirection(0, 1);" onclick="if(typeof setSnakeDirection === 'function') setSnakeDirection(0, 1)">▼</button>
+              <button class="dpad-btn" ontouchstart="event.preventDefault(); if(typeof setSnakeDirection === 'function') setSnakeDirection(1, 0);" onclick="if(typeof setSnakeDirection === 'function') setSnakeDirection(1, 0)">►</button>
+            </div>
           </div>
-        </div>
+        `}
       </div>
     `;
     
-    if (typeof drawSnake === "function") {
-       drawSnake();
-       setTimeout(() => { if(typeof attachSnakeTouchHandlers === 'function') attachSnakeTouchHandlers(); }, 50);
-    }
+    setTimeout(() => {
+       if (typeof resizeSnakeCanvas === "function") resizeSnakeCanvas();
+       if (typeof drawSnake === "function") drawSnake();
+       if (typeof attachSnakeTouchHandlers === "function") attachSnakeTouchHandlers();
+    }, 20);
   }
 
   else if (selectedGame === "CAMPAIGN") {
