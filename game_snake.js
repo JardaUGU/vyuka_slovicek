@@ -287,25 +287,30 @@ function ensureTargetFoodsExist() {
 
 function getRandomFreeGridPos(occupied) {
   const head = snakeBody.length > 0 ? snakeBody[0] : null;
+  
+  // Zakázaná zóna: 6 políček v aktuálním směru před hlavou hada
+  const dangerZone = new Set();
+  if (head && (snakeDir.x !== 0 || snakeDir.y !== 0)) {
+    for (let step = 1; step <= 6; step++) {
+      let fx = (head.x + snakeDir.x * step + snakeGridSize) % snakeGridSize;
+      let fy = (head.y + snakeDir.y * step + snakeGridSize) % snakeGridSize;
+      dangerZone.add(`${fx},${fy}`);
+    }
+  }
+
   let tries = 0;
-  while (tries < 150) {
+  while (tries < 200) {
     let x = Math.floor(Math.random() * (snakeGridSize - 2)) + 1;
     let y = Math.floor(Math.random() * (snakeGridSize - 2)) + 1;
     let key = `${x},${y}`;
-    
-    if (head && snakeDir.x !== 0 && snakeDir.y !== 0) {
-        if (x === head.x + snakeDir.x && y === head.y + snakeDir.y) { tries++; continue; }
-        if (x === head.x + snakeDir.x*2 && y === head.y + snakeDir.y*2) { tries++; continue; }
-    }
-
-    if (!occupied.has(key)) return { x, y };
+    if (!occupied.has(key) && !dangerZone.has(key)) return { x, y };
     tries++;
   }
   
   for (let x = 1; x < snakeGridSize - 1; x++) {
     for (let y = 1; y < snakeGridSize - 1; y++) {
       let key = `${x},${y}`;
-      if (!occupied.has(key)) return { x, y };
+      if (!occupied.has(key) && !dangerZone.has(key)) return { x, y };
     }
   }
   return null;
@@ -581,14 +586,14 @@ window.addEventListener("keydown", (e) => {
 });
 
 function attachSnakeTouchHandlers() {
-  const wrap = document.querySelector(".snake-canvas-wrap");
-  const canvas = document.getElementById("snake-canvas");
-  if (!wrap || !canvas) return;
+  const container = document.querySelector(".snake-container");
+  if (!container) return;
 
-  const preventDefaultTouch = (e) => { if (e.cancelable) e.preventDefault(); };
+  const isButtonTarget = (el) => el && (el.tagName === "BUTTON" || el.classList.contains("action-btn") || el.classList.contains("snake-shield-btn"));
 
-  wrap.addEventListener("touchstart", (e) => {
-    preventDefaultTouch(e);
+  container.addEventListener("touchstart", (e) => {
+    if (isButtonTarget(e.target)) return;
+    if (e.cancelable) e.preventDefault();
     if (typeof registerUserAction === "function") registerUserAction();
     if (e.touches && e.touches[0]) {
       snakeTouchStartX = e.touches[0].clientX;
@@ -596,8 +601,9 @@ function attachSnakeTouchHandlers() {
     }
   }, { passive: false });
 
-  wrap.addEventListener("touchmove", (e) => {
-    preventDefaultTouch(e);
+  container.addEventListener("touchmove", (e) => {
+    if (isButtonTarget(e.target)) return;
+    if (e.cancelable) e.preventDefault();
     if (!e.touches || !e.touches[0]) return;
     const dx = e.touches[0].clientX - snakeTouchStartX;
     const dy = e.touches[0].clientY - snakeTouchStartY;
@@ -613,6 +619,7 @@ function attachSnakeTouchHandlers() {
       snakeTouchStartY = e.touches[0].clientY;
     }
   }, { passive: false });
+}
 
   wrap.addEventListener("touchend", preventDefaultTouch, { passive: false });
 }
