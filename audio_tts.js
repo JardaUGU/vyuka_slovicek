@@ -41,6 +41,9 @@ function speakWord(text, subjectName) {
     toSpeak = toSpeak.replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, '').trim(); // Odstranění smajlíků
     toSpeak = toSpeak.replace(/\s*\([^)]*\)/g, ''); // Odstranění závorek z výslovnosti
 
+    // Zabrání čtení velkého "No" jako "Number" a u "Oh no" vylepší intonaci
+    toSpeak = toSpeak.replace(/\bNo\b/g, 'no').replace(/\bOh no\b/gi, 'oh nou');
+
     toSpeak = toSpeak.replace(/ליהוה/g, 'לַאדֹנָי').replace(/יהוה/g, 'אֲדֹנָי').replace(/L'?(Jahve|Jahveh|Yahweh|Yahwe|Jehova|JHVH|YHWH|JVHV)/gi, "L'Adonaj");
     if (/read\s*-\s*read\s*-\s*read/i.test(toSpeak)) toSpeak = "read, red, red";
     else toSpeak = toSpeak.replace(/\//g, ' or ').replace(/\s*-\s*/g, ', ');
@@ -91,6 +94,13 @@ function playTone(freq, type, duration) {
     osc.start(); osc.stop(audioCtx.currentTime + duration);
   } catch(e) {}
 }
-function sndOk() { playTone(880, 'sine', 0.08); setTimeout(() => playTone(1320, 'sine', 0.1), 80); }
-function sndErr() { playTone(220, 'square', 0.15); }
+function sndOk() { 
+  if (navigator.vibrate) try { navigator.vibrate(18); } catch(e) {}
+  playTone(880, 'sine', 0.08); 
+  setTimeout(() => playTone(1320, 'sine', 0.1), 80); 
+}
+function sndErr() { 
+  if (navigator.vibrate) try { navigator.vibrate([40, 40, 60]); } catch(e) {}
+  playTone(220, 'square', 0.15); 
+}
 function sndFanfare() { [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => playTone(f, 'triangle', 0.1), i * 110)); }

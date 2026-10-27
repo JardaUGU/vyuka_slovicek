@@ -81,9 +81,10 @@ function resizeSnakeCanvas() {
   const wrap = document.querySelector(".snake-canvas-wrap");
   const cvs = document.getElementById("snake-canvas");
   if (wrap && cvs) {
-    cvs.width = wrap.clientWidth;
-    cvs.height = wrap.clientWidth; 
-    snakeCellSize = cvs.width / snakeGridSize;
+    const size = Math.max(260, wrap.clientWidth || 320);
+    cvs.width = size;
+    cvs.height = size; 
+    snakeCellSize = size / snakeGridSize;
     drawSnake();
   }
 }
@@ -91,10 +92,11 @@ function resizeSnakeCanvas() {
 function startSnakeGame() {
   if (typeof stopArcadeLoop === "function") stopArcadeLoop();
   stopSnakeLoop();
+  if (typeof isCampaignMinigame !== "undefined") isCampaignMinigame = false;
   
   const vItems = getVocabItems();
   snakeDeck = vItems.filter(it => {
-    let clean = it.question.replace(/^(der|die|das|ein|eine|el|la|un|una)\s+/i, '').trim();
+    let clean = it.question.replace(/\s*\([^)]*\)/g, '').replace(/^(der|die|das|ein|eine|el|la|los|las|un|una)\s+/i, '').trim();
     return clean.split(/\s+/).length === 1 && clean.length >= 2 && clean.length <= 10 && !clean.includes('.');
   }).sort(() => Math.random() - 0.5);
 
@@ -108,11 +110,22 @@ function startSnakeGame() {
   snakeLevel = 1;
   snakeSpeed = 220;
   snakeShieldLetters = 0;
+  snakeState = "WAITING";
+  isSnakeWaitingForInput = true;
   selectedGame = "SNAKE";
-  setScreen("PLAYING");
+
+  snakeBody = [
+    { x: Math.floor(snakeGridSize/2), y: Math.floor(snakeGridSize/2) },
+    { x: Math.floor(snakeGridSize/2) - 1, y: Math.floor(snakeGridSize/2) },
+    { x: Math.floor(snakeGridSize/2) - 2, y: Math.floor(snakeGridSize/2) }
+  ];
+  snakeDir = { x: 1, y: 0 };
+  snakeNextDir = { x: 1, y: 0 };
+  snakeStatusMsg = "Potáhni prstem nebo stiskni šipku pro START!";
 
   setupNextSnakeWord();
-  resetSnakeToCenter("Potáhni prstem nebo stiskni šipku pro START!");
+  setScreen("PLAYING");
+  runSnakeLoop();
   
   window.addEventListener('resize', resizeSnakeCanvas);
   setTimeout(() => {
@@ -127,7 +140,7 @@ function startCampaignSnake() {
   isCampaignMinigame = true;
 
   snakeDeck = campaignMinigamePool.filter(it => {
-    let clean = it.question.replace(/^(der|die|das|ein|eine|el|la|un|una)\s+/i, '').trim();
+    let clean = it.question.replace(/\s*\([^)]*\)/g, '').replace(/^(der|die|das|ein|eine|el|la|los|las|un|una)\s+/i, '').trim();
     return clean.split(/\s+/).length === 1 && clean.length >= 2 && clean.length <= 10 && !clean.includes('.');
   }).sort(() => Math.random() - 0.5);
 
@@ -141,11 +154,22 @@ function startCampaignSnake() {
   snakeLevel = 1;
   snakeSpeed = 220;
   snakeShieldLetters = 0;
+  snakeState = "WAITING";
+  isSnakeWaitingForInput = true;
   selectedGame = "SNAKE";
-  setScreen("PLAYING");
+
+  snakeBody = [
+    { x: Math.floor(snakeGridSize/2), y: Math.floor(snakeGridSize/2) },
+    { x: Math.floor(snakeGridSize/2) - 1, y: Math.floor(snakeGridSize/2) },
+    { x: Math.floor(snakeGridSize/2) - 2, y: Math.floor(snakeGridSize/2) }
+  ];
+  snakeDir = { x: 1, y: 0 };
+  snakeNextDir = { x: 1, y: 0 };
+  snakeStatusMsg = "Potáhni prstem nebo stiskni šipku pro START!";
 
   setupNextSnakeWord();
-  resetSnakeToCenter("Potáhni prstem nebo stiskni šipku pro START!");
+  setScreen("PLAYING");
+  runSnakeLoop();
   
   window.addEventListener('resize', resizeSnakeCanvas);
   setTimeout(() => {
@@ -175,13 +199,14 @@ function setupNextSnakeWord(isWordCompleted = false) {
   if (snakeDeck.length === 0) {
     const vItems = getVocabItems();
     snakeDeck = vItems.filter(it => {
-      let clean = it.question.replace(/^(der|die|das|ein|eine|el|la|un|una)\s+/i, '').trim();
-      return clean.split(/\s+/).length === 1 && clean.length >= 2 && clean.length <= 10;
+      let clean = it.question.replace(/\s*\([^)]*\)/g, '').replace(/^(der|die|das|ein|eine|el|la|los|las|un|una)\s+/i, '').trim();
+      return clean.split(/\s+/).length === 1 && clean.length >= 2 && clean.length <= 10 && !clean.includes('.');
     }).sort(() => Math.random() - 0.5);
   }
 
   const rawItem = snakeDeck.pop();
-  let cleanForeign = rawItem.question.replace(/^(der|die|das|ein|eine|el|la|un|una)\s+/i, '').trim().toUpperCase();
+  if (!rawItem) return;
+  let cleanForeign = rawItem.question.replace(/\s*\([^)]*\)/g, '').replace(/^(der|die|das|ein|eine|el|la|los|las|un|una)\s+/i, '').trim().toUpperCase();
 
   snakeCurrentWord = {
     raw: rawItem,
@@ -287,25 +312,30 @@ function ensureTargetFoodsExist() {
 
 function getRandomFreeGridPos(occupied) {
   const head = snakeBody.length > 0 ? snakeBody[0] : null;
+  
+  // Zakázaná zóna: 6 políček v aktuálním směru před hlavou hada
+  const dangerZone = new Set();
+  if (head && (snakeDir.x !== 0 || snakeDir.y !== 0)) {
+    for (let step = 1; step <= 6; step++) {
+      let fx = (head.x + snakeDir.x * step + snakeGridSize) % snakeGridSize;
+      let fy = (head.y + snakeDir.y * step + snakeGridSize) % snakeGridSize;
+      dangerZone.add(`${fx},${fy}`);
+    }
+  }
+
   let tries = 0;
-  while (tries < 150) {
+  while (tries < 200) {
     let x = Math.floor(Math.random() * (snakeGridSize - 2)) + 1;
     let y = Math.floor(Math.random() * (snakeGridSize - 2)) + 1;
     let key = `${x},${y}`;
-    
-    if (head && snakeDir.x !== 0 && snakeDir.y !== 0) {
-        if (x === head.x + snakeDir.x && y === head.y + snakeDir.y) { tries++; continue; }
-        if (x === head.x + snakeDir.x*2 && y === head.y + snakeDir.y*2) { tries++; continue; }
-    }
-
-    if (!occupied.has(key)) return { x, y };
+    if (!occupied.has(key) && !dangerZone.has(key)) return { x, y };
     tries++;
   }
   
   for (let x = 1; x < snakeGridSize - 1; x++) {
     for (let y = 1; y < snakeGridSize - 1; y++) {
       let key = `${x},${y}`;
-      if (!occupied.has(key)) return { x, y };
+      if (!occupied.has(key) && !dangerZone.has(key)) return { x, y };
     }
   }
   return null;
@@ -327,7 +357,6 @@ function runSnakeLoop() {
 function setSnakeDirection(dx, dy) {
   if (typeof registerUserAction === "function") registerUserAction();
   
-  // Detekce pohybu proti směru hada
   if ((snakeDir.x !== 0 && snakeDir.x === -dx) || (snakeDir.y !== 0 && snakeDir.y === -dy)) {
       if (isSnakeWaitingForInput) {
           snakeBody.reverse();
@@ -403,10 +432,8 @@ function updateSnake() {
         const shieldEl = document.getElementById("snake-shield-indicator");
         if (shieldEl) shieldEl.innerText = `🛡️ Štít: ${snakeShieldLetters} p.`;
 
-        // OPRAVA BUGU S UNDEFINED:
         if (snakeShieldLetters === 0) {
           if (isWordDone) {
-             // Pokud se slovo dokončilo, ignorujeme dialog o štítu a dáme rovnou další slovo
              handleSnakeWordComplete(); 
           } else {
              handleShieldExpired();
@@ -581,14 +608,14 @@ window.addEventListener("keydown", (e) => {
 });
 
 function attachSnakeTouchHandlers() {
-  const wrap = document.querySelector(".snake-canvas-wrap");
-  const canvas = document.getElementById("snake-canvas");
-  if (!wrap || !canvas) return;
+  const container = document.querySelector(".snake-container");
+  if (!container) return;
 
-  const preventDefaultTouch = (e) => { if (e.cancelable) e.preventDefault(); };
+  const isButtonTarget = (el) => el && (el.tagName === "BUTTON" || el.classList.contains("action-btn") || el.classList.contains("snake-shield-btn"));
 
-  wrap.addEventListener("touchstart", (e) => {
-    preventDefaultTouch(e);
+  container.addEventListener("touchstart", (e) => {
+    if (isButtonTarget(e.target)) return;
+    if (e.cancelable) e.preventDefault();
     if (typeof registerUserAction === "function") registerUserAction();
     if (e.touches && e.touches[0]) {
       snakeTouchStartX = e.touches[0].clientX;
@@ -596,8 +623,9 @@ function attachSnakeTouchHandlers() {
     }
   }, { passive: false });
 
-  wrap.addEventListener("touchmove", (e) => {
-    preventDefaultTouch(e);
+  container.addEventListener("touchmove", (e) => {
+    if (isButtonTarget(e.target)) return;
+    if (e.cancelable) e.preventDefault();
     if (!e.touches || !e.touches[0]) return;
     const dx = e.touches[0].clientX - snakeTouchStartX;
     const dy = e.touches[0].clientY - snakeTouchStartY;
@@ -613,6 +641,4 @@ function attachSnakeTouchHandlers() {
       snakeTouchStartY = e.touches[0].clientY;
     }
   }, { passive: false });
-
-  wrap.addEventListener("touchend", preventDefaultTouch, { passive: false });
 }

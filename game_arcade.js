@@ -79,7 +79,7 @@ function runArcadeLoop() {
   arcadeY += arcadeSpeed;
   const el = document.getElementById("arcade-falling-elem");
   const playfield = document.getElementById("arcade-field");
-  if (el && playfield && arcadeY >= playfield.clientHeight - el.clientHeight - 8) {
+  if (el && playfield && arcadeY >= playfield.clientHeight - el.clientHeight - 2) {
     handleArcadeMiss();
     return;
   }
