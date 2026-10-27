@@ -81,9 +81,10 @@ function resizeSnakeCanvas() {
   const wrap = document.querySelector(".snake-canvas-wrap");
   const cvs = document.getElementById("snake-canvas");
   if (wrap && cvs) {
-    cvs.width = wrap.clientWidth;
-    cvs.height = wrap.clientWidth; 
-    snakeCellSize = cvs.width / snakeGridSize;
+    const size = Math.max(260, wrap.clientWidth || 320);
+    cvs.width = size;
+    cvs.height = size; 
+    snakeCellSize = size / snakeGridSize;
     drawSnake();
   }
 }
@@ -91,10 +92,11 @@ function resizeSnakeCanvas() {
 function startSnakeGame() {
   if (typeof stopArcadeLoop === "function") stopArcadeLoop();
   stopSnakeLoop();
+  isCampaignMinigame = false;
   
   const vItems = getVocabItems();
   snakeDeck = vItems.filter(it => {
-    let clean = it.question.replace(/^(der|die|das|ein|eine|el|la|un|una)\s+/i, '').trim();
+    let clean = it.question.replace(/\s*\([^)]*\)/g, '').replace(/^(der|die|das|ein|eine|el|la|los|las|un|una)\s+/i, '').trim();
     return clean.split(/\s+/).length === 1 && clean.length >= 2 && clean.length <= 10 && !clean.includes('.');
   }).sort(() => Math.random() - 0.5);
 
@@ -108,11 +110,22 @@ function startSnakeGame() {
   snakeLevel = 1;
   snakeSpeed = 220;
   snakeShieldLetters = 0;
+  snakeState = "WAITING";
+  isSnakeWaitingForInput = true;
   selectedGame = "SNAKE";
-  setScreen("PLAYING");
+
+  snakeBody = [
+    { x: Math.floor(snakeGridSize/2), y: Math.floor(snakeGridSize/2) },
+    { x: Math.floor(snakeGridSize/2) - 1, y: Math.floor(snakeGridSize/2) },
+    { x: Math.floor(snakeGridSize/2) - 2, y: Math.floor(snakeGridSize/2) }
+  ];
+  snakeDir = { x: 1, y: 0 };
+  snakeNextDir = { x: 1, y: 0 };
+  snakeStatusMsg = "Potáhni prstem nebo stiskni šipku pro START!";
 
   setupNextSnakeWord();
-  resetSnakeToCenter("Potáhni prstem nebo stiskni šipku pro START!");
+  setScreen("PLAYING");
+  runSnakeLoop();
   
   window.addEventListener('resize', resizeSnakeCanvas);
   setTimeout(() => {
@@ -127,7 +140,7 @@ function startCampaignSnake() {
   isCampaignMinigame = true;
 
   snakeDeck = campaignMinigamePool.filter(it => {
-    let clean = it.question.replace(/^(der|die|das|ein|eine|el|la|un|una)\s+/i, '').trim();
+    let clean = it.question.replace(/\s*\([^)]*\)/g, '').replace(/^(der|die|das|ein|eine|el|la|los|las|un|una)\s+/i, '').trim();
     return clean.split(/\s+/).length === 1 && clean.length >= 2 && clean.length <= 10 && !clean.includes('.');
   }).sort(() => Math.random() - 0.5);
 
@@ -141,11 +154,22 @@ function startCampaignSnake() {
   snakeLevel = 1;
   snakeSpeed = 220;
   snakeShieldLetters = 0;
+  snakeState = "WAITING";
+  isSnakeWaitingForInput = true;
   selectedGame = "SNAKE";
-  setScreen("PLAYING");
+
+  snakeBody = [
+    { x: Math.floor(snakeGridSize/2), y: Math.floor(snakeGridSize/2) },
+    { x: Math.floor(snakeGridSize/2) - 1, y: Math.floor(snakeGridSize/2) },
+    { x: Math.floor(snakeGridSize/2) - 2, y: Math.floor(snakeGridSize/2) }
+  ];
+  snakeDir = { x: 1, y: 0 };
+  snakeNextDir = { x: 1, y: 0 };
+  snakeStatusMsg = "Potáhni prstem nebo stiskni šipku pro START!";
 
   setupNextSnakeWord();
-  resetSnakeToCenter("Potáhni prstem nebo stiskni šipku pro START!");
+  setScreen("PLAYING");
+  runSnakeLoop();
   
   window.addEventListener('resize', resizeSnakeCanvas);
   setTimeout(() => {
@@ -175,13 +199,14 @@ function setupNextSnakeWord(isWordCompleted = false) {
   if (snakeDeck.length === 0) {
     const vItems = getVocabItems();
     snakeDeck = vItems.filter(it => {
-      let clean = it.question.replace(/^(der|die|das|ein|eine|el|la|un|una)\s+/i, '').trim();
-      return clean.split(/\s+/).length === 1 && clean.length >= 2 && clean.length <= 10;
+      let clean = it.question.replace(/\s*\([^)]*\)/g, '').replace(/^(der|die|das|ein|eine|el|la|los|las|un|una)\s+/i, '').trim();
+      return clean.split(/\s+/).length === 1 && clean.length >= 2 && clean.length <= 10 && !clean.includes('.');
     }).sort(() => Math.random() - 0.5);
   }
 
   const rawItem = snakeDeck.pop();
-  let cleanForeign = rawItem.question.replace(/^(der|die|das|ein|eine|el|la|un|una)\s+/i, '').trim().toUpperCase();
+  if (!rawItem) return;
+  let cleanForeign = rawItem.question.replace(/\s*\([^)]*\)/g, '').replace(/^(der|die|das|ein|eine|el|la|los|las|un|una)\s+/i, '').trim().toUpperCase();
 
   snakeCurrentWord = {
     raw: rawItem,
