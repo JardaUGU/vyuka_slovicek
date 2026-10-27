@@ -1,18 +1,101 @@
+/* =========================================================
+   1. VÝCHOZÍ BAREVNÁ PALETA (HLUBOKÝ VESMÍR)
+   ========================================================= */
 :root {
   --col-bg: #0b1528;
+  --col-body-bg: #030712;
   --col-card: #18263e;
+  --col-card-alt: #111c2d;      /* Tmavší verze karty (odznaky, lišty, skryté pexeso) */
   --col-card-border: #31507d;
   --col-active-tab: #00bcd4;
   --col-green: #22c55e;
   --col-red: #ef4444;
   --col-yellow: #facc15;
   --col-orange: #f97316;
-  --col-text-muted: #94a3b8;
+  --col-text: #ffffff;          /* Hlavní barva textu */
+  --col-text-muted: #94a3b8;    /* Tlumený text */
+  --col-on-active: #ffffff;     /* Text na rozsvíceném tlačítku (--col-active-tab) */
+  --col-on-green: #ffffff;      /* Text na zeleném tlačítku (--col-green) */
+  --col-success-bg: #143c28;    /* Pozadí uhodnuté karty pexesa / vyplněného slotu */
 }
-* { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; font-family: 'Roboto', sans-serif; }
-body { background-color: #030712; display: flex; justify-content: center; align-items: center; min-height: 100vh; color: #ffffff; }
+
+/* =========================================================
+   2. DEFINICE VŠECH SKINŮ (POUZE PROMĚNNÉ!)
+   ========================================================= */
+
+/* HACKER MATRIX */
+body[data-theme="matrix"] {
+  --col-bg: #000000;
+  --col-body-bg: #000000;
+  --col-card: #001100;
+  --col-card-alt: #001a00;
+  --col-card-border: #00ff00;
+  --col-active-tab: #00ff00;
+  --col-green: #00ff00;
+  --col-red: #ff0000;
+  --col-yellow: #00ff00;
+  --col-orange: #00ff00;
+  --col-text: #00ff00;
+  --col-text-muted: #00aa00;
+  --col-on-active: #000000;
+  --col-on-green: #000000;
+  --col-success-bg: #003300;
+  font-family: 'Courier New', Courier, monospace;
+}
+
+/* ZLATÝ ŠAMPION */
+body[data-theme="gold"] {
+  --col-bg: #0d0b04;
+  --col-body-bg: #060501;
+  --col-card: #211905;
+  --col-card-alt: #171103;
+  --col-card-border: #a16207;
+  --col-active-tab: #facc15;
+  --col-text: #ffffff;
+  --col-text-muted: #fde047;
+  --col-on-active: #000000;
+  --col-on-green: #ffffff;
+}
+
+/* KYBERPUNK NEON */
+body[data-theme="cyberpunk"] {
+  --col-bg: #10041e;
+  --col-body-bg: #08020f;
+  --col-card: #21093b;
+  --col-card-alt: #160529;
+  --col-card-border: #7e22ce;
+  --col-active-tab: #f43f5e;
+  --col-text: #ffffff;
+  --col-text-muted: #e9d5ff;
+  --col-on-active: #ffffff;
+  --col-on-green: #ffffff;
+}
+
+/* LEDOVÁ POLÁRNÍ ZÁŘE (SVĚTLÝ SKIN) */
+body[data-theme="arctic"] {
+  --col-bg: #e0f2fe;
+  --col-body-bg: #bae6fd;
+  --col-card: #ffffff;
+  --col-card-alt: #e0f2fe;
+  --col-card-border: #7dd3fc;
+  --col-active-tab: #0284c7;
+  --col-green: #16a34a;
+  --col-yellow: #d97706;
+  --col-text: #0c4a6e;
+  --col-text-muted: #0369a1;
+  --col-on-active: #ffffff;
+  --col-on-green: #ffffff;
+  --col-success-bg: #dcfce7;
+}
+
+/* =========================================================
+   3. ZÁKLADNÍ ROZLOŽENÍ A KOMPONENTY
+   ========================================================= */
+* { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; font-family: inherit; }
+body { background-color: var(--col-body-bg); display: flex; justify-content: center; align-items: center; min-height: 100vh; color: var(--col-text); font-family: 'Roboto', sans-serif; }
+
 #app-container {
-  width: 100vw; max-width: 680px; height: 100vh; max-height: 850px; /* Zvýšeno z 600px na 850px */
+  width: 100vw; max-width: 680px; height: 100vh; max-height: 850px;
   background-color: var(--col-bg); display: flex; flex-direction: column;
   border: 2px solid var(--col-card-border); border-radius: 12px; overflow: hidden;
   box-shadow: 0 10px 25px rgba(0,0,0,0.6);
@@ -20,363 +103,107 @@ body { background-color: #030712; display: flex; justify-content: center; align-
 @media (max-width: 680px), (max-height: 600px) {
   #app-container { border-radius: 0; border: none; max-width: 100vw; max-height: 100vh; }
 }
+
 header { height: 48px; background-color: var(--col-card); border-bottom: 2px solid var(--col-card-border); display: flex; align-items: center; padding: 0 8px; gap: 6px; }
-.nav-btn { background: var(--col-active-tab); color: #fff; border: 1px solid #fff; border-radius: 6px; height: 34px; min-width: 38px; display: flex; align-items: center; justify-content: center; font-weight: bold; cursor: pointer; font-size: 15px; }
-.badge { background: #242c3a; border: 1px solid var(--col-card-border); padding: 0 8px; height: 32px; display: flex; align-items: center; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; max-width: 130px; }
-.badge.active { background: var(--col-active-tab); border-color: #fff; }
+.nav-btn { background: var(--col-active-tab); color: var(--col-on-active); border: 1px solid var(--col-card-border); border-radius: 6px; height: 34px; min-width: 38px; display: flex; align-items: center; justify-content: center; font-weight: bold; cursor: pointer; font-size: 15px; }
+.badge { background: var(--col-card-alt); color: var(--col-text); border: 1px solid var(--col-card-border); padding: 0 8px; height: 32px; display: flex; align-items: center; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; max-width: 130px; }
+.badge.active { background: var(--col-active-tab); color: var(--col-on-active); border-color: var(--col-text); }
 .spacer { flex: 1; }
-.tts-toggle-btn { background: #24344d; border: 1px solid var(--col-card-border); color: #fff; border-radius: 6px; padding: 4px 6px; font-size: 12px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 3px; }
-.tts-toggle-btn.active { background: var(--col-green); border-color: #fff; }
-.study-timer-box { background: #101c2e; border: 1px solid var(--col-card-border); padding: 4px 7px; border-radius: 6px; font-size: 12px; font-weight: bold; display: flex; align-items: center; gap: 4px; white-space: nowrap; }
-.study-timer-box.bonus { border-color: var(--col-yellow); color: var(--col-yellow); background: #2d2605; }
+.tts-toggle-btn { background: var(--col-card-alt); color: var(--col-text); border: 1px solid var(--col-card-border); border-radius: 6px; padding: 4px 6px; font-size: 12px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 3px; }
+.tts-toggle-btn.active { background: var(--col-green); color: var(--col-on-green); border-color: var(--col-text); }
+.study-timer-box { background: var(--col-card-alt); color: var(--col-text); border: 1px solid var(--col-card-border); padding: 4px 7px; border-radius: 6px; font-size: 12px; font-weight: bold; display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+.study-timer-box.bonus { border-color: var(--col-yellow); color: var(--col-yellow); }
 .study-timer-box.paused { border-color: var(--col-orange); color: var(--col-orange); }
+
 main { flex: 1; padding: 12px; display: flex; flex-direction: column; overflow-y: auto; position: relative; }
 footer { height: 32px; background-color: var(--col-card); border-top: 1px solid var(--col-card-border); display: flex; align-items: center; justify-content: space-between; padding: 0 12px; font-size: 12px; color: var(--col-yellow); }
+
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .tile { background-color: var(--col-card); border: 1px solid var(--col-card-border); border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; text-align: center; padding: 10px; transition: transform 0.05s, border-color 0.1s; }
-.tile:active { transform: scale(0.97); border-color: #fff; }
-.tile h2 { font-size: 17px; color: #fff; margin-bottom: 4px; }
+.tile:active { transform: scale(0.97); border-color: var(--col-active-tab); }
+.tile h2 { font-size: 17px; color: var(--col-text); margin-bottom: 4px; }
 .tile p { font-size: 12px; color: var(--col-text-muted); }
-.bargraph-container { background: #111a2a; border: 1px solid var(--col-card-border); border-radius: 8px; padding: 6px 10px; margin-bottom: 8px; display: flex; flex-direction: column; gap: 4px; }
+
+.bargraph-container { background: var(--col-card-alt); border: 1px solid var(--col-card-border); border-radius: 8px; padding: 6px 10px; margin-bottom: 8px; display: flex; flex-direction: column; gap: 4px; }
 .bargraph-header { display: flex; justify-content: space-between; font-size: 12px; font-weight: bold; }
-.bargraph-track { width: 100%; height: 10px; background: #1e293b; border-radius: 5px; overflow: hidden; border: 1px solid #334155; }
+.bargraph-track { width: 100%; height: 10px; background: rgba(0,0,0,0.3); border-radius: 5px; overflow: hidden; border: 1px solid var(--col-card-border); }
 .bargraph-fill { height: 100%; background: linear-gradient(90deg, var(--col-active-tab), var(--col-green)); border-radius: 5px; transition: width 0.3s ease; }
+
 .prompt-box { background: var(--col-card); border: 1px solid var(--col-card-border); border-radius: 10px; padding: 14px; text-align: center; font-size: 22px; font-weight: 500; color: var(--col-yellow); margin-bottom: 10px; position: relative; }
 .hebrew-text { font-family: 'Tinos', serif; direction: rtl; font-size: 32px !important; line-height: 1.4; }
 .audio-btn { position: absolute; right: 12px; top: 12px; font-size: 20px; cursor: pointer; opacity: 0.8; }
-.action-btn { background: var(--col-active-tab); border: 1px solid #fff; color: #fff; padding: 12px; border-radius: 8px; font-size: 17px; font-weight: bold; text-align: center; cursor: pointer; margin-top: 8px; }
-.action-btn.green { background: var(--col-green); }
-.action-btn.red { background: var(--col-red); }
-.opt-btn { background: var(--col-card); border: 1px solid var(--col-active-tab); color: #fff; padding: 12px 6px; border-radius: 8px; font-size: 18px; text-align: center; cursor: pointer; font-weight: 500; display: flex; align-items: center; justify-content: center; transition: background 0.15s, border-color 0.15s; }
-.opt-btn.correct { background: var(--col-green) !important; border-color: #fff; }
-.opt-btn.wrong { background: var(--col-red) !important; border-color: #fff; }
+
+.action-btn { background: var(--col-active-tab); border: 1px solid var(--col-card-border); color: var(--col-on-active); padding: 12px; border-radius: 8px; font-size: 17px; font-weight: bold; text-align: center; cursor: pointer; margin-top: 8px; }
+.action-btn.green { background: var(--col-green); color: var(--col-on-green); }
+.action-btn.red { background: var(--col-red); color: #ffffff; }
+
+.opt-btn { background: var(--col-card); border: 1px solid var(--col-active-tab); color: var(--col-text); padding: 12px 6px; border-radius: 8px; font-size: 18px; text-align: center; cursor: pointer; font-weight: 500; display: flex; align-items: center; justify-content: center; transition: background 0.15s, border-color 0.15s; }
+.opt-btn.correct { background: var(--col-green) !important; color: var(--col-on-green) !important; border-color: var(--col-text); font-weight: bold; }
+.opt-btn.wrong { background: var(--col-red) !important; color: #ffffff !important; border-color: #ffffff; }
+
 .slots-row, .letters-row { display: flex; justify-content: center; gap: 8px; margin: 8px auto; flex-wrap: wrap; max-width: 580px; }
-.letter-slot { min-width: 50px; height: 52px; padding: 0 10px; background: var(--col-card); border: 2px solid var(--col-active-tab); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: bold; }
+.letter-slot { min-width: 50px; height: 52px; padding: 0 10px; background: var(--col-card); border: 2px solid var(--col-active-tab); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: bold; color: var(--col-text); }
 .letter-slot.word-slot { min-width: 80px; font-size: 19px; }
-.letter-slot.filled { background: #143c28; border-color: var(--col-green); color: var(--col-green); }
-.letter-tile { min-width: 50px; height: 52px; padding: 0 10px; background: var(--col-card); border: 2px solid var(--col-active-tab); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: bold; cursor: pointer; box-shadow: 0 3px 6px rgba(0,0,0,0.3); touch-action: manipulation; user-select: none; -webkit-tap-highlight-color: transparent; }
-.letter-tile:active:not(.used) { transform: scale(0.93); background: var(--col-active-tab); color: #fff; }
+.letter-slot.filled { background: var(--col-success-bg); border-color: var(--col-green); color: var(--col-green); }
+
+.letter-tile { min-width: 50px; height: 52px; padding: 0 10px; background: var(--col-card); color: var(--col-text); border: 2px solid var(--col-active-tab); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: bold; cursor: pointer; box-shadow: 0 3px 6px rgba(0,0,0,0.25); touch-action: manipulation; user-select: none; -webkit-tap-highlight-color: transparent; }
+.letter-tile:active:not(.used) { transform: scale(0.93); background: var(--col-active-tab); color: var(--col-on-active); }
 .letter-tile.word-tile { min-width: 80px; font-size: 19px; padding: 6px 12px; }
-.letter-tile.used { background: #181c24; border-color: #282d37; color: #4b5563; cursor: default; box-shadow: none; }
+.letter-tile.used { background: var(--col-card-alt); border-color: var(--col-card-border); color: var(--col-text-muted); opacity: 0.35; cursor: default; box-shadow: none; }
+
 .pexeso-grid { display: grid; gap: 10px; width: 100%; flex: 1; min-height: 340px; margin: 4px 0; }
-.pexeso-card { background: var(--col-card); border: 2px solid var(--col-card-border); border-radius: 10px; display: flex; align-items: center; justify-content: center; text-align: center; padding: 8px 4px; cursor: pointer; font-size: 16px; font-weight: bold; color: #fff; }
-.pexeso-card.hidden { background: #121c2c; color: var(--col-text-muted); font-size: 26px; }
-.pexeso-card.flipped { background: #1d3557; border-color: var(--col-active-tab); color: #fff; }
-.pexeso-card.matched { background: #143c28; border-color: var(--col-green); color: var(--col-green); cursor: default; }
-.filter-bar { display: flex; justify-content: space-between; align-items: center; padding: 6px 12px; background: #101b2d; border-radius: 8px; margin-bottom: 8px; font-size: 13px; }
-.toggle-btn { background: #24344d; color: #fff; border: 1px solid var(--col-card-border); padding: 4px 10px; border-radius: 6px; cursor: pointer; }
-.toggle-btn.on { background: var(--col-active-tab); border-color: #fff; }
+.pexeso-card { background: var(--col-card); border: 2px solid var(--col-card-border); border-radius: 10px; display: flex; align-items: center; justify-content: center; text-align: center; padding: 8px 4px; cursor: pointer; font-size: 16px; font-weight: bold; color: var(--col-text); }
+.pexeso-card.hidden { background: var(--col-card-alt); color: var(--col-text-muted); font-size: 26px; }
+.pexeso-card.flipped { background: var(--col-card); border-color: var(--col-active-tab); color: var(--col-text); }
+.pexeso-card.matched { background: var(--col-success-bg); border-color: var(--col-green); color: var(--col-green); cursor: default; }
+
+.filter-bar { display: flex; justify-content: space-between; align-items: center; padding: 6px 12px; background: var(--col-card-alt); border-radius: 8px; margin-bottom: 8px; font-size: 13px; }
+.toggle-btn { background: var(--col-card); color: var(--col-text); border: 1px solid var(--col-card-border); padding: 4px 10px; border-radius: 6px; cursor: pointer; }
+.toggle-btn.on { background: var(--col-active-tab); color: var(--col-on-active); border-color: var(--col-text); font-weight: bold; }
 .streak-badge { color: var(--col-orange); font-weight: bold; font-size: 13px; margin-left: 4px; }
 
-/* ARKÁDA S AKČNÍM PADEM */
+/* =========================================================
+   4. PADAJÍCÍ SLOVA (ARKÁDA)
+   ========================================================= */
 .arcade-arena { flex: 1; position: relative; background: radial-gradient(circle at 50% 30%, #11223d 0%, #080f1e 100%); border: 2px solid var(--col-card-border); border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; min-height: 380px; }
-.arcade-top-bar { height: 40px; display: flex; align-items: center; justify-content: space-between; padding: 0 14px; background: rgba(11, 21, 40, 0.7); border-bottom: 1px solid var(--col-card-border); font-size: 14px; font-weight: bold; z-index: 10; }
+.arcade-top-bar { height: 40px; display: flex; align-items: center; justify-content: space-between; padding: 0 14px; background: rgba(11, 21, 40, 0.85); color: #ffffff; border-bottom: 1px solid var(--col-card-border); font-size: 14px; font-weight: bold; z-index: 10; }
 .arcade-playfield { flex: 1; position: relative; overflow: hidden; }
 .arcade-danger-line { position: absolute; bottom: 0; left: 0; right: 0; height: 6px; background: repeating-linear-gradient(45deg, #ef4444, #ef4444 10px, #7f1d1d 10px, #7f1d1d 20px); opacity: 0.8; }
-.falling-item { position: absolute; transform: translateX(-50%); background: #192a47; border: 2px solid var(--col-active-tab); box-shadow: 0 6px 16px rgba(0, 188, 212, 0.35); border-radius: 10px; padding: 8px 18px; text-align: center; white-space: nowrap; pointer-events: none; transition: transform 0.15s, background-color 0.15s; }
-.falling-item.hit { background-color: var(--col-green) !important; border-color: #fff !important; transform: translateX(-50%) scale(1.15) !important; }
-.falling-item.miss { background-color: var(--col-red) !important; border-color: #fff !important; transform: translateX(-50%) scale(1.05) !important; }
-.falling-main-word { font-size: 26px; font-weight: bold; color: #fff; }
+.falling-item { position: absolute; transform: translateX(-50%); background: var(--col-card); border: 2px solid var(--col-active-tab); box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4); border-radius: 10px; padding: 8px 18px; text-align: center; white-space: nowrap; pointer-events: none; transition: transform 0.15s, background-color 0.15s; }
+.falling-main-word { font-size: 26px; font-weight: bold; color: var(--col-text); }
 .falling-sub-word { font-size: 13px; color: var(--col-yellow); margin-top: 2px; }
-.arcade-bottom-bar { padding: 10px; background: rgba(11, 21, 40, 0.9); border-top: 1px solid var(--col-card-border); display: flex; gap: 10px; z-index: 10; }
-.arcade-btn { flex: 1; height: 62px; background: var(--col-card); border: 2px solid var(--col-active-tab); border-radius: 10px; color: #fff; font-size: 24px; font-weight: bold; display: flex; align-items: center; justify-content: center; cursor: pointer; }
-.arcade-btn:active { transform: scale(0.94); background: var(--col-active-tab); }
+.falling-item.hit { background-color: var(--col-green) !important; border-color: #ffffff !important; transform: translateX(-50%) scale(1.15) !important; }
+.falling-item.hit .falling-main-word, .falling-item.hit .falling-sub-word { color: var(--col-on-green) !important; }
+.falling-item.miss { background-color: var(--col-red) !important; border-color: #ffffff !important; transform: translateX(-50%) scale(1.05) !important; }
+.falling-item.miss .falling-main-word, .falling-item.miss .falling-sub-word { color: #ffffff !important; }
+.arcade-bottom-bar { padding: 10px; background: var(--col-bg); border-top: 1px solid var(--col-card-border); display: flex; gap: 10px; z-index: 10; }
+.arcade-btn { flex: 1; height: 62px; background: var(--col-card); border: 2px solid var(--col-active-tab); border-radius: 10px; color: var(--col-text); font-size: 24px; font-weight: bold; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+.arcade-btn:active { transform: scale(0.94); background: var(--col-active-tab); color: var(--col-on-active); }
 
-/* --- HRA HAD: RESPONZIVNÍ A BEZ PŘETÉKÁNÍ --- */
-.snake-container { 
-  display: flex; 
-  flex-direction: column; 
-  align-items: center; 
-  width: 100%; 
-  max-width: 380px; /* LIMIT: Had nebude nikdy širší/vyšší než 380px */
-  margin: 0 auto; 
-  user-select: none; 
-  touch-action: none !important;
-}
-
+/* =========================================================
+   5. HRA HAD (SNAKE)
+   ========================================================= */
+.snake-container { display: flex; flex-direction: column; align-items: center; width: 100%; max-width: 380px; margin: 0 auto; user-select: none; touch-action: none !important; }
 .snake-header-box { width: 100%; background: var(--col-card); border: 1px solid var(--col-card-border); border-radius: 8px; padding: 4px 8px; margin-bottom: 4px; text-align: center; }
 .snake-status-bar { min-height: 18px; height: 18px; line-height: 18px; font-weight: bold; font-size: 12px; margin-top: 2px; overflow: hidden; }
-
 .snake-stats { display: flex; justify-content: space-between; align-items: center; font-weight: bold; font-size: 13px; margin-bottom: 2px; }
 .snake-shield-btn { background: #1e1b4b; border: 1px solid #818cf8; color: #c7d2fe; padding: 3px 6px; border-radius: 6px; font-size: 11px; font-weight: bold; cursor: pointer; }
 .snake-shield-btn.active { background: #065f46; border-color: #34d399; color: #a7f3d0; animation: pulseSlot 1s infinite alternate; }
-
 .snake-prompt-cz { font-size: 17px; font-weight: bold; color: var(--col-yellow); margin-bottom: 2px; }
 .snake-slots-row { display: flex; justify-content: center; gap: 4px; flex-wrap: wrap; }
-.snake-slot { min-width: 26px; height: 28px; padding: 0 4px; background: #111a2a; border: 2px solid var(--col-card-border); border-radius: 5px; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: bold; color: var(--col-text-muted); }
+.snake-slot { min-width: 26px; height: 28px; padding: 0 4px; background: var(--col-card-alt); border: 2px solid var(--col-card-border); border-radius: 5px; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: bold; color: var(--col-text-muted); }
 .snake-slot.active { border-color: var(--col-yellow); color: var(--col-yellow); box-shadow: 0 0 8px rgba(250, 204, 21, 0.4); animation: pulseSlot 1s infinite alternate; }
-.snake-slot.done { background: #143c28; border-color: var(--col-green); color: var(--col-green); }
+.snake-slot.done { background: var(--col-success-bg); border-color: var(--col-green); color: var(--col-green); }
 @keyframes pulseSlot { from { transform: scale(1); } to { transform: scale(1.08); } }
 
-.snake-canvas-wrap { 
-  position: relative; 
-  width: 100%; 
-  max-width: 340px; /* Zajišťuje, že se plátno i s lištami vždy vejde na PC obrazovku */
-  aspect-ratio: 1/1; 
-  margin: 0 auto 4px auto; 
-  border: 2px solid var(--col-card-border); 
-  border-radius: 10px; 
-  overflow: hidden; 
-  background: #08101e; 
-  touch-action: none !important;
-}
+.snake-canvas-wrap { position: relative; width: 100%; max-width: 340px; aspect-ratio: 1/1; margin: 0 auto 4px auto; border: 2px solid var(--col-card-border); border-radius: 10px; overflow: hidden; background: #08101e; touch-action: none !important; }
 #snake-canvas { width: 100% !important; height: 100% !important; display: block; touch-action: none !important; }
-
 .snake-overlay { position: absolute; inset: 0; background: rgba(8, 16, 30, 0.88); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 15px; text-align: center; z-index: 50; backdrop-filter: blur(2px); }
 
-/* Skryje dotyková tlačítka na velkých PC monitorech, protože tam jsou šipky na klávesnici */
 @media (min-width: 700px) and (min-height: 700px) {
   .snake-dpad { display: none !important; }
 }
-/* --- OVLÁDACÍ KŘÍŽ (D-PAD) PRO HADA NA MOBILU --- */
-.snake-dpad {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  margin-top: 6px;
-  width: 100%;
-}
-.dpad-row {
-  display: flex;
-  justify-content: center;
-  gap: 14px;
-}
-.dpad-btn {
-  width: 68px;
-  height: 54px;
-  background: var(--col-card);
-  border: 2px solid var(--col-active-tab);
-  border-radius: 12px;
-  color: #fff;
-  font-size: 26px;
-  font-weight: bold;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
-  user-select: none;
-  touch-action: manipulation;
-}
-.dpad-btn:active {
-  background: var(--col-active-tab);
-  transform: scale(0.92);
-}
-body[data-theme="arctic"] .dpad-btn {
-  color: #0284c7;
-  background: #fff;
-}
-/* --- BAREVNÉ SKINY APLIKACE --- */
-
-/* 1. HACKER MATRIX (Opravený černo-zelený režim) */
-body[data-theme="matrix"] {
-  --col-bg: #000000;
-  --col-card: #001100;
-  --col-card-border: #00ff00;
-  --col-active-tab: #00cc00;
-  --col-green: #00ff00;
-  --col-red: #ff0000;
-  --col-yellow: #00ff00;
-  --col-orange: #00ff00;
-  --col-text-muted: #00aa00;
-  background-color: #000000;
-  color: #00ff00;
-  font-family: 'Courier New', Courier, monospace;
-}
-body[data-theme="matrix"] .prompt-box, 
-body[data-theme="matrix"] .tile h2,
-body[data-theme="matrix"] .opt-btn {
-  color: #00ff00 !important;
-}
-body[data-theme="matrix"] .tile p {
-  color: #00aa00 !important;
-}
-body[data-theme="matrix"] .action-btn {
-  color: #000 !important;
-  background: #00ff00 !important;
-  border-color: #00ff00 !important;
-}
-body[data-theme="matrix"] .action-btn.red {
-  background: #ff0000 !important;
-  color: #fff !important;
-  border-color: #ff0000 !important;
-}
-body[data-theme="matrix"] .bargraph-fill {
-  background: #00ff00 !important;
-}
-body[data-theme="matrix"] .letter-slot.filled,
-body[data-theme="matrix"] .pexeso-card.flipped {
-  background: #004400 !important;
-  color: #00ff00 !important;
-}
-/* Oprava čitelnosti správné a špatné odpovědi v Matrix skinu */
-body[data-theme="matrix"] .opt-btn.correct { color: #000000 !important; font-weight: bold; }
-body[data-theme="matrix"] .opt-btn.wrong { color: #ffffff !important; }
-
-/* 2. ZLATÝ ŠAMPION (Luxusní černo-zlatá) */
-body[data-theme="gold"] {
-  --col-bg: #0d0b04;
-  --col-card: #211905;
-  --col-card-border: #a16207;
-  --col-active-tab: #facc15;
-  --col-text-muted: #fde047;
-  background-color: #060501;
-}
-
-/* 3. KYBERPUNK NEON (Tmavě fialová + Růžová) */
-body[data-theme="cyberpunk"] {
-  --col-bg: #10041e;
-  --col-card: #21093b;
-  --col-card-border: #7e22ce;
-  --col-active-tab: #f43f5e;
-  --col-text-muted: #e9d5ff;
-  background-color: #08020f;
-}
-
-/* --- LEDOVÁ POLÁRNÍ ZÁŘE (Světlý styl) --- */
-body[data-theme="arctic"] {
-  --col-bg: #e0f2fe;
-  --col-card: #f0f9ff;
-  --col-card-border: #7dd3fc;
-  --col-active-tab: #0284c7;
-  --col-text-muted: #0369a1;
-  --col-yellow: #d97706; /* oranžová pro lepší kontrast na světlém pozadí */
-  --col-green: #16a34a;
-  background-color: #bae6fd;
-  color: #0c4a6e;
-}
-body[data-theme="arctic"] .prompt-box, 
-body[data-theme="arctic"] .tile h2 { color: #0369a1; font-weight: bold; }
-body[data-theme="arctic"] .tile p { color: #075985; }
-body[data-theme="arctic"] .action-btn { color: #fff; }
-body[data-theme="arctic"] .letter-tile { color: #0284c7; background: #fff; border-color: #38bdf8; }
-body[data-theme="arctic"] .letter-tile.used { background: #bae6fd; border-color: #7dd3fc; color: #0ea5e9; }
-body[data-theme="arctic"] .pexeso-card.hidden { background: #bae6fd; color: #0284c7; border-color: #7dd3fc; }
-body[data-theme="arctic"] .pexeso-card { color: #0c4a6e; background: #fff; border-color: #0284c7; }
-body[data-theme="arctic"] .pexeso-card.matched { background: #dcfce7; border-color: #22c55e; color: #16a34a; }
-body[data-theme="arctic"] header { border-bottom: 2px solid #7dd3fc; background: #f0f9ff; }
-body[data-theme="arctic"] footer { border-top: 1px solid #7dd3fc; color: #0284c7; background: #f0f9ff; }
-body[data-theme="arctic"] .study-timer-box { background: #e0f2fe; color: #0284c7; border-color: #7dd3fc; }
-body[data-theme="arctic"] .study-timer-box.bonus { background: #fef3c7; border-color: #f59e0b; color: #d97706; }
-body[data-theme="arctic"] .nav-btn { color: #fff; border-color: #0284c7; }
-body[data-theme="arctic"] .badge { background: #e0f2fe; color: #0369a1; border-color: #7dd3fc; }
-body[data-theme="arctic"] .badge.active { background: #0284c7; color: #fff; }
-body[data-theme="arctic"] .tts-toggle-btn { background: #e0f2fe; color: #0369a1; border-color: #7dd3fc; }
-body[data-theme="arctic"] .tts-toggle-btn.active { background: #22c55e; color: #fff; border-color: #16a34a; }
-body[data-theme="arctic"] .opt-btn { color: #0c4a6e; }
-body[data-theme="arctic"] .opt-btn.correct { color: #fff; }
-
-/* --- PŘÍBĚHY (DUOLINGO STORIES) --- */
-.story-chat-container {
-  flex: 1;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 6px 4px 14px 4px;
-}
-.story-bubble {
-  background: var(--col-card);
-  border: 1px solid var(--col-card-border);
-  border-left: 4px solid var(--col-active-tab);
-  border-radius: 10px;
-  padding: 10px 12px;
-  cursor: pointer;
-  animation: fadeInBubble 0.25s ease-out;
-}
-.story-bubble.active-quiz {
-  border-color: var(--col-yellow);
-  border-left: 4px solid var(--col-yellow);
-}
-.story-speaker {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 13px;
-  font-weight: bold;
-  color: var(--col-active-tab);
-  margin-bottom: 4px;
-}
-.story-audio-icon {
-  font-size: 16px;
-  padding: 2px 6px;
-}
-.story-text {
-  font-size: 18px;
-  line-height: 1.35;
-}
-.story-translation {
-  margin-top: 6px;
-  padding-top: 6px;
-  border-top: 1px dashed var(--col-card-border);
-  font-size: 14px;
-  color: var(--col-yellow);
-}
-.story-quiz-box {
-  background: rgba(250, 204, 21, 0.1);
-  border: 2px solid var(--col-yellow);
-  border-radius: 10px;
-  padding: 12px;
-  text-align: center;
-}
-.story-controls {
-  padding-top: 8px;
-  border-top: 1px solid var(--col-card-border);
-}
-@keyframes fadeInBubble {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-/* OPRAVA ČITELNOSTI: PADAJÍCÍ SLOVA A HAD VE SVĚTLÉM SKINU (ARCTIC) */
-body[data-theme="arctic"] .arcade-btn {
-  background: #ffffff;
-  color: #0c4a6e;
-  border-color: #0284c7;
-}
-body[data-theme="arctic"] .arcade-btn:active {
-  background: #0284c7;
-  color: #ffffff;
-}
-body[data-theme="arctic"] .falling-item {
-  background: #ffffff;
-  border-color: #0284c7;
-  box-shadow: 0 6px 16px rgba(2, 132, 199, 0.25);
-}
-body[data-theme="arctic"] .falling-main-word {
-  color: #0c4a6e;
-}
-body[data-theme="arctic"] .falling-sub-word {
-  color: #d97706;
-}
-body[data-theme="arctic"] .falling-item.hit .falling-main-word,
-body[data-theme="arctic"] .falling-item.hit .falling-sub-word,
-body[data-theme="arctic"] .falling-item.miss .falling-main-word,
-body[data-theme="arctic"] .falling-item.miss .falling-sub-word {
-  color: #ffffff !important;
-}
-
-/* OPRAVA ČITELNOSTI: MATRIX SKIN (ČERNÉ PÍSMO NA ZELENÉM POZADÍ) */
-body[data-theme="matrix"] .arcade-btn {
-  color: #00ff00;
-  background: #001100;
-  border-color: #00ff00;
-}
-body[data-theme="matrix"] .arcade-btn:active,
-body[data-theme="matrix"] .falling-item.hit,
-body[data-theme="matrix"] .falling-item.hit .falling-main-word,
-body[data-theme="matrix"] .falling-item.hit .falling-sub-word,
-body[data-theme="matrix"] . badge.active,
-body[data-theme="matrix"] .toggle-btn.on,
-body[data-theme="matrix"] .tts-toggle-btn.active {
-  background-color: #00ff00 !important;
-  color: #000000 !important;
-  font-weight: bold;
-}
-body[data-theme="matrix"] .falling-item.miss,
-body[data-theme="matrix"] .falling-item.miss .falling-main-word,
-body[data-theme="matrix"] .falling-item.miss .falling-sub-word {
-  background-color: #ff0000 !important;
-  color: #ffffff !important;
-}
+.snake-dpad { display: flex; flex-direction: column; align-items: center; gap: 6px; margin-top: 6px; width: 100%; }
+.dpad-row { display: flex; justify-content: center; gap: 14px; }
+.dpad-btn { width: 68px; height: 54px; background: var(--col-card); border: 2px solid var(--col-active-tab); border-radius: 12px; color: var(--col-text); font-size: 26px; font-weight: bold; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3); user-select: none; touch-action: manipulation; }
+.dpad-btn:active { background: var(--col-active-tab); color: var(--col-on-active); transform: scale(0.92); }
