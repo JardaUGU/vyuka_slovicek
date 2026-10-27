@@ -688,6 +688,7 @@ function renderActiveGame() {
   }
 
   // PŘÍBĚHY (INTERAKTIVNÍ ČTENÍ S HISTORIÍ)
+  // PŘÍBĚHY (INTERAKTIVNÍ ČTENÍ S HISTORIÍ BEZ BUBLIN A PEVNÝM TLAČÍTKEM DOLE)
   else if (selectedGame === "STORY") {
     if (typeof storyStep === 'undefined' || typeof storyList === 'undefined') return;
     
@@ -713,6 +714,7 @@ function renderActiveGame() {
     const hasOpts = item.options && item.options.length > 0;
     const isCzechQuestion = hasOpts && !item.question.includes('___');
 
+    // Historie předchozích vět: čistý dialog pod sebou, bez bublin a bez českého překladu
     let historyHtml = "";
     for (let i = 0; i < storyStep; i++) {
       const hItem = storyList[i];
@@ -725,13 +727,11 @@ function renderActiveGame() {
         : hItem.question;
       hText = typeof formatPromptText === 'function' ? formatPromptText(hText) : hText;
       const hSpeech = (hItem.question.includes('___') ? hItem.question.replace(/___+/g, hItem.answer) : hItem.question).replace(/[*_]/g, '').replace(/'/g, "\\'");
-      const hTrans = !hHasOpts ? hItem.answer : (hItem.help || "");
 
       historyHtml += `
-        <div class="prompt-box" style="font-size:17px;color:inherit;margin:0 0 8px 0;padding:10px 38px 10px 12px;text-align:left;opacity:0.82;border-left:4px solid var(--col-active-tab);">
-          <div>${hText}</div>
-          ${hTrans ? `<div style="font-size:13px;color:var(--col-text-muted);margin-top:4px;">🇨🇿 ${hTrans}</div>` : ''}
-          <span class="audio-btn" style="top:8px;right:8px;font-size:16px;" onclick="if(typeof speakWord==='function') speakWord('${hSpeech}', '${selectedSubject}')">🔊</span>
+        <div style="padding:5px 0; font-size:17px; line-height:1.4; color:var(--col-text); opacity:0.78; border-bottom:1px dashed rgba(148,163,184,0.18); display:flex; justify-content:space-between; align-items: baseline; gap:8px;">
+          <span>${hText}</span>
+          <span style="cursor:pointer; font-size:15px; opacity:0.7; flex-shrink:0;" onclick="if(typeof speakWord==='function') speakWord('${hSpeech}', '${selectedSubject}')">🔊</span>
         </div>
       `;
     }
@@ -747,52 +747,59 @@ function renderActiveGame() {
       : item.question.replace(/[*_]/g, '').replace(/'/g, "\\'");
 
     main.innerHTML = `
-      <div class="bargraph-container" style="flex-shrink:0;">
-        <div class="bargraph-header">
-          <span>📖 ${selectedGroupKey} (${storyStep + 1} / ${storyList.length})</span>
-          <span style="color:var(--col-active-tab);">${pct} %</span>
-        </div>
-        <div class="bargraph-track"><div class="bargraph-fill" style="width:${pct}%;"></div></div>
-      </div>
-
-      <div id="story-scroll-wrap" style="flex:1;overflow-y:auto;padding-right:2px;">
-        ${historyHtml}
-
-        <div id="story-current-box" class="prompt-box" style="font-size:21px;color:inherit;margin:8px 0 12px 0;line-height:1.45;padding:16px 38px 16px 14px;text-align:left;border:2px solid var(--col-yellow);">
-          ${promptDisplay}
-          ${!isCzechQuestion ? `<span class="audio-btn" onclick="if(typeof speakWord==='function') speakWord('${sentenceToRead}', '${selectedSubject}')">🔊</span>` : ''}
-        </div>
-
-        ${!hasOpts ? `
-          ${item.answer ? `
-            <div class="prompt-box" style="font-size:16px;padding:10px;color:var(--col-text-muted);cursor:pointer;" onclick="if(typeof storyShowTrans!=='undefined') storyShowTrans=!storyShowTrans; renderActiveGame();">
-              ${(typeof storyShowTrans!=='undefined'&&storyShowTrans) ? '🇨🇿 ' + (typeof cleanCzechTranslation==='function'?cleanCzechTranslation(item.answer):item.answer) : '🇨🇿 Klikni pro zobrazení překladu'}
-            </div>
-          ` : ''}
-          <div class="action-btn green" style="margin-top:10px;" onclick="if(typeof nextStoryStep==='function') nextStoryStep()">POKRAČOVAT ➔</div>
-        ` : `
-          <div class="grid-2">
-            ${item.options.map((opt, idx) => {
-              let btnCls = "";
-              if (typeof storyAnswered!=='undefined'&&storyAnswered) {
-                if (opt === item.answer) btnCls = "correct";
-                else if (opt === (typeof storyChosenOpt!=='undefined'?storyChosenOpt:null)) btnCls = "wrong";
-              }
-              return `<div class="opt-btn ${btnCls}" onclick="if(typeof clickStoryOpt==='function') clickStoryOpt(${idx})">${opt}</div>`;
-            }).join('')}
+      <div style="display:flex; flex-direction:column; height:100%; overflow:hidden;">
+        <div class="bargraph-container" style="flex-shrink:0; margin-bottom:6px;">
+          <div class="bargraph-header">
+            <span>📖 ${selectedGroupKey} (${storyStep + 1} / ${storyList.length})</span>
+            <span style="color:var(--col-active-tab);">${pct} %</span>
           </div>
-          ${(typeof storyAnswered!=='undefined'&&storyAnswered) ? `
-            ${item.help ? `<div style="text-align:center;color:var(--col-yellow);margin:10px 0;font-size:16px;font-weight:bold;">🇨🇿 ${item.help}</div>` : ''}
-            <div class="action-btn green" style="margin-top:12px;" onclick="if(typeof nextStoryStep==='function') nextStoryStep()">POKRAČOVAT ➔</div>
-          ` : ''}
-        `}
+          <div class="bargraph-track"><div class="bargraph-fill" style="width:${pct}%;"></div></div>
+        </div>
+
+        <!-- SCROLLOVACÍ ČÁST S DIALOGEM A AKTUÁLNÍ VĚTOU -->
+        <div id="story-scroll-wrap" style="flex:1; overflow-y:auto; background:var(--col-card); border:1px solid var(--col-card-border); border-radius:10px; padding:10px 14px; margin-bottom:8px;">
+          ${historyHtml}
+
+          <div id="story-current-line" style="padding:10px 0 4px 0; font-size:21px; font-weight:bold; line-height:1.45; color:var(--col-yellow); display:flex; justify-content:space-between; align-items:baseline; gap:10px;">
+            <span>${promptDisplay}</span>
+            ${!isCzechQuestion ? `<span style="cursor:pointer; font-size:20px; flex-shrink:0;" onclick="if(typeof speakWord==='function') speakWord('${sentenceToRead}', '${selectedSubject}')">🔊</span>` : ''}
+          </div>
+        </div>
+
+        <!-- PEVNÝ SPODNÍ PANEL S PŘEKLADEM / MOŽNOSTMI A TLAČÍTKEM POKRAČOVAT -->
+        <div style="flex-shrink:0;">
+          ${!hasOpts ? `
+            ${item.answer ? `
+              <div class="prompt-box" style="font-size:16px; margin-bottom:8px; padding:10px; color:var(--col-text-muted); cursor:pointer;" onclick="if(typeof storyShowTrans!=='undefined') storyShowTrans=!storyShowTrans; renderActiveGame();">
+                ${(typeof storyShowTrans!=='undefined'&&storyShowTrans) ? '🇨🇿 ' + (typeof cleanCzechTranslation==='function'?cleanCzechTranslation(item.answer):item.answer) : '🇨🇿 Klikni pro zobrazení překladu'}
+              </div>
+            ` : ''}
+            <div class="action-btn green" style="margin-top:0;" onclick="if(typeof nextStoryStep==='function') nextStoryStep()">POKRAČOVAT ➔</div>
+          ` : `
+            <div class="grid-2" style="margin-bottom:6px;">
+              ${item.options.map((opt, idx) => {
+                let btnCls = "";
+                if (typeof storyAnswered!=='undefined'&&storyAnswered) {
+                  if (opt === item.answer) btnCls = "correct";
+                  else if (opt === (typeof storyChosenOpt!=='undefined'?storyChosenOpt:null)) btnCls = "wrong";
+                }
+                return `<div class="opt-btn ${btnCls}" style="padding:10px 6px; font-size:16px;" onclick="if(typeof clickStoryOpt==='function') clickStoryOpt(${idx})">${opt}</div>`;
+              }).join('')}
+            </div>
+            ${(typeof storyAnswered!=='undefined'&&storyAnswered) ? `
+              ${item.help ? `<div style="text-align:center;color:var(--col-yellow);margin:4px 0 6px 0;font-size:15px;font-weight:bold;">🇨🇿 ${item.help}</div>` : ''}
+              <div class="action-btn green" style="margin-top:0;" onclick="if(typeof nextStoryStep==='function') nextStoryStep()">POKRAČOVAT ➔</div>
+            ` : ''}
+          `}
+        </div>
       </div>
     `;
 
+    // Automatické odrolování dialogu na nejnovější větu
     setTimeout(() => {
-      const curBox = document.getElementById("story-current-box");
-      if (curBox) curBox.scrollIntoView({ behavior: "smooth", block: "end" });
-    }, 40);
+      const wrap = document.getElementById("story-scroll-wrap");
+      if (wrap) wrap.scrollTop = wrap.scrollHeight;
+    }, 20);
   }
 
   // --- MATEMATIKA ---
