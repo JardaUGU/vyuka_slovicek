@@ -478,6 +478,7 @@ function handleShieldExpired() {
 }
 
 function handleSnakeWordComplete() {
+   if (typeof saveSnakeRecord === "function") saveSnakeRecord(snakeBody.length);
   if (typeof sndFanfare === "function") sndFanfare();
   snakeScore++;
   if (typeof addReward === "function") addReward(1, "Had");
@@ -495,6 +496,7 @@ function handleSnakeWordComplete() {
 }
 
 function handleSnakeDeath(reason) {
+  if (typeof saveSnakeRecord === "function") saveSnakeRecord(snakeBody.length);
   if (typeof sndErr === "function") sndErr();
   snakeLives--;
   
