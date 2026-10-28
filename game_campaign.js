@@ -10,7 +10,103 @@ let cmpChosenOpt = null;
 let isCampaignMinigame = false;
 let campaignMinigameCoins = 0;
 let campaignMinigamePool = [];
+// ==========================================
+// CHYTRÝ TRÉNINK PRO BĚŽNÉ LEKCE (MIX)
+// ==========================================
+function startSmartMix() {
+  if (typeof stopArcadeLoop === "function") stopArcadeLoop();
+  if (typeof stopSnakeLoop === "function") stopSnakeLoop();
 
+  const allItems = activeItems.filter(it => 
+    (typeof viewMode !== 'undefined' && viewMode === "LESSONS" ? it.lesson : it.topic) === selectedGroupKey
+  );
+  
+  if (allItems.length === 0) return;
+
+  // 1. Zjistit mastery pro všechny položky (Kvízy i Slova)
+  let pool = [];
+  let unmastered = allItems.filter(it => {
+    let m = 2;
+    if (it.type === "SLOVO") {
+      m = Math.min(getSavedMastery(it.question, 'DIR_IN'), getSavedMastery(it.question, 'DIR_OUT'));
+    } else if (it.type === "KVIZ") {
+      m = getSavedMastery(it.question, 'DIR_OUT');
+    }
+    return m < 2;
+  });
+
+  // 2. Výběr 15 položek (buď těch, co neumí, nebo 15 náhodných s resetem na 0)
+  if (unmastered.length > 0) {
+    pool = unmastered.sort(() => Math.random() - 0.5).slice(0, 15);
+  } else {
+    pool = [...allItems].sort(() => Math.random() - 0.5).slice(0, 15);
+    pool.forEach(it => {
+      saveWordMasteryToGoogle(it.question, 0, 'DIR_OUT');
+      if (it.type === "SLOVO") saveWordMasteryToGoogle(it.question, 0, 'DIR_IN');
+    });
+  }
+
+  // 3. Vytvořit namixovanou frontu (Kvízy, Skládání, Výběr z možností)
+  let q = [];
+  pool.forEach(it => {
+    if (it.type === "KVIZ") {
+      q.push({ type: 'KVIZ', data: it });
+    } else if (it.type === "SLOVO") {
+      const isMultiWord = it.question.trim().includes(' ') || it.question.trim().includes('-');
+      q.push({ type: 'SCRAMBLE', data: it });
+      if (isMultiWord) {
+         if (Math.random() > 0.5) q.push({ type: 'QUIZ_IN', data: it });
+      } else {
+         q.push({ type: 'QUIZ_IN', data: it });
+         q.push({ type: 'QUIZ_OUT', data: it });
+      }
+    }
+  });
+
+  q.sort(() => Math.random() - 0.5);
+  if (q.length > 30) q = q.slice(0, 30); // Max 30 úkolů na jeden průchod
+
+  // 4. Doplnit možnosti a grafémy
+  const vItemsOnly = allItems.filter(i => i.type === "SLOVO");
+  q.forEach(task => {
+    if (task.type === 'QUIZ_OUT' || task.type === 'QUIZ_IN') {
+       const isOut = task.type === 'QUIZ_OUT';
+       const correctAns = isOut ? task.data.question : cleanCzechTranslation(task.data.answer);
+       
+       let shortItems = vItemsOnly.filter(i => {
+         const qWords = i.question.replace(/\s*\([^)]*\)/g, '').trim().split(/\s+/).length;
+         const aWords = cleanCzechTranslation(i.answer).replace(/\s*\([^)]*\)/g, '').trim().split(/\s+/).length;
+         const isSentence = /[.?!]$/.test(i.question.trim());
+         return qWords <= 2 && aWords <= 3 && !isSentence;
+       });
+       if (shortItems.length < 4) shortItems = vItemsOnly;
+
+       let falsePool = [...new Set(shortItems.map(i => isOut ? i.question : cleanCzechTranslation(i.answer)))].filter(ans => ans !== correctAns);
+       if (falsePool.length > 0) { while (falsePool.length < 3) falsePool.push(falsePool[Math.floor(Math.random() * falsePool.length)]); } 
+       else falsePool = ["...", "...", "..."];
+       
+       falsePool.sort(() => Math.random() - 0.5);
+       task.opts = [correctAns, ...falsePool.slice(0, 3)].sort(() => Math.random() - 0.5);
+       task.correctAns = correctAns;
+       task.prompt = isOut ? cleanCzechTranslation(task.data.answer) : task.data.question;
+
+    } else if (task.type === 'SCRAMBLE') {
+       const raw = task.data.question.replace(/\s*\([^)]*\)/g, '').trim();
+       const isWordMode = (raw.split(/\s+/).length >= 3 || raw.length > 15);
+       const tokens = isWordMode ? (raw.includes('-') ? raw.split('-').map(s=>s.trim()) : raw.split(/\s+/)) : getGraphemes(raw);
+       task.tokens = tokens;
+       task.tiles = tokens.map((t, i) => ({ text: t, used: false, id: i })).sort(() => Math.random() - 0.5);
+       task.placed = []; task.isWordMode = isWordMode; task.hadMistake = false;
+    } else if (task.type === 'KVIZ') {
+       task.opts = task.data.options; task.correctAns = task.data.answer; task.prompt = formatPromptText(task.data.question);
+    }
+  });
+
+  cmpQueue = q; cmpIdx = 0; cmpHearts = 5; cmpState = 'PLAYING'; cmpChosenOpt = null; isCampaignMinigame = false;
+  selectedGame = 'CAMPAIGN'; 
+  setScreen('PLAYING');
+  if (typeof isAutoTTS !== "undefined" && isAutoTTS && cmpQueue[0] && cmpQueue[0].type === 'QUIZ_IN') speakWord(cmpQueue[0].prompt, selectedSubject);
+}
 function startCampaign() {
   let q = [];
   let allVItems = getVocabItems();
@@ -102,14 +198,15 @@ function startCampaign() {
   if (isAutoTTS && cmpQueue[0] && cmpQueue[0].type === 'QUIZ_IN') speakWord(cmpQueue[0].prompt, selectedSubject);
 }
 
+// Nahrazení funkce clickCmpQuizOpt (aby uměla ukládat mastery i pro Kvízy!)
 function clickCmpQuizOpt(opt) {
   if (cmpState !== 'PLAYING') return;
   const task = cmpQueue[cmpIdx]; cmpChosenOpt = opt; cmpState = 'EVAL';
 
   if (opt === task.correctAns) {
     sndOk();
-    if (task.type === 'QUIZ_OUT' || task.type === 'QUIZ_IN') {
-      const dir = task.type === 'QUIZ_OUT' ? 'DIR_OUT' : 'DIR_IN';
+    if (task.type === 'QUIZ_OUT' || task.type === 'QUIZ_IN' || task.type === 'KVIZ') {
+      const dir = task.type === 'QUIZ_OUT' ? 'DIR_OUT' : (task.type === 'KVIZ' ? 'DIR_OUT' : 'DIR_IN');
       const mVal = getSavedMastery(task.data.question, dir);
       if (mVal < 2) saveWordMasteryToGoogle(task.data.question, mVal + 1, dir);
     }
@@ -118,16 +215,19 @@ function clickCmpQuizOpt(opt) {
     let newTask = JSON.parse(JSON.stringify(task));
     if (newTask.opts) newTask.opts.sort(() => Math.random() - 0.5);
     cmpQueue.push(newTask);
-    if (task.type === 'QUIZ_OUT' || task.type === 'QUIZ_IN') saveWordMasteryToGoogle(task.data.question, 0, task.type === 'QUIZ_OUT' ? 'DIR_OUT' : 'DIR_IN');
+    
+    if (task.type === 'QUIZ_OUT' || task.type === 'QUIZ_IN' || task.type === 'KVIZ') {
+        const dir = task.type === 'QUIZ_OUT' ? 'DIR_OUT' : (task.type === 'KVIZ' ? 'DIR_OUT' : 'DIR_IN');
+        saveWordMasteryToGoogle(task.data.question, 0, dir);
+    }
   }
 
-  if (isAutoTTS && task.type !== 'QUIZ_IN') {
+  if (typeof isAutoTTS !== "undefined" && isAutoTTS && task.type !== 'QUIZ_IN') {
     let toRead = task.type === 'KVIZ' ? task.data.question.replace(/___+/g, task.data.answer) : task.data.question;
     speakWord(toRead.replace(/[*_]/g, ''), selectedSubject);
   }
   renderActiveGame();
 }
-
 function clickCmpScrambleTile(idx) {
   if (cmpState !== 'PLAYING') return;
   const task = cmpQueue[cmpIdx]; const tile = task.tiles[idx];

@@ -14,7 +14,17 @@ let seqTargetIdx = 0, seqHighestDeployed = 0, seqSlots = [], seqStartTime = 0, s
 
 function formatPromptText(text) {
   if (!text) return "";
-  return text.replace(/\*([^*]+)\*/g, '<b style="color:var(--col-yellow);text-decoration:underline;">$1</b>');
+  // 1. Podpora žlutého zvýraznění přes hvězdičky *text*
+  let t = text.replace(/\*([^*]+)\*/g, '<b style="color:var(--col-yellow);text-decoration:underline;">$1</b>');
+  
+  // 2. Podpora svislých zlomků: zápis [a/b] převede na krásný vertikální zlomek
+  t = t.replace(/\[([^/\]]+)\/([^/\]]+)\]/g, (match, n, d) => {
+     return `<span style="display:inline-flex; flex-direction:column; text-align:center; vertical-align:middle; line-height:1.1; font-size:0.75em; margin: 0 4px;">
+               <span style="border-bottom:2px solid currentColor; padding:0 3px;">${n.trim()}</span>
+               <span style="padding:0 3px;">${d.trim()}</span>
+             </span>`;
+  });
+  return t;
 }
 
 function vCardNext() {

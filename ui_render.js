@@ -90,13 +90,19 @@ function renderScreen() {
         </div>
 
         <div class="grid-2">
+          ${!subjs["Matematika"] ? `
+            <div class="tile" style="border-color:var(--col-active-tab);" onclick="if(typeof chooseSubject === 'function') chooseSubject('Matematika')">
+              <h2 style="color:var(--col-active-tab);">🔢 Matematika</h2><p>Výběr operací a dril</p>
+            </div>
+          ` : ''}
       `;
       Object.keys(subjs).forEach(s => {
         const sLow = s.toLowerCase();
         const isCesta = sLow.includes("cesta") || sLow.includes("postupn") || sLow.includes("inteligentn");
-        const stl = isCesta ? 'border-color:var(--col-green);' : '';
-        const ikn = isCesta ? '🚀 ' : '';
-        html += `<div class="tile" style="${stl}" onclick="if(typeof chooseSubject==='function') chooseSubject('${s.replace(/'/g, "\\'")}')"><h2>${ikn}${s}</h2><p>${subjs[s]} úloh</p></div>`;
+        const isMat = (s === "Matematika");
+        const stl = isCesta ? 'border-color:var(--col-green);' : (isMat ? 'border-color:var(--col-active-tab);' : '');
+        const ikn = isCesta ? '🚀 ' : (isMat ? '🔢 ' : '');
+        html += `<div class="tile" style="${stl}" onclick="if(typeof chooseSubject==='function') chooseSubject('${s.replace(/'/g, "\\'")}')"><h2>${ikn}${s}</h2><p>${isMat ? 'Dril + ' + subjs[s] + ' úloh' : subjs[s] + ' úloh'}</p></div>`;
       });
       html += `</div>`;
       main.innerHTML = html;
@@ -162,7 +168,6 @@ function renderScreen() {
       
       let html = "";
 
-      // Pokud jsme v Matematice, vykreslíme nejprve procedurální generátor
       if (selectedSubject === "Matematika") {
         let ops = [
           { id: "FRACTIONS_STEP", title: "Zlomky (Krokově)", desc: "Sčítání a odčítání formou řešení na papíře." },
@@ -173,11 +178,11 @@ function renderScreen() {
           { id: "MUL_SMALL", title: "Malá násobilka", desc: "Základy násobení" }
         ];
         html += `
-          <h2 style="font-size:18px;margin-bottom:12px;text-align:center;color:var(--col-yellow);">Nekonečný trénink:</h2>
-          <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:20px;">
+          <h2 style="font-size:18px;margin-bottom:10px;text-align:center;color:var(--col-yellow);">Nekonečný trénink:</h2>
+          <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:18px;">
             ${ops.map(o => `
-              <div class="tile" style="flex-direction:row;justify-content:space-between;padding:12px;text-align:left; ${o.id.startsWith('EQ_')||o.id==='EXPR_QUADRATIC'||o.id==='FRACTIONS_STEP' ? 'border-color:var(--col-green); background:rgba(34,197,94,0.1);' : ''}" onclick="if(typeof startMathPractice==='function') startMathPractice('${o.id}', '${o.title}')">
-                <div><h2 style="${o.id.startsWith('EQ_')||o.id==='EXPR_QUADRATIC'||o.id==='FRACTIONS_STEP' ? 'color:var(--col-green);' : 'color:var(--col-text);'}">${o.title}</h2><p style="color:var(--col-text-muted);">${o.desc}</p></div>
+              <div class="tile" style="flex-direction:row;justify-content:space-between;padding:12px;text-align:left; ${o.id.startsWith('EQ_')||o.id==='EXPR_QUADRATIC'||o.id==='FRACTIONS_STEP' ? 'border-color:var(--col-green);' : ''}" onclick="if(typeof startMathPractice==='function') startMathPractice('${o.id}', '${o.title}')">
+                <div><h2 style="${o.id.startsWith('EQ_')||o.id==='EXPR_QUADRATIC'||o.id==='FRACTIONS_STEP' ? 'color:var(--col-green);' : ''}">${o.title}</h2><p>${o.desc}</p></div>
                 <span style="color:var(--col-active-tab);font-weight:bold;font-size:20px;">➔</span>
               </div>
             `).join('')}
@@ -185,7 +190,6 @@ function renderScreen() {
         `;
       }
 
-      // Následně vykreslíme běžné lekce/témata z tabulky
       const groupsMap = {};
       if (activeItems && activeItems.length > 0) {
         activeItems.forEach(it => {
@@ -195,7 +199,7 @@ function renderScreen() {
         });
 
         html += `
-          <h2 style="font-size:18px;margin-bottom:12px;text-align:center;color:var(--col-yellow);">${selectedSubject === "Matematika" ? "Úlohy z tabulky:" : "Výběr úloh:"}</h2>
+          <h2 style="font-size:18px;margin-bottom:10px;text-align:center;color:var(--col-yellow);">${selectedSubject === "Matematika" ? "Úlohy a testy z tabulky:" : "Výběr lekce / tématu:"}</h2>
           <div class="filter-bar">
             <button class="toggle-btn ${typeof viewMode !== 'undefined' && viewMode==='LESSONS'?'on':''}" onclick="if(typeof viewMode !== 'undefined') { viewMode='LESSONS'; renderScreen(); }">Lekce</button>
             <button class="toggle-btn ${typeof viewMode !== 'undefined' && viewMode==='TOPICS'?'on':''}" onclick="if(typeof viewMode !== 'undefined') { viewMode='TOPICS'; renderScreen(); }">Témata</button>
@@ -213,7 +217,7 @@ function renderScreen() {
           </div>
         `;
       } else if (selectedSubject !== "Matematika") {
-         html += `<div style="text-align:center;padding:20px;color:var(--col-text-muted);">V tomto předmětu zatím nejsou žádné úlohy pro tvůj ročník.</div>`;
+        html += `<div style="text-align:center;padding:20px;color:var(--col-text-muted);">V tomto předmětu zatím nejsou žádné úlohy.</div>`;
       }
 
       main.innerHTML = html;
@@ -352,7 +356,17 @@ function renderScreen() {
       const qItems = typeof getQuizItems === 'function' ? getQuizItems() : [];
       const sItems = typeof getSeqItems === 'function' ? getSeqItems() : [];
       const quickMode = typeof getQuickChoiceMode === 'function' ? getQuickChoiceMode() : null;
-      let html = `<div class="grid-2">`;
+      let html = "";
+      
+      if (vItems.length > 0 || qItems.length > 0) {
+        html += `
+          <div class="action-btn" style="background:linear-gradient(135deg, #8b5cf6, #3b82f6); border-color:#c4b5fd; margin-bottom:15px; padding:16px; font-size:20px; box-shadow: 0 4px 15px rgba(139, 92, 246, 0.4);" onclick="if(typeof startSmartMix==='function') startSmartMix()">
+            🧠 SPUSTIT CHYTRÝ TRÉNINK
+          </div>
+        `;
+      }
+
+      html += `<div class="grid-2">`;
       
       if (vItems.length > 0) {
         html += `
@@ -429,7 +443,6 @@ function renderScreen() {
     document.getElementById("main-content").innerHTML = `<div style="text-align:center;padding:30px;color:red;">Kritická chyba zobrazení.<br><br>${err.message}</div>`;
   }
 }
-
 // -------------------------------------------------------------
 // VYKRESLOVÁNÍ AKTIVNÍCH HER A MÓDŮ
 // -------------------------------------------------------------
