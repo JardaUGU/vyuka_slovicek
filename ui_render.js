@@ -158,41 +158,68 @@ function renderScreen() {
       `;
     }
 
-    // 4. VÝBĚR MATEMATIKY
-    else if (currentScreen === "SELECT_MATH_OP") {
-      if(bSubj) { bSubj.style.display = "flex"; bSubj.innerText = "Matematika"; }
-      if(bGroup) bGroup.style.display = "none";
-      if (typeof renderMathOpSelection === "function") renderMathOpSelection();
-    }
-
-    // 5. VÝBĚR SKUPINY (LEKCE / TÉMATA)
-    else if (currentScreen === "SELECT_GROUP") {
+    // 4 + 5. VÝBĚR SKUPINY (LEKCE / TÉMATA) A MATEMATIKY
+    else if (currentScreen === "SELECT_GROUP" || currentScreen === "SELECT_MATH_OP") {
       if(bSubj) { bSubj.style.display = "flex"; bSubj.innerText = selectedSubject; }
       if(bGroup) bGroup.style.display = "none";
-      const groupsMap = {};
-      activeItems.forEach(it => {
-        const k = (typeof viewMode !== 'undefined' && viewMode === "LESSONS") ? it.lesson : it.topic;
-        if (!k) return; if (!groupsMap[k]) groupsMap[k] = { name: k, count: 0, raw: [] };
-        groupsMap[k].count++; groupsMap[k].raw.push(it);
-      });
+      
+      let html = "";
 
-      main.innerHTML = `
-        <div class="filter-bar">
-          <button class="toggle-btn ${typeof viewMode !== 'undefined' && viewMode==='LESSONS'?'on':''}" onclick="if(typeof viewMode !== 'undefined') { viewMode='LESSONS'; renderScreen(); }">Lekce</button>
-          <button class="toggle-btn ${typeof viewMode !== 'undefined' && viewMode==='TOPICS'?'on':''}" onclick="if(typeof viewMode !== 'undefined') { viewMode='TOPICS'; renderScreen(); }">Témata</button>
-        </div>
-        <div style="display:flex;flex-direction:column;gap:8px;">
-          ${Object.values(groupsMap).map(g => {
-            const mPct = (typeof getGroupMasteryPercent === "function") ? getGroupMasteryPercent(g.raw, selectedSubject) : 0;
-            return `
-              <div class="tile" style="flex-direction:column;align-items:stretch;padding:12px;" onclick="if(typeof chooseGroup==='function') chooseGroup('${g.name.replace(/'/g, "\\'")}')">
-                <div style="display:flex;justify-content:space-between;"><h2>${g.name}</h2><span style="color:var(--col-active-tab);">${g.count} úloh</span></div>
-                <div class="bargraph-track" style="height:6px;margin-top:6px;"><div class="bargraph-fill" style="width:${mPct}%;"></div></div>
+      // Pokud jsme v Matematice, vykreslíme nejprve procedurální generátor
+      if (selectedSubject === "Matematika") {
+        let ops = [
+          { id: "FRACTIONS_STEP", title: "Zlomky (Krokově)", desc: "Sčítání a odčítání formou řešení na papíře." },
+          { id: "EXPR_QUADRATIC", title: "Algebraické výrazy", desc: "Zadávej libovolné mezikroky roznásobení (x+a)²." },
+          { id: "EQ_KEYBOARD", title: "Rovnice (Klávesnice)", desc: "Upravuj libovolně obě strany rovnice přes klávesnici." },
+          { id: "EQ_FRACTIONS", title: "Rovnice se zlomky", desc: "Nácvik odstranění zlomku z rovnice." },
+          { id: "ADD_SUB_20_NO", title: "+ a - do 20", desc: "12 + 5, 17 - 4" },
+          { id: "MUL_SMALL", title: "Malá násobilka", desc: "Základy násobení" }
+        ];
+        html += `
+          <h2 style="font-size:18px;margin-bottom:12px;text-align:center;color:var(--col-yellow);">Nekonečný trénink:</h2>
+          <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:20px;">
+            ${ops.map(o => `
+              <div class="tile" style="flex-direction:row;justify-content:space-between;padding:12px;text-align:left; ${o.id.startsWith('EQ_')||o.id==='EXPR_QUADRATIC'||o.id==='FRACTIONS_STEP' ? 'border-color:var(--col-green); background:rgba(34,197,94,0.1);' : ''}" onclick="if(typeof startMathPractice==='function') startMathPractice('${o.id}', '${o.title}')">
+                <div><h2 style="${o.id.startsWith('EQ_')||o.id==='EXPR_QUADRATIC'||o.id==='FRACTIONS_STEP' ? 'color:var(--col-green);' : 'color:var(--col-text);'}">${o.title}</h2><p style="color:var(--col-text-muted);">${o.desc}</p></div>
+                <span style="color:var(--col-active-tab);font-weight:bold;font-size:20px;">➔</span>
               </div>
-            `;
-          }).join('')}
-        </div>
-      `;
+            `).join('')}
+          </div>
+        `;
+      }
+
+      // Následně vykreslíme běžné lekce/témata z tabulky
+      const groupsMap = {};
+      if (activeItems && activeItems.length > 0) {
+        activeItems.forEach(it => {
+          const k = (typeof viewMode !== 'undefined' && viewMode === "LESSONS") ? it.lesson : it.topic;
+          if (!k) return; if (!groupsMap[k]) groupsMap[k] = { name: k, count: 0, raw: [] };
+          groupsMap[k].count++; groupsMap[k].raw.push(it);
+        });
+
+        html += `
+          <h2 style="font-size:18px;margin-bottom:12px;text-align:center;color:var(--col-yellow);">${selectedSubject === "Matematika" ? "Úlohy z tabulky:" : "Výběr úloh:"}</h2>
+          <div class="filter-bar">
+            <button class="toggle-btn ${typeof viewMode !== 'undefined' && viewMode==='LESSONS'?'on':''}" onclick="if(typeof viewMode !== 'undefined') { viewMode='LESSONS'; renderScreen(); }">Lekce</button>
+            <button class="toggle-btn ${typeof viewMode !== 'undefined' && viewMode==='TOPICS'?'on':''}" onclick="if(typeof viewMode !== 'undefined') { viewMode='TOPICS'; renderScreen(); }">Témata</button>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            ${Object.values(groupsMap).map(g => {
+              const mPct = (typeof getGroupMasteryPercent === "function") ? getGroupMasteryPercent(g.raw, selectedSubject) : 0;
+              return `
+                <div class="tile" style="flex-direction:column;align-items:stretch;padding:12px;" onclick="if(typeof chooseGroup==='function') chooseGroup('${g.name.replace(/'/g, "\\'")}')">
+                  <div style="display:flex;justify-content:space-between;"><h2>${g.name}</h2><span style="color:var(--col-active-tab);">${g.count} úloh</span></div>
+                  <div class="bargraph-track" style="height:6px;margin-top:6px;"><div class="bargraph-fill" style="width:${mPct}%;"></div></div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        `;
+      } else if (selectedSubject !== "Matematika") {
+         html += `<div style="text-align:center;padding:20px;color:var(--col-text-muted);">V tomto předmětu zatím nejsou žádné úlohy pro tvůj ročník.</div>`;
+      }
+
+      main.innerHTML = html;
     }
 
     // 6. KAMPAŇ HUB (S PŘÍBĚHY A CEFR)
