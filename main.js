@@ -217,6 +217,27 @@ function buyShopItem(itemKey, cost) {
     alert(`Úspěšně zakoupeno! 🛒\nPoložka ${itemKey} byla přidána.`); if(typeof renderScreen==='function') renderScreen();
   } else { alert("Nemáš dostatek zlaťáků! 💰"); }
 }
+
+function saveSnakeRecord(length) {
+  if (!currentUser) return;
+  const currentMax = Number(currentUser.maxSnake || 0);
+  if (length > currentMax) {
+    currentUser.maxSnake = length;
+    localStorage.setItem("cur_user", JSON.stringify(currentUser));
+    
+    const uKey = currentUser.name.toLowerCase().trim();
+    const u = (appData.users || []).find(x => x.name.toLowerCase().trim() === uKey);
+    if (u) u.maxSnake = length;
+    
+    try {
+      const fd = new URLSearchParams();
+      fd.append("action", "save_snake_record");
+      fd.append("user", currentUser.name);
+      fd.append("record", length);
+      fetch(API_URL, { method: "POST", mode: "no-cors", body: fd });
+    } catch(e) {}
+  }
+}
 window.buyFreeze = function() { buyShopItem("Zmrazeni", 20); };
 
 function getTodayDateStr() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
@@ -370,7 +391,8 @@ function selectUser(name, grade, targetMinutes) {
     name, grade: parseInt(grade) || 2, targetMinutes: parseInt(targetMinutes) || 15, stars: 0,
     startLevels: (foundU && foundU.startLevels) ? foundU.startLevels : {},
     inventory: (foundU && foundU.inventory) ? foundU.inventory : {},
-    unlockedThemes: themesArr, activeTheme: activeTh, coins: foundU ? Number(foundU.coins || 0) : 0
+    unlockedThemes: themesArr, activeTheme: activeTh, coins: foundU ? Number(foundU.coins || 0) : 0,
+    maxSnake: foundU ? Number(foundU.maxSnake || 0) : 0 // NOVÝ ŘÁDEK
   };
   localStorage.setItem("cur_user", JSON.stringify(currentUser)); 
   if(typeof applyAppSkin==='function') applyAppSkin(currentUser.activeTheme);

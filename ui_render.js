@@ -43,7 +43,7 @@ function renderScreen() {
                 <p style="color:var(--col-orange);margin-top:4px;">🔥 Série: ${streakDays} dní</p>
                 <p style="color:${isDone ? 'var(--col-yellow)' : 'var(--col-text-muted)'};margin-top:2px;font-weight:bold;">⏱️ Dnes: ${uMin}/${targetM} min ${isDone?'★':''}</p>
                 <p style="color:var(--col-text-muted);margin-top:4px;font-size:12px;background:rgba(0,0,0,0.2);padding:2px 6px;border-radius:6px;min-height:22px;">
-                  💰 ${coins} | 🧊 ${freezes}x
+                  💰 ${coins} | 🧊 ${freezes}x | 🐍 ${u.maxSnake || 0}
                   ${unlockedSkins ? `<br>🎨 ${unlockedSkins}` : ''}
                 </p>
               </div>
@@ -108,9 +108,9 @@ function renderScreen() {
       main.innerHTML = html;
     }
 
-    // 3. SPOLEČNÝ OBCHOD
+    // 3. SPOLEČNÝ OBCHOD A PROFIL
     else if (currentScreen === "SHOP") {
-      if(bSubj) { bSubj.style.display = "flex"; bSubj.innerText = "🛒 Obchod"; }
+      if(bSubj) { bSubj.style.display = "flex"; bSubj.innerText = "🛒 Obchod a Profil"; }
       if(bGroup) bGroup.style.display = "none";
       const freezes = typeof getUserItemCount === 'function' ? getUserItemCount(currentUser.name, "Zmrazeni") : 0;
       const unlockedThemes = typeof getUserUnlockedThemes === 'function' ? getUserUnlockedThemes(currentUser.name) : []; 
@@ -120,8 +120,45 @@ function renderScreen() {
       const u = (appData.users || []).find(x => x.name.toLowerCase().trim() === uKey);
       const hasPin = !!(u && u.pin) || !!localStorage.getItem(`user_pin_${uKey}`);
 
+      // VÝPOČET STATISTIK (Slovíčka a Příběhy)
+      let masteredSet = new Set();
+      let storiesSet = new Set();
+      const prog = (appData.progress && appData.progress[uKey]) ? appData.progress[uKey] : {};
+      
+      for (const key in prog) {
+          if (key.includes("STORY")) {
+              if (Number(prog[key]) >= 1) storiesSet.add(key);
+          } else {
+              if (Number(prog[key]) >= 2) masteredSet.add(key);
+          }
+      }
+      for (let i = 0; i < localStorage.length; i++) {
+          const lKey = localStorage.key(i);
+          if (lKey.startsWith(`story_done_${uKey}`)) storiesSet.add(lKey);
+      }
+
       main.innerHTML = `
         <div style="padding:4px;">
+          
+          <!-- PRŮKAZ STUDENTA (STATISTIKY) -->
+          <div style="background:var(--col-card); border:1px solid var(--col-card-border); border-radius:12px; padding:15px; margin-bottom:15px; text-align:center;">
+             <h2 style="color:var(--col-active-tab); font-size:19px; margin-bottom:12px;">🎓 Průkaz studenta</h2>
+             <div style="display:flex; justify-content:space-around; align-items:center;">
+                <div>
+                   <div style="font-size:26px; font-weight:bold; color:var(--col-yellow);">${masteredSet.size}</div>
+                   <div style="font-size:12px; color:var(--col-text-muted);">Zlatých úloh</div>
+                </div>
+                <div>
+                   <div style="font-size:26px; font-weight:bold; color:var(--col-green);">${storiesSet.size}</div>
+                   <div style="font-size:12px; color:var(--col-text-muted);">Příběhů</div>
+                </div>
+                <div>
+                   <div style="font-size:26px; font-weight:bold; color:#10b981;">${currentUser.maxSnake || 0}</div>
+                   <div style="font-size:12px; color:var(--col-text-muted);">Rekord Hada</div>
+                </div>
+             </div>
+          </div>
+
           <div style="background:var(--col-card);border:1px solid var(--col-card-border);border-radius:12px;padding:14px;margin-bottom:15px;display:flex;justify-content:space-between;align-items:center;">
              <div><b style="font-size:16px;">🔐 Ochrana profilu</b><p style="font-size:12px;color:var(--col-text-muted);margin-top:2px;">Zamez ostatním ve vstupu do tvého účtu.</p></div>
              <button class="action-btn" style="margin:0;padding:8px 12px;font-size:14px;" onclick="if(typeof setUserPIN==='function') setUserPIN()">${hasPin ? 'Změnit PIN' : 'Nastavit PIN'}</button>
@@ -160,7 +197,6 @@ function renderScreen() {
         </div>
       `;
     }
-
     // 4 + 5. VÝBĚR SKUPINY (LEKCE / TÉMATA) A MATEMATIKY
     else if (currentScreen === "SELECT_GROUP" || currentScreen === "SELECT_MATH_OP") {
       if(bSubj) { bSubj.style.display = "flex"; bSubj.innerText = selectedSubject; }
