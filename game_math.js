@@ -86,31 +86,7 @@ function evalExpr(str, xVal) {
 }
 
 // --- HLAVNÍ LOGIKA ---
-function openMathOperationSelect() { selectedSubject = "Matematika"; setScreen("SELECT_MATH_OP"); }
 
-function renderMathOpSelection() {
-  const main = document.getElementById("main-content");
-  let ops = [
-    { id: "FRACTIONS_STEP", title: "Zlomky (Krokově)", desc: "Sčítání a odčítání formou řešení na papíře." },
-    { id: "EXPR_QUADRATIC", title: "Algebraické výrazy", desc: "Zadávej libovolné mezikroky roznásobení (x+a)²." },
-    { id: "EQ_KEYBOARD", title: "Rovnice (Klávesnice)", desc: "Upravuj libovolně obě strany rovnice přes klávesnici." },
-    { id: "EQ_FRACTIONS", title: "Rovnice se zlomky", desc: "Nácvik odstranění zlomku z rovnice." },
-    { id: "ADD_SUB_20_NO", title: "+ a - do 20", desc: "12 + 5, 17 - 4" },
-    { id: "MUL_SMALL", title: "Malá násobilka", desc: "Základy násobení" }
-  ];
-
-  main.innerHTML = `
-    <h2 style="font-size:18px;margin-bottom:12px;text-align:center;color:var(--col-yellow);">Vyber matematiku:</h2>
-    <div style="display:flex;flex-direction:column;gap:8px;">
-      ${ops.map(o => `
-        <div class="tile" style="flex-direction:row;justify-content:space-between;padding:12px;text-align:left; ${o.id.startsWith('EQ_')||o.id==='EXPR_QUADRATIC'||o.id==='FRACTIONS_STEP' ? 'border-color:var(--col-green); background:#112a1f;' : ''}" onclick="startMathPractice('${o.id}', '${o.title}')">
-          <div><h2 style="${o.id.startsWith('EQ_')||o.id==='EXPR_QUADRATIC'||o.id==='FRACTIONS_STEP' ? 'color:var(--col-green);' : ''}">${o.title}</h2><p>${o.desc}</p></div>
-          <span style="color:var(--col-active-tab);font-weight:bold;font-size:20px;">➔</span>
-        </div>
-      `).join('')}
-    </div>
-  `;
-}
 
 function startMathPractice(opId, opTitle) {
   mathOperation = opId; selectedGroupKey = opTitle; selectedGame = "PROCEDURAL_MATH"; mathStreak = 0; generateMathTask(); setScreen("PLAYING");
