@@ -90,9 +90,6 @@ function renderScreen() {
         </div>
 
         <div class="grid-2">
-          <div class="tile" style="border-color:var(--col-active-tab);" onclick="if(typeof openMathOperationSelect === 'function') openMathOperationSelect()">
-            <h2 style="color:var(--col-active-tab);">🔢 Matematika</h2><p>Výběr operací a dril</p>
-          </div>
       `;
       Object.keys(subjs).forEach(s => {
         const sLow = s.toLowerCase();
