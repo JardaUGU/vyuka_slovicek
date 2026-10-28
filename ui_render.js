@@ -352,7 +352,20 @@ function renderScreen() {
       const qItems = typeof getQuizItems === 'function' ? getQuizItems() : [];
       const sItems = typeof getSeqItems === 'function' ? getSeqItems() : [];
       const quickMode = typeof getQuickChoiceMode === 'function' ? getQuickChoiceMode() : null;
-      let html = `<div class="grid-2">`;
+      let html = "";
+      
+      // NOVÉ: Inteligentní trénink na jedno kliknutí (mix)
+      if (vItems.length > 0 || qItems.length > 0) {
+        html += `
+          <div class="action-btn" style="background:linear-gradient(135deg, #8b5cf6, #3b82f6); border-color:#c4b5fd; margin-bottom:15px; padding:16px; font-size:20px; box-shadow: 0 4px 15px rgba(139, 92, 246, 0.4);" onclick="if(typeof startSmartMix==='function') startSmartMix()">
+            🧠 SPUSTIT CHYTRÝ TRÉNINK
+          </div>
+        `;
+      }
+      
+      html += `<div class="grid-2">`;
+      
+      if (vItems.length > 0) {
       
       if (vItems.length > 0) {
         html += `
