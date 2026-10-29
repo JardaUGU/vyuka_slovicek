@@ -46,19 +46,25 @@ function startSmartMix() {
     });
   }
 
-  // 3. Vytvořit namixovanou frontu (Kvízy, Skládání, Výběr z možností)
+// 3. Vytvořit namixovanou frontu (Kvízy, Skládání, Výběr z možností)
   let q = [];
   pool.forEach(it => {
     if (it.type === "KVIZ") {
       q.push({ type: 'KVIZ', data: it });
     } else if (it.type === "SLOVO") {
-      const isMultiWord = it.question.trim().includes(' ') || it.question.trim().includes('-');
-      q.push({ type: 'SCRAMBLE', data: it });
-      if (isMultiWord) {
-         if (Math.random() > 0.5) q.push({ type: 'QUIZ_IN', data: it });
-      } else {
+      
+      if (selectedSubject === "Matematika") {
+         // OPRAVA: Matematika se NIKDY neskládá z kostiček, vždy je to jen otázka se 4 možnostmi (QUIZ_IN)
          q.push({ type: 'QUIZ_IN', data: it });
-         q.push({ type: 'QUIZ_OUT', data: it });
+      } else {
+         const isMultiWord = it.question.trim().includes(' ') || it.question.trim().includes('-');
+         q.push({ type: 'SCRAMBLE', data: it });
+         if (isMultiWord) {
+            if (Math.random() > 0.5) q.push({ type: 'QUIZ_IN', data: it });
+         } else {
+            q.push({ type: 'QUIZ_IN', data: it });
+            q.push({ type: 'QUIZ_OUT', data: it });
+         }
       }
     }
   });
@@ -74,6 +80,7 @@ function startSmartMix() {
        const correctAns = isOut ? task.data.question : cleanCzechTranslation(task.data.answer);
        
        let shortItems = vItemsOnly.filter(i => {
+         if (selectedSubject === "Matematika") return true; // V matematice bereme všechny odpovědi
          const qWords = i.question.replace(/\s*\([^)]*\)/g, '').trim().split(/\s+/).length;
          const aWords = cleanCzechTranslation(i.answer).replace(/\s*\([^)]*\)/g, '').trim().split(/\s+/).length;
          const isSentence = /[.?!]$/.test(i.question.trim());
@@ -88,7 +95,10 @@ function startSmartMix() {
        falsePool.sort(() => Math.random() - 0.5);
        task.opts = [correctAns, ...falsePool.slice(0, 3)].sort(() => Math.random() - 0.5);
        task.correctAns = correctAns;
-       task.prompt = isOut ? cleanCzechTranslation(task.data.answer) : task.data.question;
+       
+       // OPRAVA: Pro matematiku proženeme zadání přes formatPromptText, aby byly zlomky hezké!
+       let rawPrompt = isOut ? cleanCzechTranslation(task.data.answer) : task.data.question;
+       task.prompt = typeof formatPromptText === 'function' ? formatPromptText(rawPrompt) : rawPrompt;
 
     } else if (task.type === 'SCRAMBLE') {
        const raw = task.data.question.replace(/\s*\([^)]*\)/g, '').trim();
