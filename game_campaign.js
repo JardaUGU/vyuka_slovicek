@@ -46,25 +46,51 @@ function startSmartMix() {
     });
   }
 
-  // 3. Vytvořit namixovanou frontu (Kvízy, Skládání, Výběr z možností)
-  let q = [];
-  pool.forEach(it => {
+// 3. Vytvořit 3 navazující vlny (1. Poznávání -> 2. Aktivní překlad -> 3. Skládání)
+  let wave1 = []; // Kvízy a Cizí -> CZ
+  let wave2 = []; // CZ -> Cizí
+  let wave3 = []; // Skládání (Scramble)
+
+  // Aby v jednom tréninku nebylo 45 úkolů, vezmeme do vln max 10 položek (cca 25-30 úkolů celkem)
+  let wavePool = pool.slice(0, 10);
+
+  wavePool.forEach(it => {
     if (it.type === "KVIZ") {
-      q.push({ type: 'KVIZ', data: it });
+      wave1.push({ type: 'KVIZ', data: it, wave: 1 });
     } else if (it.type === "SLOVO") {
-      const isMultiWord = it.question.trim().includes(' ') || it.question.trim().includes('-');
-      q.push({ type: 'SCRAMBLE', data: it });
-      if (isMultiWord) {
-         if (Math.random() > 0.5) q.push({ type: 'QUIZ_IN', data: it });
+      if (selectedSubject === "Matematika") {
+         wave1.push({ type: 'QUIZ_IN', data: it, wave: 1 });
       } else {
-         q.push({ type: 'QUIZ_IN', data: it });
-         q.push({ type: 'QUIZ_OUT', data: it });
+         const isMultiWord = it.question.trim().includes(' ') || it.question.trim().includes('-');
+         if (isMultiWord) {
+            if (getSavedMastery(it.question, 'DIR_IN') < 2) {
+               wave1.push({ type: 'QUIZ_IN', data: it, wave: 1 });
+            }
+            wave3.push({ type: 'SCRAMBLE', data: it, wave: 3 });
+         } else {
+            if (getSavedMastery(it.question, 'DIR_IN') < 2) wave1.push({ type: 'QUIZ_IN', data: it, wave: 1 });
+            if (getSavedMastery(it.question, 'DIR_OUT') < 2) wave2.push({ type: 'QUIZ_OUT', data: it, wave: 2 });
+            wave3.push({ type: 'SCRAMBLE', data: it, wave: 3 });
+         }
       }
     }
   });
 
-  q.sort(() => Math.random() - 0.5);
-  if (q.length > 30) q = q.slice(0, 30); // Max 30 úkolů na jeden průchod
+  // Zamícháme každou vlnu zvlášť
+  wave1.sort(() => Math.random() - 0.5);
+  wave2.sort(() => Math.random() - 0.5);
+  wave3.sort(() => Math.random() - 0.5);
+
+  // Pojistka: pohlídáme, aby poslední slovo jedné vlny nebylo první slovo vlny následující
+  if (wave1.length > 0 && wave2.length > 1 && wave1[wave1.length - 1].data.question === wave2[0].data.question) {
+    wave2.push(wave2.shift());
+  }
+  if (wave2.length > 0 && wave3.length > 1 && wave2[wave2.length - 1].data.question === wave3[0].data.question) {
+    wave3.push(wave3.shift());
+  }
+
+  let q = [...wave1, ...wave2, ...wave3];
+  if (q.length > 30) q = q.slice(0, 30);
 
   // 4. Doplnit možnosti a grafémy
   const vItemsOnly = allItems.filter(i => i.type === "SLOVO");
@@ -74,6 +100,7 @@ function startSmartMix() {
        const correctAns = isOut ? task.data.question : cleanCzechTranslation(task.data.answer);
        
        let shortItems = vItemsOnly.filter(i => {
+         if (selectedSubject === "Matematika") return true; // V matematice bereme všechny odpovědi
          const qWords = i.question.replace(/\s*\([^)]*\)/g, '').trim().split(/\s+/).length;
          const aWords = cleanCzechTranslation(i.answer).replace(/\s*\([^)]*\)/g, '').trim().split(/\s+/).length;
          const isSentence = /[.?!]$/.test(i.question.trim());
@@ -88,7 +115,10 @@ function startSmartMix() {
        falsePool.sort(() => Math.random() - 0.5);
        task.opts = [correctAns, ...falsePool.slice(0, 3)].sort(() => Math.random() - 0.5);
        task.correctAns = correctAns;
-       task.prompt = isOut ? cleanCzechTranslation(task.data.answer) : task.data.question;
+       
+       // OPRAVA: Pro matematiku proženeme zadání přes formatPromptText, aby byly zlomky hezké!
+       let rawPrompt = isOut ? cleanCzechTranslation(task.data.answer) : task.data.question;
+       task.prompt = typeof formatPromptText === 'function' ? formatPromptText(rawPrompt) : rawPrompt;
 
     } else if (task.type === 'SCRAMBLE') {
        const raw = task.data.question.replace(/\s*\([^)]*\)/g, '').trim();
@@ -214,7 +244,7 @@ function clickCmpQuizOpt(opt) {
     sndErr(); cmpHearts = Math.max(0, cmpHearts - 1);
     let newTask = JSON.parse(JSON.stringify(task));
     if (newTask.opts) newTask.opts.sort(() => Math.random() - 0.5);
-    cmpQueue.push(newTask);
+    requeueFailedTask(newTask); // <--- UPRAVENO: vloží na konec aktuální vlny
     
     if (task.type === 'QUIZ_OUT' || task.type === 'QUIZ_IN' || task.type === 'KVIZ') {
         const dir = task.type === 'QUIZ_OUT' ? 'DIR_OUT' : (task.type === 'KVIZ' ? 'DIR_OUT' : 'DIR_IN');
@@ -228,6 +258,23 @@ function clickCmpQuizOpt(opt) {
   }
   renderActiveGame();
 }
+
+// Zařadí zkaženou úlohu na konec její aktuální vlny (místo úplného konce tréninku)
+function requeueFailedTask(newTask) {
+  if (!newTask.wave) {
+    cmpQueue.push(newTask);
+    return;
+  }
+  let insertIdx = cmpQueue.length;
+  for (let i = cmpIdx + 1; i < cmpQueue.length; i++) {
+    if ((cmpQueue[i].wave || 99) > newTask.wave) {
+      insertIdx = i;
+      break;
+    }
+  }
+  cmpQueue.splice(insertIdx, 0, newTask);
+}
+
 function clickCmpScrambleTile(idx) {
   if (cmpState !== 'PLAYING') return;
   const task = cmpQueue[cmpIdx]; const tile = task.tiles[idx];
@@ -246,11 +293,12 @@ function clickCmpScrambleTile(idx) {
         if (mOut < 2) saveWordMasteryToGoogle(task.data.question, Math.min(2, mOut + step), 'DIR_OUT');
       }
     }
-  } else {
+   } else {
     sndErr(); cmpHearts = Math.max(0, cmpHearts - 1); task.hadMistake = true;
-    let newTask = { type: 'SCRAMBLE', data: task.data, tokens: task.tokens, isWordMode: task.isWordMode, hadMistake: false };
+    let newTask = { type: 'SCRAMBLE', data: task.data, tokens: task.tokens, isWordMode: task.isWordMode, hadMistake: false, wave: task.wave };
     newTask.tiles = task.tokens.map((t, i) => ({ text: t, used: false, id: i })).sort(() => Math.random() - 0.5);
-    newTask.placed = []; cmpQueue.push(newTask);
+    newTask.placed = []; 
+    requeueFailedTask(newTask); // <--- UPRAVENO: vloží na konec aktuální vlny
   }
   renderActiveGame();
 }
@@ -305,6 +353,13 @@ function finishCampaign(bonusCoins) {
   if (bonusCoins > 0) {
     addCoins(currentUser.name, bonusCoins);
   }
-  setScreen("CAMPAIGN_HUB");
+  
+  const sLow = (selectedSubject || "").toLowerCase();
+  // Pokud hrajeme běžný předmět (např. Hebrejštinu), vrátíme se do výběru her
+  if (sLow.includes("cesta") || sLow.includes("postupn") || sLow.includes("inteligentn")) {
+    setScreen("CAMPAIGN_HUB");
+  } else {
+    setScreen("SELECT_GAME");
+  }
 }
 

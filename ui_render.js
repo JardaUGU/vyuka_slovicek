@@ -743,14 +743,20 @@ function renderActiveGame() {
         ${promptDisplay}
         ${((typeof qAnswered!=='undefined'&&qAnswered) && typeof getTargetLang==='function' && getTargetLang(selectedSubject) !== 'cs-CZ') ? `<span class="audio-btn" onclick="if(typeof speakWord==='function') speakWord('${(q.question.includes('___') ? q.question.replace(/___+/g, q.answer) : q.question + ' ' + q.answer).replace(/[*_]/g, '')}', '${selectedSubject}')">🔊</span>` : ''}
       </div>
-      <div class="grid-2">
+     <div class="grid-2">
         ${q.options.map((opt, optIdx) => {
           let btnCls = "";
           if (typeof qAnswered!=='undefined'&&qAnswered) {
             if (opt === q.answer) btnCls = "correct";
             else if (opt === (typeof qChosenOpt!=='undefined'?qChosenOpt:null)) btnCls = "wrong";
           }
-          return `<div class="opt-btn ${btnCls}" onclick="if(typeof clickQuizOpt==='function') clickQuizOpt(${optIdx})">${opt}</div>`;
+          
+          // OPRAVA: Zvětšení hebrejského fontu uvnitř tlačítek
+          if (/[\u0590-\u05FF]/.test(opt)) btnCls += " hebrew-text";
+          
+          let displayOpt = typeof formatPromptText === 'function' ? formatPromptText(String(opt)) : opt;
+          
+          return `<div class="opt-btn ${btnCls.trim()}" onclick="if(typeof clickQuizOpt==='function') clickQuizOpt(${optIdx})">${displayOpt}</div>`;
         }).join('')}
       </div>
       ${(typeof qAnswered!=='undefined'&&qAnswered) ? `
@@ -1177,7 +1183,13 @@ function renderActiveGame() {
           if (opt === task.correctAns) btnCls = "correct";
           else if (opt === (typeof cmpChosenOpt!=='undefined'?cmpChosenOpt:null)) btnCls = "wrong";
         }
-        html += `<div class="opt-btn ${btnCls}" onclick="if(typeof clickCmpQuizOpt==='function') clickCmpQuizOpt('${String(opt).replace(/'/g, "\\'")}')">${opt}</div>`;
+        
+        // OPRAVA: Zvětšení hebrejského fontu uvnitř tlačítek
+        if (/[\u0590-\u05FF]/.test(opt)) btnCls += " hebrew-text";
+        
+        let displayOpt = typeof formatPromptText === 'function' ? formatPromptText(String(opt)) : opt;
+        
+        html += `<div class="opt-btn ${btnCls.trim()}" onclick="if(typeof clickCmpQuizOpt==='function') clickCmpQuizOpt('${String(opt).replace(/'/g, "\\'")}')">${displayOpt}</div>`;
       });
       html += `</div>`;
 
