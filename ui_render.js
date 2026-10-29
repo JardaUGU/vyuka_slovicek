@@ -1183,7 +1183,13 @@ function renderActiveGame() {
           if (opt === task.correctAns) btnCls = "correct";
           else if (opt === (typeof cmpChosenOpt!=='undefined'?cmpChosenOpt:null)) btnCls = "wrong";
         }
-        html += `<div class="opt-btn ${btnCls}" onclick="if(typeof clickCmpQuizOpt==='function') clickCmpQuizOpt('${String(opt).replace(/'/g, "\\'")}')">${opt}</div>`;
+        
+        // OPRAVA: Zvětšení hebrejského fontu uvnitř tlačítek
+        if (/[\u0590-\u05FF]/.test(opt)) btnCls += " hebrew-text";
+        
+        let displayOpt = typeof formatPromptText === 'function' ? formatPromptText(String(opt)) : opt;
+        
+        html += `<div class="opt-btn ${btnCls.trim()}" onclick="if(typeof clickCmpQuizOpt==='function') clickCmpQuizOpt('${String(opt).replace(/'/g, "\\'")}')">${displayOpt}</div>`;
       });
       html += `</div>`;
 
