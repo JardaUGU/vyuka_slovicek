@@ -47,7 +47,11 @@ function speakWord(text, subjectName) {
     // Zabrání čtení velkého "No" jako "Number" a u "Oh no" vylepší intonaci
     toSpeak = toSpeak.replace(/\bNo\b/g, 'no').replace(/\bOh no\b/gi, 'oh nou');
 
-    toSpeak = toSpeak.replace(/ליהוה/g, 'לַאדֹנָי').replace(/יהוה/g, 'אֲדֹנָי').replace(/L'?(Jahve|Jahveh|Yahweh|Yahwe|Jehova|JHVH|YHWH|JVHV)/gi, "L'Adonaj");
+    // OPRAVA HEBREJŠTINY (Ladonaj vs Adonaj pro všechny velikosti písmen a varianty)
+    toSpeak = toSpeak.replace(/ליהוה/g, 'לַאדֹנָי').replace(/יהוה/g, 'אֲדֹנָי');
+    toSpeak = toSpeak.replace(/l'?(jahve|jahveh|yahweh|yahwe|jehova|jhvh|yhwh|jhwh|jvhv)/gi, "Ladonaj");
+    toSpeak = toSpeak.replace(/(jahve|jahveh|yahweh|yahwe|jehova|jhvh|yhwh|jhwh|jvhv)/gi, "Adonaj");
+    
     if (/read\s*-\s*read\s*-\s*read/i.test(toSpeak)) toSpeak = "read, red, red";
     else toSpeak = toSpeak.replace(/\//g, ' or ').replace(/\s*-\s*/g, ', ');
     if (/^\s*I\s*[.!?]?\s*$/i.test(toSpeak)) toSpeak = "eye";
