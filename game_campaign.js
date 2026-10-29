@@ -46,31 +46,51 @@ function startSmartMix() {
     });
   }
 
-// 3. Vytvořit namixovanou frontu (Kvízy, Skládání, Výběr z možností)
-  let q = [];
-  pool.forEach(it => {
+// 3. Vytvořit 3 navazující vlny (1. Poznávání -> 2. Aktivní překlad -> 3. Skládání)
+  let wave1 = []; // Kvízy a Cizí -> CZ
+  let wave2 = []; // CZ -> Cizí
+  let wave3 = []; // Skládání (Scramble)
+
+  // Aby v jednom tréninku nebylo 45 úkolů, vezmeme do vln max 10 položek (cca 25-30 úkolů celkem)
+  let wavePool = pool.slice(0, 10);
+
+  wavePool.forEach(it => {
     if (it.type === "KVIZ") {
-      q.push({ type: 'KVIZ', data: it });
+      wave1.push({ type: 'KVIZ', data: it });
     } else if (it.type === "SLOVO") {
-      
       if (selectedSubject === "Matematika") {
-         // OPRAVA: Matematika se NIKDY neskládá z kostiček, vždy je to jen otázka se 4 možnostmi (QUIZ_IN)
-         q.push({ type: 'QUIZ_IN', data: it });
+         wave1.push({ type: 'QUIZ_IN', data: it });
       } else {
          const isMultiWord = it.question.trim().includes(' ') || it.question.trim().includes('-');
-         q.push({ type: 'SCRAMBLE', data: it });
          if (isMultiWord) {
-            if (Math.random() > 0.5) q.push({ type: 'QUIZ_IN', data: it });
+            if (getSavedMastery(it.question, 'DIR_IN') < 2) {
+               wave1.push({ type: 'QUIZ_IN', data: it });
+            }
+            wave3.push({ type: 'SCRAMBLE', data: it });
          } else {
-            q.push({ type: 'QUIZ_IN', data: it });
-            q.push({ type: 'QUIZ_OUT', data: it });
+            if (getSavedMastery(it.question, 'DIR_IN') < 2) wave1.push({ type: 'QUIZ_IN', data: it });
+            if (getSavedMastery(it.question, 'DIR_OUT') < 2) wave2.push({ type: 'QUIZ_OUT', data: it });
+            wave3.push({ type: 'SCRAMBLE', data: it });
          }
       }
     }
   });
 
-  q.sort(() => Math.random() - 0.5);
-  if (q.length > 30) q = q.slice(0, 30); // Max 30 úkolů na jeden průchod
+  // Zamícháme každou vlnu zvlášť
+  wave1.sort(() => Math.random() - 0.5);
+  wave2.sort(() => Math.random() - 0.5);
+  wave3.sort(() => Math.random() - 0.5);
+
+  // Pojistka: pohlídáme, aby poslední slovo jedné vlny nebylo první slovo vlny následující
+  if (wave1.length > 0 && wave2.length > 1 && wave1[wave1.length - 1].data.question === wave2[0].data.question) {
+    wave2.push(wave2.shift());
+  }
+  if (wave2.length > 0 && wave3.length > 1 && wave2[wave2.length - 1].data.question === wave3[0].data.question) {
+    wave3.push(wave3.shift());
+  }
+
+  let q = [...wave1, ...wave2, ...wave3];
+  if (q.length > 30) q = q.slice(0, 30);
 
   // 4. Doplnit možnosti a grafémy
   const vItemsOnly = allItems.filter(i => i.type === "SLOVO");
