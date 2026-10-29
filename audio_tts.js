@@ -32,6 +32,9 @@ function getTargetLang(subjectName) {
 // DŮLEŽITÉ (BUGFIX): Nečte závorky, jména postav ani emotikony.
 function speakWord(text, subjectName) {
   if (!('speechSynthesis' in window)) return;
+  // ZÁKAZ ČTENÍ PRO MATEMATIKU
+  if (subjectName === "Matematika") return; 
+  
   window.speechSynthesis.cancel();
   
   setTimeout(() => {
