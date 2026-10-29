@@ -56,21 +56,21 @@ function startSmartMix() {
 
   wavePool.forEach(it => {
     if (it.type === "KVIZ") {
-      wave1.push({ type: 'KVIZ', data: it });
+      wave1.push({ type: 'KVIZ', data: it, wave: 1 });
     } else if (it.type === "SLOVO") {
       if (selectedSubject === "Matematika") {
-         wave1.push({ type: 'QUIZ_IN', data: it });
+         wave1.push({ type: 'QUIZ_IN', data: it, wave: 1 });
       } else {
          const isMultiWord = it.question.trim().includes(' ') || it.question.trim().includes('-');
          if (isMultiWord) {
             if (getSavedMastery(it.question, 'DIR_IN') < 2) {
-               wave1.push({ type: 'QUIZ_IN', data: it });
+               wave1.push({ type: 'QUIZ_IN', data: it, wave: 1 });
             }
-            wave3.push({ type: 'SCRAMBLE', data: it });
+            wave3.push({ type: 'SCRAMBLE', data: it, wave: 3 });
          } else {
-            if (getSavedMastery(it.question, 'DIR_IN') < 2) wave1.push({ type: 'QUIZ_IN', data: it });
-            if (getSavedMastery(it.question, 'DIR_OUT') < 2) wave2.push({ type: 'QUIZ_OUT', data: it });
-            wave3.push({ type: 'SCRAMBLE', data: it });
+            if (getSavedMastery(it.question, 'DIR_IN') < 2) wave1.push({ type: 'QUIZ_IN', data: it, wave: 1 });
+            if (getSavedMastery(it.question, 'DIR_OUT') < 2) wave2.push({ type: 'QUIZ_OUT', data: it, wave: 2 });
+            wave3.push({ type: 'SCRAMBLE', data: it, wave: 3 });
          }
       }
     }
@@ -244,7 +244,7 @@ function clickCmpQuizOpt(opt) {
     sndErr(); cmpHearts = Math.max(0, cmpHearts - 1);
     let newTask = JSON.parse(JSON.stringify(task));
     if (newTask.opts) newTask.opts.sort(() => Math.random() - 0.5);
-    cmpQueue.push(newTask);
+    requeueFailedTask(newTask); // <--- UPRAVENO: vloží na konec aktuální vlny
     
     if (task.type === 'QUIZ_OUT' || task.type === 'QUIZ_IN' || task.type === 'KVIZ') {
         const dir = task.type === 'QUIZ_OUT' ? 'DIR_OUT' : (task.type === 'KVIZ' ? 'DIR_OUT' : 'DIR_IN');
@@ -258,6 +258,23 @@ function clickCmpQuizOpt(opt) {
   }
   renderActiveGame();
 }
+
+// Zařadí zkaženou úlohu na konec její aktuální vlny (místo úplného konce tréninku)
+function requeueFailedTask(newTask) {
+  if (!newTask.wave) {
+    cmpQueue.push(newTask);
+    return;
+  }
+  let insertIdx = cmpQueue.length;
+  for (let i = cmpIdx + 1; i < cmpQueue.length; i++) {
+    if ((cmpQueue[i].wave || 99) > newTask.wave) {
+      insertIdx = i;
+      break;
+    }
+  }
+  cmpQueue.splice(insertIdx, 0, newTask);
+}
+
 function clickCmpScrambleTile(idx) {
   if (cmpState !== 'PLAYING') return;
   const task = cmpQueue[cmpIdx]; const tile = task.tiles[idx];
@@ -276,11 +293,12 @@ function clickCmpScrambleTile(idx) {
         if (mOut < 2) saveWordMasteryToGoogle(task.data.question, Math.min(2, mOut + step), 'DIR_OUT');
       }
     }
-  } else {
+   } else {
     sndErr(); cmpHearts = Math.max(0, cmpHearts - 1); task.hadMistake = true;
-    let newTask = { type: 'SCRAMBLE', data: task.data, tokens: task.tokens, isWordMode: task.isWordMode, hadMistake: false };
+    let newTask = { type: 'SCRAMBLE', data: task.data, tokens: task.tokens, isWordMode: task.isWordMode, hadMistake: false, wave: task.wave };
     newTask.tiles = task.tokens.map((t, i) => ({ text: t, used: false, id: i })).sort(() => Math.random() - 0.5);
-    newTask.placed = []; cmpQueue.push(newTask);
+    newTask.placed = []; 
+    requeueFailedTask(newTask); // <--- UPRAVENO: vloží na konec aktuální vlny
   }
   renderActiveGame();
 }
