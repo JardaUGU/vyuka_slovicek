@@ -168,8 +168,8 @@ PRAVIDLA PRO ÚPRAVU KÓDU A CHOVÁNÍ APLIKACE
    - Pravidla specifická pro předměty:
      a) Matematika: NIKDY se negeneruje skládání (SCRAMBLE). Úlohy jsou výhradně formou výběru ze 4 možností a nesprávné volby MUSÍ generovat inteligentní matematický algoritmus (zachovává jednotky i formát odpovědi, mění jen čísla/zlomky).
      b) Hebrejština: Možnosti v tlačítkách s hebrejskými znaky automaticky dostávají třídu `.hebrew-text` (zvětšení na 32px a RTL směr).
-   - Životy, hodnocení a návrat:
-     Trénink začíná s 5 ❤️. Správná odpověď zvyšuje mastery (+1 ★, max 2 ★, u kvízů se ukládá do směru DIR_OUT), chyba shazuje na 0 ★ a klonuje úlohu na konec fronty. Po dokončení (nebo při stisku tlačítka Zpět) vrací hráče VŽDY do SELECT_GAME (nikdy do CAMPAIGN_HUB).
+   - Životy, oprava chyb v rámci vlny a návrat:
+     Trénink začíná s 5 ❤️. Správná odpověď zvyšuje mastery (+1 ★, max 2 ★, u kvízů se ukládá do směru DIR_OUT). Při chybě žák ztrácí 1 ❤️, mastery klesne na 0 ★ a zkažená úloha se zařadí na KONEC AKTUÁLNÍ VLNY (pomocí `requeueFailedTask`), nikoliv až na úplný konec tréninku – žák tak musí zvládnout nižší stupeň (např. poznávání v 1. vlně) dříve, než postoupí do těžší 2. a 3. vlny. Po dokončení (nebo při stisku tlačítka Zpět) vrací hráče VŽDY do SELECT_GAME (nikdy do CAMPAIGN_HUB).
 
 
 8. STRUKTURA DAT V GOOGLE SHEETS (kod.gs):
