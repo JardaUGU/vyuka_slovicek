@@ -315,6 +315,13 @@ function finishCampaign(bonusCoins) {
   if (bonusCoins > 0) {
     addCoins(currentUser.name, bonusCoins);
   }
-  setScreen("CAMPAIGN_HUB");
+  
+  const sLow = (selectedSubject || "").toLowerCase();
+  // Pokud hrajeme běžný předmět (např. Hebrejštinu), vrátíme se do výběru her
+  if (sLow.includes("cesta") || sLow.includes("postupn") || sLow.includes("inteligentn")) {
+    setScreen("CAMPAIGN_HUB");
+  } else {
+    setScreen("SELECT_GAME");
+  }
 }
 
