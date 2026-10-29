@@ -153,6 +153,24 @@ PRAVIDLA PRO ÚPRAVU KÓDU A CHOVÁNÍ APLIKACE
      b) Zlomky krokově (FRACTIONS_STEP): generuje sčítání/odčítání zlomků s různými jmenovateli. Hráč na 5sloupcové klávesnici zadává mezikroky (např. "4/12+3/12"). Systém vyhodnotí matematickou rovnost se zadáním, zformátuje vstup do vertikálních zlomků a zapíše do historie. Úloha končí až po zadání jednoho zlomku v základním tvaru (kontrola přes největší společný dělitel gcd === 1; při nekráceném zlomku např. "6/6" zapíše krok do historie s oranžovou výzvou "Zkrať na základní tvar!").
      c) Algebraické výrazy (EXPR_QUADRATIC): zadá např. "(x - 5)² = ?". Hráč zadává mezikroky roznásobení (např. "(x-5)*(x-5)" nebo "x²-5x-5x+25"). Systém ověřuje rovnost dosazením testovacích čísel (x = 10 a x = -7). Končí po zadání zjednodušeného kanonického tvaru "x²-10x+25".
      d) Krokové rovnice (EQ_KEYBOARD / EQ_FRACTIONS): algebraický řešič rovnic ax + b = c (včetně zlomkových koeficientů). Hráč zadává operaci aplikovanou na obě strany rovnice (např. "-5", "/3", "*6", "-2x"). Systém operaci skutečně provede na levé i pravé straně (včetně krácení zlomků) a vypíše novou rovnici do historie, dokud neosamostatní "x = číslo".
+7.12. Chytrý trénink pro běžné lekce (SMART_MIX - game_campaign.js)
+   - Spouští se velkým tlačítkem „🧠 SPUSTIT CHYTRÝ TRÉNINK“ na obrazovce výběru her (SELECT_GAME) pro jakoukoliv lekci běžného předmětu (Angličtina, Němčina, Hebrejština, Matematika...).
+   - Výběr položek a nekonečné opakování:
+     a) Do tréninku se přednostně vybere až 10–15 položek z dané lekce s úrovní zvládnutí < 2 ★.
+     b) Pokud má žák již všechna slova lekce na 2 ★, vybere se 15 náhodných položek, jejich mastery se v tabulce resetuje na 0 ★ a zařadí se do výuky (zajišťuje nekonečný opakovací cyklus).
+   - Třífázová pedagogická vlna (Spaced Repetition):
+     Aby se zabránilo okamžitému opakování stejného slova v různých režimech po sobě, fronta úloh se striktně dělí do 3 samostatných vln:
+     1. Vlna 1 (Poznávání): Kvízy s gramatikou (KVIZ) a pasivní porozumění Cizí ➔ CZ (QUIZ_IN).
+     2. Vlna 2 (Aktivní překlad): Výběr ze 4 možností CZ ➔ Cizí (QUIZ_OUT).
+     3. Vlna 3 (Pravopis): Skládání z písmen nebo slov (SCRAMBLE).
+   - Anti-clustering (ochrana před opakováním za sebou):
+     Každá vlna se míchá zvlášť a kód hlídá přechody mezi vlnami, aby poslední slovo předchozí vlny nebylo stejné jako první slovo následující vlny. Mezi dvěma výskyty stejného slova v různých režimech je tak vždy odstup minimálně 8–10 jiných úloh.
+   - Pravidla specifická pro předměty:
+     a) Matematika: NIKDY se negeneruje skládání (SCRAMBLE). Úlohy jsou výhradně formou výběru ze 4 možností a nesprávné volby MUSÍ generovat inteligentní matematický algoritmus (zachovává jednotky i formát odpovědi, mění jen čísla/zlomky).
+     b) Hebrejština: Možnosti v tlačítkách s hebrejskými znaky automaticky dostávají třídu `.hebrew-text` (zvětšení na 32px a RTL směr).
+   - Životy, hodnocení a návrat:
+     Trénink začíná s 5 ❤️. Správná odpověď zvyšuje mastery (+1 ★, max 2 ★, u kvízů se ukládá do směru DIR_OUT), chyba shazuje na 0 ★ a klonuje úlohu na konec fronty. Po dokončení (nebo při stisku tlačítka Zpět) vrací hráče VŽDY do SELECT_GAME (nikdy do CAMPAIGN_HUB).
+
 
 8. STRUKTURA DAT V GOOGLE SHEETS (kod.gs):
    - List "Uzivatele": Jmeno | Trida | DenniCilMinut | Streak | StreakLastDate | Zlataky | Item_Zmrazeni | Start_Angli... | Skiny | AktivniSkin | PIN (sloupce od 7. dál se hledají dynamicky podle názvu hlavičky).
