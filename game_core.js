@@ -38,16 +38,21 @@ function getGroupMasteryPercent(groupItems, subjName) {
   return Math.min(100, Math.round((points / (vList.length * 4)) * 100));
 }
 
-// Opravené tlačítko ZPĚT, které respektuje Příběhy a Cestu
+// Opravené tlačítko ZPĚT, které plně respektuje, z jakého předmětu jsme přišli
 function goBack() {
   if (typeof stopArcadeLoop === "function") stopArcadeLoop();
   if (typeof stopSnakeLoop === "function") stopSnakeLoop();
   if (typeof sendTimeHeartbeatToGoogle === "function") sendTimeHeartbeatToGoogle();
 
   const isMinigame = (typeof isCampaignMinigame !== "undefined" && isCampaignMinigame && selectedGame !== "PROCEDURAL_MATH");
+  const sLow = (typeof selectedSubject !== 'undefined' ? selectedSubject || "" : "").toLowerCase();
+  const isCampaignSubj = sLow.includes("cesta") || sLow.includes("postupn") || sLow.includes("inteligentn");
 
-  if (currentScreen === "PLAYING" && (selectedGame === "CAMPAIGN" || selectedGame === "STORY" || isMinigame)) {
-    setScreen("CAMPAIGN_HUB");
+  if (currentScreen === "PLAYING" && selectedGame === "STORY") {
+    setScreen(isCampaignSubj ? "CAMPAIGN_HUB" : "SELECT_GAME");
+  }
+  else if (currentScreen === "PLAYING" && (selectedGame === "CAMPAIGN" || isMinigame)) {
+    setScreen(isCampaignSubj ? "CAMPAIGN_HUB" : "SELECT_GAME");
   }
   else if (currentScreen === "PLAYING" && selectedGame === "PEXESO") {
     setScreen("SELECT_PEXESO_SIZE");
@@ -70,8 +75,7 @@ function goBack() {
     setScreen("SELECT_SUBJECT");
   }
   else if (currentScreen === "SELECT_GAME") {
-    const sLow = (selectedSubject || "").toLowerCase();
-    if (sLow.includes("cesta") || sLow.includes("postupn") || sLow.includes("inteligentn")) {
+    if (isCampaignSubj) {
       setScreen("CAMPAIGN_HUB");
     } else {
       setScreen("SELECT_GROUP");
