@@ -1059,7 +1059,7 @@ function renderActiveGame() {
               <span class="snake-shield-btn" style="opacity:0.4;">🛡️ Štít</span>
             `))}
 
-            <span style="color:var(--col-active-tab);">Slova: ${typeof snakeScore!=='undefined'?snakeScore:0} | Délka: ${typeof snakeBody!=='undefined'?snakeBody.length:3}</span>
+            <span style="color:var(--col-active-tab);">Slova: ${typeof snakeScore!=='undefined'?snakeScore:0} | Délka: <span id="snake-length-ui">${typeof snakeBody!=='undefined'?snakeBody.length:3}</span></span>
           </div>
 
           ${typeof snakeCurrentWord!=='undefined' && snakeCurrentWord ? `
