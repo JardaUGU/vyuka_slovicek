@@ -6,12 +6,14 @@ let storyStep = 0;
 let storyAnswered = false;
 let storyChosenOpt = null;
 let storyShowTrans = false;
+let storyMaxHearts = 0; // NOVÉ
+let storyHearts = 0; // NOVÉ
 
 function launchStoryMode(topicName) {
   selectedGroupKey = topicName;
   const userG = parseInt(currentUser.grade) || 2;
   
-  // Zachováme přesné pořadí vět tak, jak jdou za sebou v tabulce!
+  // Zachováme přesné pořadí vět tak, jak jdou za sebou v tabulce
   storyList = (appData.items || []).filter(it => 
     it.subject === selectedSubject && 
     isItemAllowedForGrade(it, userG) && 
@@ -23,6 +25,11 @@ function launchStoryMode(topicName) {
     alert("Tento příběh zatím neobsahuje žádné věty.");
     return;
   }
+
+  // Spočítáme kolik má příběh otázek a dáme tolik srdíček
+  storyMaxHearts = storyList.filter(it => it.options && it.options.length > 0).length;
+  if (storyMaxHearts === 0) storyMaxHearts = 1; // Pojistka, kdyby byl příběh jen čtecí
+  storyHearts = storyMaxHearts;
 
   storyStep = 0;
   storyAnswered = false;
@@ -55,10 +62,10 @@ function clickStoryOpt(optIdx) {
     sndOk();
   } else {
     sndErr();
+    storyHearts = Math.max(0, storyHearts - 1); // Ztráta srdíčka při chybě
   }
 
   // Přečte větu POUZE tehdy, pokud je to doplňovačka cizího textu (obsahuje '___').
-  // Pokud tam '___' není, jde o českou kontrolní otázku, takže TTS mlčí.
   if (typeof isAutoTTS !== "undefined" && isAutoTTS) {
     if (item.question.includes('___')) {
       let fullSentence = item.question.replace(/___+/g, item.answer);
@@ -108,7 +115,7 @@ function finishStory() {
   const alreadyDone = isStoryCompleted(selectedGroupKey, storyList);
 
   if (!alreadyDone) {
-    addCoins(currentUser.name, 10);
+    addCoins(currentUser.name, storyHearts); // Přidá tolik zlaťáků, kolik zbylo srdíček
     addReward(3, "Příběh: " + selectedGroupKey);
     saveWordMasteryToGoogle(selectedGroupKey, 2, "STORY");
     localStorage.setItem(`story_done_${uKey}_${selectedGroupKey}`, "1");
@@ -116,5 +123,11 @@ function finishStory() {
   } else {
     addReward(1, "Opakování příběhu: " + selectedGroupKey);
   }
-  setScreen("CAMPAIGN_HUB");
+  
+  const sLow = (selectedSubject || "").toLowerCase();
+  if (sLow.includes("cesta") || sLow.includes("postupn") || sLow.includes("inteligentn")) {
+    setScreen("CAMPAIGN_HUB");
+  } else {
+    setScreen("SELECT_GAME");
+  }
 }
