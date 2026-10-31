@@ -81,16 +81,34 @@ function startSmartMix() {
   wave2.sort(() => Math.random() - 0.5);
   wave3.sort(() => Math.random() - 0.5);
 
-  // Pojistka: pohlídáme, aby poslední slovo jedné vlny nebylo první slovo vlny následující
-  if (wave1.length > 0 && wave2.length > 1 && wave1[wave1.length - 1].data.question === wave2[0].data.question) {
-    wave2.push(wave2.shift());
-  }
-  if (wave2.length > 0 && wave3.length > 1 && wave2[wave2.length - 1].data.question === wave3[0].data.question) {
-    wave3.push(wave3.shift());
-  }
+  // ROBUSTNÍ POJISTKA (Anti-clustering): Prohledá vlnu a bezpečně vymění slovíčko,
+  // aniž by se vlnový systém rozbil nebo míchal typy úloh z jiných vln.
+  const secureWaveTransition = (prevWave, nextWave) => {
+    if (prevWave.length > 0 && nextWave.length > 1) {
+      const lastQuestion = prevWave[prevWave.length - 1].data.question;
+      if (nextWave[0].data.question === lastQuestion) {
+        // Najde ve vlně první úlohu, která se liší, a prohodí ji na 1. místo
+        for (let i = 1; i < nextWave.length; i++) {
+          if (nextWave[i].data.question !== lastQuestion) {
+            let temp = nextWave[0];
+            nextWave[0] = nextWave[i];
+            nextWave[i] = temp;
+            break;
+          }
+        }
+      }
+    }
+  };
+
+  secureWaveTransition(wave1, wave2);
+  
+  // Zjistíme, která vlna byla před vlnou 3 skutečně poslední (wave2 může být výjimečně prázdná)
+  const activePrevWave = wave2.length > 0 ? wave2 : wave1;
+  secureWaveTransition(activePrevWave, wave3);
 
   let q = [...wave1, ...wave2, ...wave3];
-  if (q.length > 30) q = q.slice(0, 30);
+  // Zvýšen limit na 35, aby se zbytečně neodstřihávala fáze "Skládání" (wave3) na konci
+  if (q.length > 35) q = q.slice(0, 35);
 
   // 4. Doplnit možnosti a grafémy
   const vItemsOnly = allItems.filter(i => i.type === "SLOVO");
@@ -160,12 +178,18 @@ function startCampaign() {
   let unmasteredVItems = currentVItems.filter(it => 
     getSavedMastery(it.question, 'DIR_IN') < 2 || getSavedMastery(it.question, 'DIR_OUT') < 2
   );
-  let targetVItems = unmasteredVItems.length > 0 ? unmasteredVItems : currentVItems;
+  
+  let targetVItems = [...unmasteredVItems].sort(() => Math.random() - 0.5);
 
-  // Aby se stihly všechny fáze (Kvíz + Skládání) do limitu, vezmeme max 12 slov na jeden zátah
-  if (targetVItems.length > 12) {
-    targetVItems = [...targetVItems].sort(() => Math.random() - 0.5).slice(0, 12);
+  // OPRAVA: Pokud je nezvládnutých slov méně než 12, doplníme je zvládnutými slovy z aktuální lekce,
+  // aby měl trénink za 5 zlaťáků vždy smysluplnou a dostatečnou délku.
+  if (targetVItems.length < 12) {
+    let masteredVItems = currentVItems.filter(it => !unmasteredVItems.includes(it)).sort(() => Math.random() - 0.5);
+    targetVItems = [...targetVItems, ...masteredVItems];
   }
+  
+  // Nyní bezpečně ořízneme na max 12 slov (což vygeneruje cca 25 - 40 úkolů)
+  targetVItems = targetVItems.slice(0, 12);
 
   targetVItems.forEach(it => {
       if (it.question.trim().includes(' ') || it.question.trim().includes('-')) {
