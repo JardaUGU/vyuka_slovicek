@@ -156,7 +156,6 @@ function clickScrambleTile(idx) {
   lastScrambleClickTime = now;
 
   const item = scrambleTiles[idx];
-  // Ignoruje kliknutí na použitá a blokovaná písmena
   if (item.used || item.isWrong) return; 
   
   const w = getVocabItems()[vCurrentWord];
@@ -168,13 +167,16 @@ function clickScrambleTile(idx) {
     item.used = true; 
     scramblePlaced.push(item.text);
     
-    // Uvolníme zablokovaná písmena
-    scrambleTiles.forEach(t => t.isWrong = false);
-
     if (scramblePlaced.length === target.length) {
       scrambleDone = true; scrambleSolvedCount++;
       if (!scrambleHadMistake) { addReward(1, typeof selectedGroupKey !== 'undefined' ? selectedGroupKey : ""); sndFanfare(); }
       if (typeof isAutoTTS !== "undefined" && isAutoTTS) speakWord(w.question, selectedSubject);
+    } else {
+      // VYLEPŠENÍ: Zjistíme další hledaný znak a odblokujeme ho, pokud byl dříve vybrán chybně
+      const nextExpected = target[scramblePlaced.length];
+      scrambleTiles.forEach(t => { 
+        if (t.text === nextExpected) t.isWrong = false; 
+      });
     }
   } else { 
     sndErr(); 
