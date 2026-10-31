@@ -181,22 +181,24 @@ function startCampaign() {
   
   let targetVItems = [...unmasteredVItems].sort(() => Math.random() - 0.5);
 
-  // OPRAVA: Pokud je nezvládnutých slov méně než 12, doplníme je zvládnutými slovy z aktuální lekce,
-  // aby měl trénink za 5 zlaťáků vždy smysluplnou a dostatečnou délku.
-  if (targetVItems.length < 12) {
+  // OPRAVA: Pokud je nezvládnutých slov málo, doplníme zvládnutá slova.
+  // Zvýšíme limit na 15 slov, což zaručí cca 30 - 40 úkolů v tréninku.
+  if (targetVItems.length < 15) {
     let masteredVItems = currentVItems.filter(it => !unmasteredVItems.includes(it)).sort(() => Math.random() - 0.5);
     targetVItems = [...targetVItems, ...masteredVItems];
   }
   
-  // Nyní bezpečně ořízneme na max 12 slov (což vygeneruje cca 25 - 40 úkolů)
-  targetVItems = targetVItems.slice(0, 12);
+  targetVItems = targetVItems.slice(0, 15);
 
   targetVItems.forEach(it => {
+      // Vynutíme testování i u slov, která už mají 2 hvězdy, aby měl trénink správnou délku
+      let forceTest = (getSavedMastery(it.question, 'DIR_IN') === 2 && getSavedMastery(it.question, 'DIR_OUT') === 2);
+      
       if (it.question.trim().includes(' ') || it.question.trim().includes('-')) {
           qSentences.push({ type: 'SCRAMBLE', data: it });
       } else {
-          if (getSavedMastery(it.question, 'DIR_IN') < 2) qNewPassive.push({ type: 'QUIZ_IN', data: it });
-          if (getSavedMastery(it.question, 'DIR_OUT') < 2) qNewActive.push({ type: 'QUIZ_OUT', data: it });
+          if (getSavedMastery(it.question, 'DIR_IN') < 2 || forceTest) qNewPassive.push({ type: 'QUIZ_IN', data: it });
+          if (getSavedMastery(it.question, 'DIR_OUT') < 2 || forceTest) qNewActive.push({ type: 'QUIZ_OUT', data: it });
           qSentences.push({ type: 'SCRAMBLE', data: it });
       }
   });
@@ -302,10 +304,18 @@ function requeueFailedTask(newTask) {
 function clickCmpScrambleTile(idx) {
   if (cmpState !== 'PLAYING') return;
   const task = cmpQueue[cmpIdx]; const tile = task.tiles[idx];
-  if (tile.used) return;
+  
+  // Ignoruje kliknutí, pokud je písmeno už použité, nebo je dočasně označené jako chybné
+  if (tile.used || tile.isWrong) return; 
 
   if (tile.text === task.tokens[task.placed.length]) {
-    sndOk(); tile.used = true; task.placed.push(tile.text);
+    sndOk(); 
+    tile.used = true; 
+    task.placed.push(tile.text);
+    
+    // RESET: Uvolníme všechna zablokovaná "chybná" písmena pro hádání dalšího znaku
+    task.tiles.forEach(t => t.isWrong = false);
+
     if (task.placed.length === task.tokens.length) { 
       cmpState = 'EVAL'; if (isAutoTTS) speakWord(task.data.question, selectedSubject); 
       if (!task.hadMistake) {
@@ -317,12 +327,19 @@ function clickCmpScrambleTile(idx) {
         if (mOut < 2) saveWordMasteryToGoogle(task.data.question, Math.min(2, mOut + step), 'DIR_OUT');
       }
     }
-   } else {
-    sndErr(); cmpHearts = Math.max(0, cmpHearts - 1); task.hadMistake = true;
-    let newTask = { type: 'SCRAMBLE', data: task.data, tokens: task.tokens, isWordMode: task.isWordMode, hadMistake: false, wave: task.wave };
-    newTask.tiles = task.tokens.map((t, i) => ({ text: t, used: false, id: i })).sort(() => Math.random() - 0.5);
-    newTask.placed = []; 
-    requeueFailedTask(newTask); // <--- UPRAVENO: vloží na konec aktuální vlny
+  } else {
+    sndErr(); 
+    tile.isWrong = true; // Označí písmeno jako chybné (zčervená a nepůjde kliknout)
+    
+    // Ochrana srdíček: Potrestáme ho jen při PRVNÍ chybě v daném slově
+    if (!task.hadMistake) {
+      cmpHearts = Math.max(0, cmpHearts - 1); 
+      task.hadMistake = true;
+      let newTask = { type: 'SCRAMBLE', data: task.data, tokens: task.tokens, isWordMode: task.isWordMode, hadMistake: false, wave: task.wave };
+      newTask.tiles = task.tokens.map((t, i) => ({ text: t, used: false, id: i })).sort(() => Math.random() - 0.5);
+      newTask.placed = []; 
+      requeueFailedTask(newTask); 
+    }
   }
   renderActiveGame();
 }
