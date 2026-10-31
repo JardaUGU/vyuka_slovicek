@@ -422,6 +422,9 @@ function updateSnake() {
       snakeFoods.splice(foodIdx, 1);
       snakeCurrentIdx++;
       snakeBody.unshift(head);
+      
+      const lenEl = document.getElementById("snake-length-ui");
+      if (lenEl) lenEl.innerText = snakeBody.length;
 
       updateSnakeSlotsDisplay();
       

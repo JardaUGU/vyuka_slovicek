@@ -344,7 +344,7 @@ function renderScreen() {
               let sItems = storiesGroups[title];
               let isDone = (typeof isStoryCompleted === "function") && isStoryCompleted(title, sItems);
               let borderCol = isDone ? "var(--col-green)" : "var(--col-yellow)";
-              let badgeText = isDone ? `<span style="color:var(--col-green); font-weight:bold; font-size:14px;">✅ Přečteno</span>` : `<span style="color:var(--col-yellow); font-weight:bold; font-size:15px;">🎁 +10 💰</span>`;
+             let badgeText = isDone ? `<span style="color:var(--col-green); font-weight:bold; font-size:14px;">✅ Přečteno</span>` : `<span style="color:var(--col-yellow); font-weight:bold; font-size:15px;">🎁 Nový!</span>`;
 
               storiesHtml += `
                 <div class="tile" style="flex-direction:row; justify-content:space-between; padding:12px 14px; background:var(--col-card); border-color:${borderCol};" onclick="if(typeof startStory==='function') startStory('${title.replace(/'/g, "\\'")}')">
@@ -773,16 +773,18 @@ function renderActiveGame() {
     
     if (storyStep >= storyList.length) {
       const alreadyDone = (typeof isStoryCompleted === "function") && isStoryCompleted(selectedGroupKey, storyList);
+      const rewardCoins = typeof storyHearts !== 'undefined' ? storyHearts : 0; // NOVÉ
+
       main.innerHTML = `
         <div style="text-align:center;padding:30px;">
           <h2 style="color:var(--col-green);font-size:28px;margin-bottom:10px;">PŘÍBĚH DOKONČEN! 🎉</h2>
           <p style="font-size:18px;color:inherit;margin-bottom:20px;">Skvělá práce při čtení příběhu <b>${selectedGroupKey}</b>.</p>
           ${!alreadyDone ? `
-            <p style="font-size:24px;color:var(--col-yellow);font-weight:bold;margin-bottom:25px;">Získáváš odměnu: +10 💰</p>
+            <p style="font-size:24px;color:var(--col-yellow);font-weight:bold;margin-bottom:25px;">Získáváš odměnu: +${rewardCoins} 💰</p>
           ` : `
             <p style="font-size:16px;color:var(--col-text-muted);margin-bottom:25px;">Tento příběh už máš splněný (odměna již byla vyplacena).</p>
           `}
-          <div class="action-btn green" onclick="if(typeof finishStory==='function') finishStory()">${!alreadyDone ? 'VYINKASOVAT 10 💰 A ZPĚT' : 'ZPĚT NA CESTU'}</div>
+          <div class="action-btn green" onclick="if(typeof finishStory==='function') finishStory()">${!alreadyDone ? 'VYINKASOVAT ' + rewardCoins + ' 💰 A ZPĚT' : 'ZPĚT NA CESTU'}</div>
         </div>
       `;
       return;
@@ -791,7 +793,7 @@ function renderActiveGame() {
     const item = storyList[storyStep];
     const pct = Math.round(((storyStep + 1) / storyList.length) * 100);
     const hasOpts = item.options && item.options.length > 0;
-    const isCzechQuestion = hasOpts && !item.question.includes('___');
+    const heartsHtml = "❤️".repeat(typeof storyHearts !== 'undefined' ? storyHearts : 0) + "🖤".repeat(Math.max(0, (typeof storyMaxHearts !== 'undefined' ? storyMaxHearts : 0) - (typeof storyHearts !== 'undefined' ? storyHearts : 0)));
 
     // Historie předchozích vět: čistý dialog pod sebou, bez bublin a bez českého překladu
     let historyHtml = "";
@@ -830,7 +832,7 @@ function renderActiveGame() {
         <div class="bargraph-container" style="flex-shrink:0; margin-bottom:6px;">
           <div class="bargraph-header">
             <span>📖 ${selectedGroupKey} (${storyStep + 1} / ${storyList.length})</span>
-            <span style="color:var(--col-active-tab);">${pct} %</span>
+            <span style="color:var(--col-active-tab);">${heartsHtml} &nbsp; ${pct} %</span>
           </div>
           <div class="bargraph-track"><div class="bargraph-fill" style="width:${pct}%;"></div></div>
         </div>
@@ -1059,7 +1061,7 @@ function renderActiveGame() {
               <span class="snake-shield-btn" style="opacity:0.4;">🛡️ Štít</span>
             `))}
 
-            <span style="color:var(--col-active-tab);">Slova: ${typeof snakeScore!=='undefined'?snakeScore:0} | Délka: ${typeof snakeBody!=='undefined'?snakeBody.length:3}</span>
+            <span style="color:var(--col-active-tab);">Slova: ${typeof snakeScore!=='undefined'?snakeScore:0} | Délka: <span id="snake-length-ui">${typeof snakeBody!=='undefined'?snakeBody.length:3}</span></span>
           </div>
 
           ${typeof snakeCurrentWord!=='undefined' && snakeCurrentWord ? `
