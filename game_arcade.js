@@ -9,21 +9,30 @@ function stopArcadeLoop() {
   if (arcadeAnimId) { cancelAnimationFrame(arcadeAnimId); arcadeAnimId = null; }
 }
 
-function startArcadeGame() {
+function startArcadeGame(overrideMode) {
   stopArcadeLoop();
   isCampaignMinigame = false;
   const vItems = getVocabItems();
-  const mode = getQuickChoiceMode();
-  arcadeMode = "CLASSIC_" + mode;
   
-  arcadeDeck = vItems.filter(it => {
-    if (mode === "DER_DIE_DAS") return /^(der|die|das)\s/i.test(it.question);
-    if (mode === "A_AN") return /^(a|an)\s/i.test(it.question);
-    if (mode === "I_Y") return it.question.includes('_');
-    return false;
-  }).sort(() => Math.random() - 0.5);
+  // Zpětná kompatibilita + načtení režimu z tlačítka
+  let mode = overrideMode;
+  if (!mode) mode = getQuickChoiceMode();
+  
+  if (mode === "TRANSLATE") {
+      arcadeMode = "TRANSLATE";
+      arcadeDeck = vItems.filter(it => it.question.split(' ').length <= 2 && !it.question.includes('.')).sort(() => Math.random() - 0.5);
+  } else {
+      arcadeMode = "CLASSIC_" + mode;
+      arcadeDeck = vItems.filter(it => {
+        if (mode === "DER_DIE_DAS") return /^(der|die|das)\s/i.test(it.question);
+        if (mode === "A_AN") return /^(a|an)\s/i.test(it.question);
+        if (mode === "I_Y") return it.question.includes('_');
+        return false;
+      }).sort(() => Math.random() - 0.5);
+  }
 
-  if (arcadeDeck.length === 0) { alert("Málo vhodných slov."); return; }
+  if (arcadeDeck.length < 3) { alert("Málo vhodných slov pro tento režim."); return; }
+  
   arcadeLives = 3; arcadeScore = 0; arcadeLevel = 1; arcadeSpeed = 0.8; arcadeState = "PLAYING";
   selectedGame = "ARCADE";
   setScreen("PLAYING");
@@ -60,11 +69,11 @@ function spawnArcadeWord() {
   arcadeX = Math.floor(Math.random() * 40) + 30; 
   arcadeState = "PLAYING";
 
-  if (arcadeMode === "TRANSLATE") {
-      let others = campaignMinigamePool.filter(it => it.question !== arcadeCurrent.question && cleanCzechTranslation(it.answer) !== cleanCzechTranslation(arcadeCurrent.answer)).sort(()=>Math.random()-0.5).slice(0,2);
+ if (arcadeMode === "TRANSLATE") {
+      let poolToUse = isCampaignMinigame ? campaignMinigamePool : getVocabItems().filter(it => it.question.split(' ').length <= 2 && !it.question.includes('.'));
+      let others = poolToUse.filter(it => it.question !== arcadeCurrent.question && cleanCzechTranslation(it.answer) !== cleanCzechTranslation(arcadeCurrent.answer)).sort(()=>Math.random()-0.5).slice(0,2);
       arcadeCurrentOptions = [arcadeCurrent.question, ...others.map(o=>o.question)].sort(()=>Math.random()-0.5);
   }
-
   renderActiveGame();
   runArcadeLoop();
 }
