@@ -81,16 +81,34 @@ function startSmartMix() {
   wave2.sort(() => Math.random() - 0.5);
   wave3.sort(() => Math.random() - 0.5);
 
-  // Pojistka: pohlídáme, aby poslední slovo jedné vlny nebylo první slovo vlny následující
-  if (wave1.length > 0 && wave2.length > 1 && wave1[wave1.length - 1].data.question === wave2[0].data.question) {
-    wave2.push(wave2.shift());
-  }
-  if (wave2.length > 0 && wave3.length > 1 && wave2[wave2.length - 1].data.question === wave3[0].data.question) {
-    wave3.push(wave3.shift());
-  }
+  // ROBUSTNÍ POJISTKA (Anti-clustering): Prohledá vlnu a bezpečně vymění slovíčko,
+  // aniž by se vlnový systém rozbil nebo míchal typy úloh z jiných vln.
+  const secureWaveTransition = (prevWave, nextWave) => {
+    if (prevWave.length > 0 && nextWave.length > 1) {
+      const lastQuestion = prevWave[prevWave.length - 1].data.question;
+      if (nextWave[0].data.question === lastQuestion) {
+        // Najde ve vlně první úlohu, která se liší, a prohodí ji na 1. místo
+        for (let i = 1; i < nextWave.length; i++) {
+          if (nextWave[i].data.question !== lastQuestion) {
+            let temp = nextWave[0];
+            nextWave[0] = nextWave[i];
+            nextWave[i] = temp;
+            break;
+          }
+        }
+      }
+    }
+  };
+
+  secureWaveTransition(wave1, wave2);
+  
+  // Zjistíme, která vlna byla před vlnou 3 skutečně poslední (wave2 může být výjimečně prázdná)
+  const activePrevWave = wave2.length > 0 ? wave2 : wave1;
+  secureWaveTransition(activePrevWave, wave3);
 
   let q = [...wave1, ...wave2, ...wave3];
-  if (q.length > 30) q = q.slice(0, 30);
+  // Zvýšen limit na 35, aby se zbytečně neodstřihávala fáze "Skládání" (wave3) na konci
+  if (q.length > 35) q = q.slice(0, 35);
 
   // 4. Doplnit možnosti a grafémy
   const vItemsOnly = allItems.filter(i => i.type === "SLOVO");
@@ -160,19 +178,27 @@ function startCampaign() {
   let unmasteredVItems = currentVItems.filter(it => 
     getSavedMastery(it.question, 'DIR_IN') < 2 || getSavedMastery(it.question, 'DIR_OUT') < 2
   );
-  let targetVItems = unmasteredVItems.length > 0 ? unmasteredVItems : currentVItems;
+  
+  let targetVItems = [...unmasteredVItems].sort(() => Math.random() - 0.5);
 
-  // Aby se stihly všechny fáze (Kvíz + Skládání) do limitu, vezmeme max 12 slov na jeden zátah
-  if (targetVItems.length > 12) {
-    targetVItems = [...targetVItems].sort(() => Math.random() - 0.5).slice(0, 12);
+  // OPRAVA: Pokud je nezvládnutých slov málo, doplníme zvládnutá slova.
+  // Zvýšíme limit na 15 slov, což zaručí cca 30 - 40 úkolů v tréninku.
+  if (targetVItems.length < 15) {
+    let masteredVItems = currentVItems.filter(it => !unmasteredVItems.includes(it)).sort(() => Math.random() - 0.5);
+    targetVItems = [...targetVItems, ...masteredVItems];
   }
+  
+  targetVItems = targetVItems.slice(0, 15);
 
   targetVItems.forEach(it => {
+      // Vynutíme testování i u slov, která už mají 2 hvězdy, aby měl trénink správnou délku
+      let forceTest = (getSavedMastery(it.question, 'DIR_IN') === 2 && getSavedMastery(it.question, 'DIR_OUT') === 2);
+      
       if (it.question.trim().includes(' ') || it.question.trim().includes('-')) {
           qSentences.push({ type: 'SCRAMBLE', data: it });
       } else {
-          if (getSavedMastery(it.question, 'DIR_IN') < 2) qNewPassive.push({ type: 'QUIZ_IN', data: it });
-          if (getSavedMastery(it.question, 'DIR_OUT') < 2) qNewActive.push({ type: 'QUIZ_OUT', data: it });
+          if (getSavedMastery(it.question, 'DIR_IN') < 2 || forceTest) qNewPassive.push({ type: 'QUIZ_IN', data: it });
+          if (getSavedMastery(it.question, 'DIR_OUT') < 2 || forceTest) qNewActive.push({ type: 'QUIZ_OUT', data: it });
           qSentences.push({ type: 'SCRAMBLE', data: it });
       }
   });
@@ -278,10 +304,14 @@ function requeueFailedTask(newTask) {
 function clickCmpScrambleTile(idx) {
   if (cmpState !== 'PLAYING') return;
   const task = cmpQueue[cmpIdx]; const tile = task.tiles[idx];
-  if (tile.used) return;
+  
+  if (tile.used || tile.isWrong) return; 
 
   if (tile.text === task.tokens[task.placed.length]) {
-    sndOk(); tile.used = true; task.placed.push(tile.text);
+    sndOk(); 
+    tile.used = true; 
+    task.placed.push(tile.text);
+    
     if (task.placed.length === task.tokens.length) { 
       cmpState = 'EVAL'; if (isAutoTTS) speakWord(task.data.question, selectedSubject); 
       if (!task.hadMistake) {
@@ -292,13 +322,27 @@ function clickCmpScrambleTile(idx) {
         if (mIn < 2) saveWordMasteryToGoogle(task.data.question, Math.min(2, mIn + step), 'DIR_IN');
         if (mOut < 2) saveWordMasteryToGoogle(task.data.question, Math.min(2, mOut + step), 'DIR_OUT');
       }
+    } else {
+      // VYLEPŠENÍ: Zjistíme, jaké písmeno/slovo je na řadě teď
+      const nextExpected = task.tokens[task.placed.length];
+      // Odblokujeme POUZE ta červená písmena, která se shodují s tím, co teď hledáme
+      task.tiles.forEach(t => { 
+        if (t.text === nextExpected) t.isWrong = false; 
+      });
     }
-   } else {
-    sndErr(); cmpHearts = Math.max(0, cmpHearts - 1); task.hadMistake = true;
-    let newTask = { type: 'SCRAMBLE', data: task.data, tokens: task.tokens, isWordMode: task.isWordMode, hadMistake: false, wave: task.wave };
-    newTask.tiles = task.tokens.map((t, i) => ({ text: t, used: false, id: i })).sort(() => Math.random() - 0.5);
-    newTask.placed = []; 
-    requeueFailedTask(newTask); // <--- UPRAVENO: vloží na konec aktuální vlny
+  } else {
+    sndErr(); 
+    tile.isWrong = true; // Označí písmeno jako chybné (zčervená a nepůjde kliknout)
+    
+    // Ochrana srdíček: Potrestáme ho jen při PRVNÍ chybě v daném slově
+    if (!task.hadMistake) {
+      cmpHearts = Math.max(0, cmpHearts - 1); 
+      task.hadMistake = true;
+      let newTask = { type: 'SCRAMBLE', data: task.data, tokens: task.tokens, isWordMode: task.isWordMode, hadMistake: false, wave: task.wave };
+      newTask.tiles = task.tokens.map((t, i) => ({ text: t, used: false, id: i })).sort(() => Math.random() - 0.5);
+      newTask.placed = []; 
+      requeueFailedTask(newTask); 
+    }
   }
   renderActiveGame();
 }

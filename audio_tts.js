@@ -47,8 +47,13 @@ function speakWord(text, subjectName) {
     // Zabrání čtení velkého "No" jako "Number" a u "Oh no" vylepší intonaci
     toSpeak = toSpeak.replace(/\bNo\b/g, 'no').replace(/\bOh no\b/gi, 'oh nou');
 
-    // OPRAVA HEBREJŠTINY (Ladonaj vs Adonaj pro všechny velikosti písmen a varianty)
-    toSpeak = toSpeak.replace(/ליהוה/g, 'לַאדֹנָי').replace(/יהוה/g, 'אֲדֹנָי');
+    // OPRAVA HEBREJŠTINY (ignoruje samohlásky/nikud uvnitř Božího jména pomocí Unicode)
+    // \u05DC = Lamed, \u05D9 = Jod, \u05D4 = He, \u05D5 = Vav
+    // [\u0591-\u05C7]* znamená "ignoruj jakékoliv množství samohlásek mezi písmeny"
+    const regexLadonaj = /\u05DC[\u0591-\u05C7]*\u05D9[\u0591-\u05C7]*\u05D4[\u0591-\u05C7]*\u05D5[\u0591-\u05C7]*\u05D4/g;
+    const regexAdonaj = /\u05D9[\u0591-\u05C7]*\u05D4[\u0591-\u05C7]*\u05D5[\u0591-\u05C7]*\u05D4/g;
+    
+    toSpeak = toSpeak.replace(regexLadonaj, 'לַאדֹנָי').replace(regexAdonaj, 'אֲדֹנָי');
     toSpeak = toSpeak.replace(/l'?(jahve|jahveh|yahweh|yahwe|jehova|jhvh|yhwh|jhwh|jvhv)/gi, "Ladonaj");
     toSpeak = toSpeak.replace(/(jahve|jahveh|yahweh|yahwe|jehova|jhvh|yhwh|jhwh|jvhv)/gi, "Adonaj");
     

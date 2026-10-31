@@ -323,6 +323,11 @@ function registerUserAction() {
   checkDateRollover(); lastUserActivityTime = Date.now();
   if (isTimerPaused) { isTimerPaused = false; updateStudyTimerUI(); }
   if (typeof updateVoices === "function" && typeof cachedVoices !== "undefined" && cachedVoices.length === 0) updateVoices();
+
+  // NOVÝ BLOK: Probudí uspáný AudioContext na iOS (iPhone/iPad) ihned při prvním dotyku
+  if (typeof audioCtx !== "undefined" && audioCtx.state === "suspended") {
+    audioCtx.resume().catch(() => {});
+  }
 }
 window.addEventListener('click', registerUserAction, true);
 window.addEventListener('touchstart', registerUserAction, true);

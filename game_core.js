@@ -42,6 +42,7 @@ function getGroupMasteryPercent(groupItems, subjName) {
 function goBack() {
   if (typeof stopArcadeLoop === "function") stopArcadeLoop();
   if (typeof stopSnakeLoop === "function") stopSnakeLoop();
+  if (typeof stopPexesoTimeout === "function") stopPexesoTimeout();
   if (typeof sendTimeHeartbeatToGoogle === "function") sendTimeHeartbeatToGoogle();
 
   const isMinigame = (typeof isCampaignMinigame !== "undefined" && isCampaignMinigame && selectedGame !== "PROCEDURAL_MATH");
@@ -88,6 +89,7 @@ function goBack() {
 function startGame(game) { 
   if (typeof stopArcadeLoop === "function") stopArcadeLoop(); 
   if (typeof stopSnakeLoop === "function") stopSnakeLoop();
+  if (typeof stopPexesoTimeout === "function") stopPexesoTimeout();
   selectedGame = game; 
   if (typeof isCampaignMinigame !== "undefined") isCampaignMinigame = false; 
   if (typeof initGameState === "function") initGameState(); 

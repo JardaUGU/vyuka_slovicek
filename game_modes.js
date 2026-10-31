@@ -152,24 +152,37 @@ let lastScrambleClickTime = 0;
 function clickScrambleTile(idx) {
   if (scrambleDone) return;
   const now = Date.now();
-  if (now - lastScrambleClickTime < 120) return; // Ochrana proti dvojdotyku
+  if (now - lastScrambleClickTime < 120) return; 
   lastScrambleClickTime = now;
 
   const item = scrambleTiles[idx];
-  if (item.used) return;
-  const w = getVocabItems()[vCurrentWord];
+  if (item.used || item.isWrong) return; 
   
+  const w = getVocabItems()[vCurrentWord];
   const cleanTarget = w.question.replace(/\s*\([^)]*\)/g, '').trim();
   const target = scrambleIsWordMode ? (cleanTarget.includes('-') ? cleanTarget.split('-').map(s=>s.trim()) : cleanTarget.split(/\s+/)) : getGraphemes(cleanTarget);
 
   if (item.text === target[scramblePlaced.length]) {
-    sndOk(); item.used = true; scramblePlaced.push(item.text);
+    sndOk(); 
+    item.used = true; 
+    scramblePlaced.push(item.text);
+    
     if (scramblePlaced.length === target.length) {
       scrambleDone = true; scrambleSolvedCount++;
       if (!scrambleHadMistake) { addReward(1, typeof selectedGroupKey !== 'undefined' ? selectedGroupKey : ""); sndFanfare(); }
       if (typeof isAutoTTS !== "undefined" && isAutoTTS) speakWord(w.question, selectedSubject);
+    } else {
+      // VYLEPŠENÍ: Zjistíme další hledaný znak a odblokujeme ho, pokud byl dříve vybrán chybně
+      const nextExpected = target[scramblePlaced.length];
+      scrambleTiles.forEach(t => { 
+        if (t.text === nextExpected) t.isWrong = false; 
+      });
     }
-  } else { sndErr(); scrambleHadMistake = true; }
+  } else { 
+    sndErr(); 
+    item.isWrong = true; // Zablokuje toto písmeno
+    scrambleHadMistake = true; 
+  }
   if(typeof renderActiveGame === 'function') renderActiveGame();
 }
 
