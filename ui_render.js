@@ -272,32 +272,31 @@ function renderScreen() {
         for (let k in currentUser.startLevels) { if (subjNorm.includes(k) || k.includes(subjNorm)) { userMinLvl = Number(currentUser.startLevels[k]) || 1; break; } }
       }
 
-      // VYLEPŠENÝ ALGORITMUS HLEDÁNÍ AKTUÁLNÍ LEKCE (Ochrana proti propadu)
+      // VYLEPŠENÝ ALGORITMUS HLEDÁNÍ AKTUÁLNÍ LEKCE (Postupný průchod s ochranou)
       let currentLessonIndex = 0;
       
-      // 1. Nastavíme výchozí pozici podle minimálního levelu uživatele (pokud přeskakoval)
+      // 1. Nastavíme výchozí pozici podle minimálního levelu uživatele
       for (let i = 0; i < lessons.length; i++) {
         let num = parseInt(lessons[i].replace(/\D/g, '')) || 1;
         if (num <= userMinLvl) currentLessonIndex = i;
       }
 
-      // 2. Projdeme všechny lekce a najdeme ten nejvyšší odemčený bod
-      for (let i = 0; i < lessons.length; i++) {
+      // 2. Projdeme lekce hezky popořadě.
+      for (let i = currentLessonIndex; i < lessons.length; i++) {
+        currentLessonIndex = i; // Nastavíme se do aktuálně testované lekce
+        
         let lItems = vItems.filter(it => it.lesson === lessons[i]);
         let pct = (typeof getGroupMasteryPercent === "function") ? getGroupMasteryPercent(lItems, selectedSubject) : 0;
         
-        // Pokud má lekce nějaký postup (i malý), uživatel už v ní prokazatelně je
-        if (pct > 0 && i > currentLessonIndex) {
-            currentLessonIndex = i;
-        }
-        // Pokud je lekce splněna na >= 95%, automaticky odemyká právo na lekci následující
-        if (pct >= 95 && i >= currentLessonIndex) {
-            currentLessonIndex = i + 1;
+        // Hranice 60 % funguje jako záchranný polštář.
+        // Zabrání propadu do starých lekcí, pokud žák zapomene pár slov (spadne z 100% třeba na 85%).
+        // Zároveň zabrání přeskoku do Levelu 49 (kvůli shodným slovům), 
+        // protože se smyčka nekompromisně zastaví už na Levelu 20.
+        if (pct < 60) {
+            break;
         }
       }
       
-      // Pojistka, abychom nepřeskočili mimo seznam lekcí
-      currentLessonIndex = Math.min(currentLessonIndex, lessons.length - 1);
       let currentLesson = lessons[currentLessonIndex] || "Level 1";
 
       if (typeof selectedGroupKey !== 'undefined') selectedGroupKey = currentLesson; 
