@@ -415,13 +415,21 @@ function renderScreen() {
       
       if (vItems.length > 0 || qItems.length > 0) {
         html += `
-          <div class="action-btn" style="background:linear-gradient(135deg, #8b5cf6, #3b82f6); border-color:#c4b5fd; margin-bottom:15px; padding:16px; font-size:20px; box-shadow: 0 4px 15px rgba(139, 92, 246, 0.4);" onclick="if(typeof startSmartMix==='function') startSmartMix()">
+          <div class="action-btn" style="background:linear-gradient(135deg, #8b5cf6, #3b82f6); border-color:#c4b5fd; margin-bottom:5px; padding:16px; font-size:20px; box-shadow: 0 4px 15px rgba(139, 92, 246, 0.4);" onclick="if(typeof startSmartMix==='function') startSmartMix()">
             🧠 SPUSTIT CHYTRÝ TRÉNINK
           </div>
         `;
       }
 
-      html += `<div class="grid-2">`;
+      // ==========================================
+      // SEKCE 1: STUDIUM
+      // ==========================================
+      html += `
+        <div style="margin: 18px 0 10px 0; border-bottom: 2px solid var(--col-card-border); padding-bottom: 5px;">
+          <h3 style="color:var(--col-active-tab); font-size:16px; text-transform:uppercase; letter-spacing:1px;">📚 Studium</h3>
+        </div>
+        <div class="grid-2">
+      `;
       
       if (vItems.length > 0) {
         html += `
@@ -430,25 +438,60 @@ function renderScreen() {
             <h2 style="color:var(--col-green);">2. Zkoušení</h2><p>${typeof testingDirection!=='undefined' && testingDirection==='DIR_OUT'?'🇨🇿 ➔ Cizí':'Cizí ➔ 🇨🇿'}</p>
           </div>
           <div class="tile" onclick="if(typeof startGame==='function') startGame('SCRAMBLE')"><h2>3. Skládání</h2><p>Pravopis</p></div>
+        `;
+      }
+      if (qItems.length > 0) {
+        html += `<div class="tile" style="border-color:var(--col-green);" onclick="if(typeof startGame==='function') startGame('QUIZ')"><h2 style="color:var(--col-green);">📝 Kvíz</h2><p>${qItems.length} otázek</p></div>`;
+      }
+      html += `</div>`;
+
+      // ==========================================
+      // SEKCE 2: HRY A VÝZVY
+      // ==========================================
+      html += `
+        <div style="margin: 22px 0 10px 0; border-bottom: 2px solid var(--col-card-border); padding-bottom: 5px;">
+          <h3 style="color:var(--col-yellow); font-size:16px; text-transform:uppercase; letter-spacing:1px;">🎮 Hry</h3>
+        </div>
+        <div class="grid-2">
+      `;
+      
+      if (vItems.length > 0) {
+        html += `
           <div class="tile" onclick="if(typeof setScreen==='function') setScreen('SELECT_PEXESO_SIZE')"><h2>🃏 Pexeso</h2><p>Hledání dvojic</p></div>
           <div class="tile" style="border-color:var(--col-green);" onclick="if(typeof startSnakeGame === 'function') startSnakeGame()">
             <h2 style="color:var(--col-green);">🐍 Had</h2><p>Pravopis na čas</p>
           </div>
         `;
       }
-      if (quickMode) {
-        html += `
-          <div class="tile" style="border-color:var(--col-orange);grid-column: span 2;" onclick="if(typeof startArcadeGame==='function') startArcadeGame()">
-            <h2 style="color:var(--col-orange);">☄️ Padající slova (${quickMode.replace(/_/g, ' ')})</h2><p>Arkáda: 3 životy!</p>
-          </div>
-        `;
-      }
-      if (qItems.length > 0) {
-        html += `<div class="tile" style="border-color:var(--col-green);" onclick="if(typeof startGame==='function') startGame('QUIZ')"><h2 style="color:var(--col-green);">📝 Kvíz</h2><p>${qItems.length} otázek</p></div>`;
-      }
+      
       if (sItems.length > 0) {
         html += `<div class="tile" style="border-color:var(--col-yellow);" onclick="if(typeof openSequenceMenu==='function') openSequenceMenu()"><h2 style="color:var(--col-yellow);">⏱️ Řada na čas</h2><p>${sItems.length} úloh</p></div>`;
       }
+
+      // Arkáda: 1. Překlad (pokud jsou krátká slova)
+      let translateEligible = vItems.filter(it => it.question.split(' ').length <= 2 && !it.question.includes('.')).length >= 3;
+      if (translateEligible) {
+        html += `
+          <div class="tile" style="border-color:var(--col-orange);" onclick="if(typeof startArcadeGame==='function') startArcadeGame('TRANSLATE')">
+            <h2 style="color:var(--col-orange);">☄️ Padající slova</h2><p>Rychlý překlad</p>
+          </div>
+        `;
+      }
+
+      // Arkáda: 2. Členy/Gramatika
+      if (quickMode) {
+        let modeLabel = quickMode;
+        if (quickMode === "DER_DIE_DAS") modeLabel = "Členy der/die/das";
+        else if (quickMode === "A_AN") modeLabel = "Členy a / an";
+        else if (quickMode === "I_Y") modeLabel = "Doplňování i / y";
+        
+        html += `
+          <div class="tile" style="border-color:var(--col-orange);" onclick="if(typeof startArcadeGame==='function') startArcadeGame('${quickMode}')">
+            <h2 style="color:var(--col-orange);">☄️ Padající slova</h2><p>${modeLabel}</p>
+          </div>
+        `;
+      }
+      
       if (vItems.length === 0 && qItems.length === 0 && sItems.length === 0) {
         html += `<div style="grid-column:span 2;text-align:center;padding:20px;color:var(--col-text-muted);">V této lekci nejsou žádná data ke hraní.</div>`;
       }

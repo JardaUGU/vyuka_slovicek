@@ -29,7 +29,8 @@ function launchStoryMode(topicName) {
   // Spočítáme kolik má příběh otázek a dáme tolik srdíček
   storyMaxHearts = storyList.filter(it => it.options && it.options.length > 0).length;
   if (storyMaxHearts === 0) storyMaxHearts = 1; // Pojistka, kdyby byl příběh jen čtecí
-  storyHearts = storyMaxHearts;
+    // ZMĚNA: Začínáme s NULA srdíčky (žák si je musí vydělat)
+  storyHearts = 0;
 
   storyStep = 0;
   storyAnswered = false;
@@ -60,12 +61,14 @@ function clickStoryOpt(optIdx) {
 
   if (chosen === item.answer) {
     sndOk();
+    // ZMĚNA: Přidá srdíčko za správnou odpověď a spustí efekt
+    storyHearts = Math.min(storyMaxHearts, storyHearts + 1); 
+    showBigHeartFlash();
   } else {
     sndErr();
-    storyHearts = Math.max(0, storyHearts - 1); // Ztráta srdíčka při chybě
+    // Za chybu se už neodečítá, protože žák má jen 1 pokus (zajistí to proměnná storyAnswered)
   }
 
-  // Přečte větu POUZE tehdy, pokud je to doplňovačka cizího textu (obsahuje '___').
   if (typeof isAutoTTS !== "undefined" && isAutoTTS) {
     if (item.question.includes('___')) {
       let fullSentence = item.question.replace(/___+/g, item.answer);
@@ -130,4 +133,14 @@ function finishStory() {
   } else {
     setScreen("SELECT_GAME");
   }
+}
+
+function showBigHeartFlash() {
+  const main = document.getElementById("main-content");
+  if (!main) return;
+  const flash = document.createElement("div");
+  flash.className = "heart-flash-container";
+  flash.innerText = "❤️";
+  main.appendChild(flash);
+  setTimeout(() => { if (flash.parentNode) flash.remove(); }, 850);
 }

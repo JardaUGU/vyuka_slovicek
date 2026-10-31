@@ -224,3 +224,21 @@ footer { height: 32px; background-color: var(--col-card); border-top: 1px solid 
   30%, 50%, 70% { transform: translateX(-5px); }
   40%, 60% { transform: translateX(5px); }
 }
+
+/* EFEKT VYSKOČENÍ SRDÍČKA (PŘÍBĚHY) */
+.heart-flash-container {
+  position: absolute;
+  top: 45%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 140px;
+  z-index: 1000;
+  pointer-events: none;
+  animation: heartPop 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+@keyframes heartPop {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.3); }
+  30% { opacity: 1; transform: translate(-50%, -50%) scale(1.1); }
+  50% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -120%) scale(1.3); }
+}
