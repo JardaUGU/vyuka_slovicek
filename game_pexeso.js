@@ -8,8 +8,18 @@ let pexesoFlipped = [];
 let pexesoMatched = [];
 let pexesoLocked = false;
 let pexesoAttempts = 0;
+let pexesoTimeoutId = null; // NOVÉ: Proměnná pro uchování časovače
+
+// NOVÁ FUNKCE: Spolehlivě zastaví odpočet přetáčení karet
+function stopPexesoTimeout() {
+  if (pexesoTimeoutId) { 
+    clearTimeout(pexesoTimeoutId); 
+    pexesoTimeoutId = null; 
+  }
+}
 
 function startPexesoGame(pairCount) {
+  stopPexesoTimeout(); // Zastavení případného běžícího časovače
   isCampaignMinigame = false;
   pexesoPairCount = pairCount; 
   selectedGame = "PEXESO";
@@ -67,10 +77,11 @@ function clickPexesoCard(idx) {
         if (!isCampaignMinigame) addReward(2, selectedGroupKey);
       }
       renderActiveGame();
-    } else {
+     } else {
       sndErr(); 
       pexesoLocked = true;
-      setTimeout(() => { 
+      // ZDE JE ZMĚNA: Přidáno "pexesoTimeoutId = "
+      pexesoTimeoutId = setTimeout(() => { 
         pexesoFlipped = []; 
         pexesoLocked = false; 
         renderActiveGame(); 
