@@ -207,3 +207,20 @@ footer { height: 32px; background-color: var(--col-card); border-top: 1px solid 
 .dpad-row { display: flex; justify-content: center; gap: 14px; }
 .dpad-btn { width: 68px; height: 52px; background: var(--col-card); border: 2px solid var(--col-active-tab); border-radius: 12px; color: var(--col-text); font-size: 26px; font-weight: bold; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3); user-select: none; touch-action: manipulation; }
 .dpad-btn:active { background: var(--col-active-tab); color: var(--col-on-active); transform: scale(0.92); }
+
+/* EFEKT PRO CHYBNÉ PÍSMENO VE SKLÁDÁNÍ */
+.letter-tile.wrong-temporary {
+  background: var(--col-red) !important;
+  color: #ffffff !important;
+  border-color: #ffffff !important;
+  opacity: 0.5;
+  pointer-events: none; /* Zabrání dalšímu klikání */
+  animation: shakeTile 0.35s cubic-bezier(.36,.07,.19,.97) both;
+}
+
+@keyframes shakeTile {
+  10%, 90% { transform: translateX(-2px); }
+  20%, 80% { transform: translateX(3px); }
+  30%, 50%, 70% { transform: translateX(-5px); }
+  40%, 60% { transform: translateX(5px); }
+}
