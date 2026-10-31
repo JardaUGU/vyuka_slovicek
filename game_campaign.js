@@ -305,7 +305,6 @@ function clickCmpScrambleTile(idx) {
   if (cmpState !== 'PLAYING') return;
   const task = cmpQueue[cmpIdx]; const tile = task.tiles[idx];
   
-  // Ignoruje kliknutí, pokud je písmeno už použité, nebo je dočasně označené jako chybné
   if (tile.used || tile.isWrong) return; 
 
   if (tile.text === task.tokens[task.placed.length]) {
@@ -313,9 +312,6 @@ function clickCmpScrambleTile(idx) {
     tile.used = true; 
     task.placed.push(tile.text);
     
-    // RESET: Uvolníme všechna zablokovaná "chybná" písmena pro hádání dalšího znaku
-    task.tiles.forEach(t => t.isWrong = false);
-
     if (task.placed.length === task.tokens.length) { 
       cmpState = 'EVAL'; if (isAutoTTS) speakWord(task.data.question, selectedSubject); 
       if (!task.hadMistake) {
@@ -326,6 +322,13 @@ function clickCmpScrambleTile(idx) {
         if (mIn < 2) saveWordMasteryToGoogle(task.data.question, Math.min(2, mIn + step), 'DIR_IN');
         if (mOut < 2) saveWordMasteryToGoogle(task.data.question, Math.min(2, mOut + step), 'DIR_OUT');
       }
+    } else {
+      // VYLEPŠENÍ: Zjistíme, jaké písmeno/slovo je na řadě teď
+      const nextExpected = task.tokens[task.placed.length];
+      // Odblokujeme POUZE ta červená písmena, která se shodují s tím, co teď hledáme
+      task.tiles.forEach(t => { 
+        if (t.text === nextExpected) t.isWrong = false; 
+      });
     }
   } else {
     sndErr(); 
