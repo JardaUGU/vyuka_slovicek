@@ -272,13 +272,33 @@ function renderScreen() {
         for (let k in currentUser.startLevels) { if (subjNorm.includes(k) || k.includes(subjNorm)) { userMinLvl = Number(currentUser.startLevels[k]) || 1; break; } }
       }
 
-      let currentLesson = lessons[0] || "Level 1";
-      for (let l of lessons) {
-        let num = parseInt(l.replace(/\D/g, '')) || 1; if (num < userMinLvl) continue;
-        let lItems = vItems.filter(it => it.lesson === l);
-        let pct = (typeof getGroupMasteryPercent === "function") ? getGroupMasteryPercent(lItems, selectedSubject) : 0;
-        if (pct < 95) { currentLesson = l; break; }
+      // VYLEPŠENÝ ALGORITMUS HLEDÁNÍ AKTUÁLNÍ LEKCE (Ochrana proti propadu)
+      let currentLessonIndex = 0;
+      
+      // 1. Nastavíme výchozí pozici podle minimálního levelu uživatele (pokud přeskakoval)
+      for (let i = 0; i < lessons.length; i++) {
+        let num = parseInt(lessons[i].replace(/\D/g, '')) || 1;
+        if (num <= userMinLvl) currentLessonIndex = i;
       }
+
+      // 2. Projdeme všechny lekce a najdeme ten nejvyšší odemčený bod
+      for (let i = 0; i < lessons.length; i++) {
+        let lItems = vItems.filter(it => it.lesson === lessons[i]);
+        let pct = (typeof getGroupMasteryPercent === "function") ? getGroupMasteryPercent(lItems, selectedSubject) : 0;
+        
+        // Pokud má lekce nějaký postup (i malý), uživatel už v ní prokazatelně je
+        if (pct > 0 && i > currentLessonIndex) {
+            currentLessonIndex = i;
+        }
+        // Pokud je lekce splněna na >= 95%, automaticky odemyká právo na lekci následující
+        if (pct >= 95 && i >= currentLessonIndex) {
+            currentLessonIndex = i + 1;
+        }
+      }
+      
+      // Pojistka, abychom nepřeskočili mimo seznam lekcí
+      currentLessonIndex = Math.min(currentLessonIndex, lessons.length - 1);
+      let currentLesson = lessons[currentLessonIndex] || "Level 1";
 
       if (typeof selectedGroupKey !== 'undefined') selectedGroupKey = currentLesson; 
       let curItems = vItems.filter(it => it.lesson === currentLesson);
