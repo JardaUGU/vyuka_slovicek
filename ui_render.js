@@ -812,6 +812,8 @@ function renderActiveGame() {
     const item = storyList[storyStep];
     const pct = Math.round(((storyStep + 1) / storyList.length) * 100);
     const hasOpts = item.options && item.options.length > 0;
+    // NOVÝ ŘÁDEK: Definice, zda se jedná o českou kvízovou otázku (má možnosti, ale nemá "___")
+    const isCzechQuestion = hasOpts && !item.question.includes('___'); 
     const heartsHtml = "❤️".repeat(typeof storyHearts !== 'undefined' ? storyHearts : 0) + "🖤".repeat(Math.max(0, (typeof storyMaxHearts !== 'undefined' ? storyMaxHearts : 0) - (typeof storyHearts !== 'undefined' ? storyHearts : 0)));
 
     // Historie předchozích vět: čistý dialog pod sebou, bez bublin a bez českého překladu
