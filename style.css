@@ -242,3 +242,35 @@ footer { height: 32px; background-color: var(--col-card); border-top: 1px solid 
   50% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
   100% { opacity: 0; transform: translate(-50%, -120%) scale(1.3); }
 }
+
+/* =========================================================
+   MAPA KAMPANĚ (CESTA VE STYLU DUOLINGO)
+   ========================================================= */
+.campaign-map-wrap { position: relative; padding: 50px 0 80px 0; display: flex; flex-direction: column; align-items: center; gap: 40px; overflow-x: hidden; }
+.map-line { position: absolute; top: 0; bottom: 0; left: 50%; transform: translateX(-50%); width: 14px; background: var(--col-card-alt); border-left: 2px solid var(--col-card-border); border-right: 2px solid var(--col-card-border); z-index: 1; }
+.map-line-fill { position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 14px; background: var(--col-green); z-index: 1; border-left: 2px solid #166534; border-right: 2px solid #166534; transition: height 0.5s; }
+
+.map-node-row { position: relative; display: flex; justify-content: center; align-items: center; width: 100%; z-index: 2; }
+
+.map-node { width: 70px; height: 70px; border-radius: 50%; border: 4px solid var(--col-card-border); background: var(--col-card); display: flex; align-items: center; justify-content: center; font-size: 28px; cursor: pointer; box-shadow: 0 5px 0 var(--col-card-border); transition: all 0.15s; position: relative; }
+.map-node:active:not(.locked) { transform: translateY(5px) !important; box-shadow: 0 0 0 transparent; }
+
+.map-node.completed { background: var(--col-green); border-color: #bbf7d0; box-shadow: 0 5px 0 #166534; color: #fff; }
+.map-node.active { width: 95px; height: 95px; background: var(--col-active-tab); border-color: #e0f2fe; box-shadow: 0 6px 0 #0369a1; color: #fff; animation: pulseNode 1.5s infinite alternate; }
+.map-node.locked { background: var(--col-card-alt); border-color: var(--col-card-border); color: var(--col-text-muted); opacity: 0.7; cursor: not-allowed; }
+
+.map-label { position: absolute; top: -22px; font-size: 13px; font-weight: bold; color: var(--col-text-muted); background: var(--col-card); padding: 2px 10px; border-radius: 12px; border: 2px solid var(--col-card-border); white-space: nowrap; z-index: 3; box-shadow: 0 2px 5px rgba(0,0,0,0.3); }
+.map-label.active { color: var(--col-yellow); border-color: var(--col-yellow); background: #451a03; top: -26px; font-size: 15px; }
+
+.map-story-btn { position: absolute; width: 48px; height: 48px; border-radius: 50%; background: var(--col-yellow); border: 3px solid #fef08a; box-shadow: 0 4px 0 #b45309; display: flex; align-items: center; justify-content: center; font-size: 22px; cursor: pointer; transition: transform 0.1s; z-index: 3; animation: floatStory 3s ease-in-out infinite; }
+.map-story-btn.done { background: var(--col-card); border-color: var(--col-green); box-shadow: 0 4px 0 #166534; animation: none; filter: grayscale(0.2); }
+.map-story-btn:active { transform: translateY(4px) !important; box-shadow: 0 0 0 transparent; }
+
+@keyframes pulseNode { 
+  0% { box-shadow: 0 6px 0 #0369a1, 0 0 0 0 rgba(2, 132, 199, 0.7); } 
+  100% { box-shadow: 0 6px 0 #0369a1, 0 0 0 15px rgba(2, 132, 199, 0); transform: scale(1.02); } 
+}
+@keyframes floatStory { 
+  0%, 100% { transform: translateY(0); } 
+  50% { transform: translateY(-6px); } 
+}

@@ -10,7 +10,15 @@ function renderScreen() {
     
     const main = document.getElementById("main-content");
     const bUser = document.getElementById("badge-user"); const bSubj = document.getElementById("badge-subj"); const bGroup = document.getElementById("badge-group");
-    if (bUser) bUser.innerText = currentUser ? currentUser.name : "Uživatel";
+    
+    // OPRAVA TLAČÍTKA UŽIVATELE (Návrat do Předmětů)
+    if (bUser) {
+      bUser.innerText = currentUser ? currentUser.name : "Uživatel";
+      bUser.onclick = () => {
+         if (currentUser) setScreen('SELECT_SUBJECT');
+         else setScreen('SELECT_USER');
+      };
+    }
 
     // 1. VÝBĚR UŽIVATELE
     if (currentScreen === "SELECT_USER" || !currentUser) {
@@ -259,7 +267,7 @@ function renderScreen() {
       main.innerHTML = html;
     }
 
-    // 6. KAMPAŇ HUB (S PŘÍBĚHY A CEFR)
+   // 6. KAMPAŇ HUB (MAPA CESTY)
     else if (currentScreen === "CAMPAIGN_HUB") {
       if(bSubj) { bSubj.style.display = "flex"; bSubj.innerText = selectedSubject; }
       if(bGroup) bGroup.style.display = "none";
@@ -267,12 +275,15 @@ function renderScreen() {
       const vItems = typeof getVocabItems === 'function' ? getVocabItems() : [];
       let lessons = [...new Set(vItems.map(it => it.lesson))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
 
-      const subjNorm = selectedSubject.toLowerCase().replace(/[^a-z]/g, ""); let userMinLvl = 1;
+      let userMinLvl = 1;
+      const subjNorm = selectedSubject.toLowerCase().replace(/[^a-z]/g, ""); 
       if (currentUser && currentUser.startLevels) {
         for (let k in currentUser.startLevels) { if (subjNorm.includes(k) || k.includes(subjNorm)) { userMinLvl = Number(currentUser.startLevels[k]) || 1; break; } }
       }
 
-      // VYLEPŠENÝ ALGORITMUS HLEDÁNÍ AKTUÁLNÍ LEKCE (Postupný průchod s ochranou)
+      // =======================================================
+      // CHYTRÝ ALGORITMUS AKTUÁLNÍ LEKCE (Postup s výhledem)
+      // =======================================================
       let currentLessonIndex = 0;
       
       // 1. Nastavíme výchozí pozici podle minimálního levelu uživatele
@@ -281,127 +292,170 @@ function renderScreen() {
         if (num <= userMinLvl) currentLessonIndex = i;
       }
 
-      // 2. Projdeme lekce hezky popořadě.
+      // 2. Projdeme lekce postupně
       for (let i = currentLessonIndex; i < lessons.length; i++) {
-        currentLessonIndex = i; // Nastavíme se do aktuálně testované lekce
-        
         let lItems = vItems.filter(it => it.lesson === lessons[i]);
         let pct = (typeof getGroupMasteryPercent === "function") ? getGroupMasteryPercent(lItems, selectedSubject) : 0;
         
-        // Hranice 60 % funguje jako záchranný polštář.
-        // Zabrání propadu do starých lekcí, pokud žák zapomene pár slov (spadne z 100% třeba na 85%).
-        // Zároveň zabrání přeskoku do Levelu 49 (kvůli shodným slovům), 
-        // protože se smyčka nekompromisně zastaví už na Levelu 20.
-        if (pct < 60) {
+        let nextPct = 0;
+        if (i + 1 < lessons.length) {
+            let nextItems = vItems.filter(it => it.lesson === lessons[i+1]);
+            nextPct = (typeof getGroupMasteryPercent === "function") ? getGroupMasteryPercent(nextItems, selectedSubject) : 0;
+        }
+
+        // ZASTAVOVACÍ PRAVIDLO: 
+        // Pokud je v aktuální lekci slabý postup (< 20 %) A ZÁROVEŇ v další není vůbec nic (0 %),
+        // našli jsme skutečnou "hranici" vašeho studia.
+        if (pct < 20 && nextPct === 0) {
+            currentLessonIndex = i;
             break;
         }
+        
+        // Jinak pokračujeme v hledání (čímž automaticky přemosťujeme propady v zapomenutých starých lekcích)
+        currentLessonIndex = i;
       }
       
-      let currentLesson = lessons[currentLessonIndex] || "Level 1";
-
-      if (typeof selectedGroupKey !== 'undefined') selectedGroupKey = currentLesson; 
-      let curItems = vItems.filter(it => it.lesson === currentLesson);
-      let currentPct = (typeof getGroupMasteryPercent === "function") ? getGroupMasteryPercent(curItems, selectedSubject) : 0;
-
+      // CEFR bargraf pro jazyky
       let cefrHtml = "";
-      if (subjNorm.includes("angli")) {
-         const curIndex = lessons.indexOf(currentLesson);
-         const cefrPct = Math.min(100, Math.max(0, Math.round((curIndex / Math.max(1, lessons.length - 1)) * 100)));
+      if (/angli|nemc|spanel|franc|ital/i.test(subjNorm)) {
+         const cefrPct = Math.min(100, Math.max(0, Math.round((currentLessonIndex / Math.max(1, lessons.length - 1)) * 100)));
          cefrHtml = `
-           <div style="margin-top:20px; background:var(--col-card); padding:10px 14px; border-radius:10px; border:1px solid var(--col-card-border);">
-             <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:6px;">
-                <span style="font-weight:${cefrPct<25?'bold':'normal'}; color:${cefrPct<25?'inherit':'var(--col-text-muted)'};">A1</span>
-                <span style="font-weight:${cefrPct>=25&&cefrPct<50?'bold':'normal'}; color:${cefrPct>=25&&cefrPct<50?'inherit':'var(--col-text-muted)'};">A2</span>
-                <span style="font-weight:${cefrPct>=50&&cefrPct<75?'bold':'normal'}; color:${cefrPct>=50&&cefrPct<75?'inherit':'var(--col-text-muted)'};">B1</span>
-                <span style="font-weight:${cefrPct>=75?'bold':'normal'}; color:${cefrPct>=75?'inherit':'var(--col-text-muted)'};">B2</span>
+           <div style="width: 100%; max-width: 320px; margin: 5px auto 25px auto;">
+             <div style="display:flex; justify-content:space-between; font-size:11px; margin-bottom:5px; font-weight:bold;">
+                <span style="color:${cefrPct<25?'var(--col-text)':'var(--col-text-muted)'};">A1</span>
+                <span style="color:${cefrPct>=25&&cefrPct<50?'var(--col-text)':'var(--col-text-muted)'};">A2</span>
+                <span style="color:${cefrPct>=50&&cefrPct<75?'var(--col-text)':'var(--col-text-muted)'};">B1</span>
+                <span style="color:${cefrPct>=75?'var(--col-text)':'var(--col-text-muted)'};">B2</span>
              </div>
-             <div class="bargraph-track" style="height:12px; position:relative; border-radius:6px; overflow:hidden;">
+             <div class="bargraph-track" style="height:6px; border-radius:3px;">
                <div class="bargraph-fill" style="width:${cefrPct}%; background:linear-gradient(90deg, #3b82f6, #8b5cf6);"></div>
-               <div style="position:absolute; left:25%; top:0; bottom:0; width:2px; background:var(--col-bg);"></div>
-               <div style="position:absolute; left:50%; top:0; bottom:0; width:2px; background:var(--col-bg);"></div>
-               <div style="position:absolute; left:75%; top:0; bottom:0; width:2px; background:var(--col-bg);"></div>
              </div>
-             <div style="text-align:center; font-size:11px; color:var(--col-text-muted); margin-top:8px;">Evropský referenční rámec (CEFR)</div>
            </div>
          `;
       }
 
-      let curIndex = lessons.indexOf(currentLesson);
-      let currentLessonNum = parseInt(String(currentLesson).replace(/\D/g, '')) || 1;
-
-      let storiesGroups = {};
+      // Propojení příběhů
+      let storiesByLesson = {};
       const userG = parseInt(currentUser.grade) || 2;
       let allSubjectItems = (appData.items || []).filter(it => it.subject === selectedSubject && (typeof isItemAllowedForGrade==='function' ? isItemAllowedForGrade(it, userG) : true));
-      
       allSubjectItems.forEach(it => {
           if (it.type && it.type.toUpperCase().includes('PRIBEH')) {
-              let isUnlocked = true;
-              let storyIndex = lessons.indexOf(it.lesson);
-              let storyLessonNum = parseInt(String(it.lesson).replace(/\D/g, ''));
-              
-              if (storyIndex !== -1 && curIndex !== -1) {
-                  isUnlocked = storyIndex <= curIndex;
-              } else if (!isNaN(storyLessonNum) && !isNaN(currentLessonNum)) {
-                  isUnlocked = storyLessonNum <= currentLessonNum;
-              }
-
-              if (isUnlocked) {
-                  let t = it.topic || 'Neznámý příběh';
-                  if (!storiesGroups[t]) storiesGroups[t] = [];
-                  storiesGroups[t].push(it);
+              let t = it.topic || 'Příběh';
+              if (!storiesByLesson[it.lesson]) storiesByLesson[it.lesson] = [];
+              if (!storiesByLesson[it.lesson].some(s => s.title === t)) {
+                  let sItems = allSubjectItems.filter(x => x.topic === t && x.type.toUpperCase().includes('PRIBEH'));
+                  storiesByLesson[it.lesson].push({ title: t, items: sItems });
               }
           }
       });
 
-      let storiesHtml = "";
-      let storyKeys = Object.keys(storiesGroups);
-      if (storyKeys.length > 0) {
-          storiesHtml += `<div style="margin-top:25px; text-align:left;">`;
-          storiesHtml += `<h3 style="color:var(--col-active-tab); font-size:18px; margin-bottom:10px;">📚 Příběhy k přečtení</h3>`;
-          storiesHtml += `<div style="display:flex; flex-direction:column; gap:8px;">`;
-          storyKeys.forEach(title => {
-              let sItems = storiesGroups[title];
-              let isDone = (typeof isStoryCompleted === "function") && isStoryCompleted(title, sItems);
-              let borderCol = isDone ? "var(--col-green)" : "var(--col-yellow)";
-             let badgeText = isDone ? `<span style="color:var(--col-green); font-weight:bold; font-size:14px;">✅ Přečteno</span>` : `<span style="color:var(--col-yellow); font-weight:bold; font-size:15px;">🎁 Nový!</span>`;
-
-              storiesHtml += `
-                <div class="tile" style="flex-direction:row; justify-content:space-between; padding:12px 14px; background:var(--col-card); border-color:${borderCol};" onclick="if(typeof startStory==='function') startStory('${title.replace(/'/g, "\\'")}')">
-                  <div style="text-align:left;">
-                      <h3 style="color:inherit; font-size:16px;">${isDone ? '📖 ' : '✨ '}${title}</h3>
-                      <p style="color:var(--col-text-muted); font-size:12px; margin-top:2px;">${sItems.length} částí příběhu</p>
-                  </div>
-                  <div style="text-align:right;">
-                      ${badgeText}
-                  </div>
-                </div>
-              `;
-          });
-          storiesHtml += `</div></div>`;
+      // ==========================================
+      // VYKRESLENÍ ORGANICKÉ MAPY A SVG CESTY
+      // ==========================================
+      
+      // X = Výchylky do stran (větší rozptyl k okrajům)
+      const offsetsX = [0, -35, -70, -90, -50, 10, 60, 85, 45, -15, -60, -85, -35, 25, 75, 95, 55, 0, -45, -80]; 
+      
+      // Y = Různě dlouhé vzdálenosti mezi levely (aby to nepůsobilo jako umělá mřížka)
+      const offsetsY = [120, 150, 110, 140, 160, 115, 135, 155, 125, 145]; 
+      
+      const MAP_WIDTH = 340;
+      const CENTER_X = MAP_WIDTH / 2;
+      const PADDING_TOP = 40; 
+      
+      // Předpočítání Y souřadnic pro každý uzel
+      let nodeYPositions = [];
+      let currentY = PADDING_TOP;
+      for (let i = 0; i < lessons.length; i++) {
+         nodeYPositions.push(currentY);
+         currentY += offsetsY[i % offsetsY.length]; // K dalšímu přidáme náhodnou mezeru
       }
+      let svgHeight = currentY + 30; // Trochu místa na spodní okraj
 
+      let pathStringAll = "";
+      let pathStringDone = "";
+      let mapNodesHtml = "";
+      
+      lessons.forEach((l, i) => {
+        let isCompleted = i < currentLessonIndex;
+        let isActive = i === currentLessonIndex;
+        let isLocked = i > currentLessonIndex;
+        
+        let cx = CENTER_X + offsetsX[i % offsetsX.length];
+        let cy = nodeYPositions[i];
+        
+        let cmd = i === 0 ? "M" : "L";
+        pathStringAll += `${cmd} ${cx} ${cy} `;
+        if (i <= currentLessonIndex) {
+            pathStringDone += `${cmd} ${cx} ${cy} `;
+        }
+        
+        let nodeClass = isActive ? "active" : (isCompleted ? "completed" : "locked");
+        let icon = isActive ? "▶️" : (isCompleted ? "⭐" : "🔒");
+        
+        let storyHtml = "";
+        if (storiesByLesson[l]) {
+           storiesByLesson[l].forEach((story, sIdx) => {
+               let isDone = (typeof isStoryCompleted === "function") && isStoryCompleted(story.title, story.items);
+               let storyClass = isDone ? "done" : "";
+               let storyIcon = isDone ? "📖" : "🎁";
+               
+               // Příběhy vždy odskakují směrem ke středu, takže nikdy nevyjedou mimo obrazovku
+               let storySide = cx <= CENTER_X ? `left: 100%; margin-left: 14px;` : `right: 100%; margin-right: 14px;`;
+               let clickAction = isLocked ? `alert('Tento příběh se odemkne, až se dostaneš do této lekce.')` : `if(typeof startStory==='function') startStory('${story.title.replace(/'/g, "\\'")}')`;
+               
+               storyHtml += `
+                 <div class="map-story-btn ${storyClass}" style="position: absolute; ${storySide} top: 50%; transform: translateY(-50%); z-index: 5;" onclick="${clickAction}" title="${story.title}">
+                    ${storyIcon}
+                 </div>
+               `;
+           });
+        }
+
+        let clickAction = "";
+        if (isActive || isCompleted) {
+           clickAction = `if(typeof selectedGroupKey !== 'undefined') selectedGroupKey = '${l.replace(/'/g, "\\'")}'; if(typeof startCampaign==='function') startCampaign();`;
+        }
+
+        mapNodesHtml += `
+          <div class="map-node ${nodeClass}" ${isActive ? 'id="active-lesson-node"' : ''} style="position: absolute; left: ${cx}px; top: ${cy}px; transform: translate(-50%, -50%); z-index: 2;" onclick="${clickAction}">
+             <div class="map-label ${isActive ? 'active' : ''}">${l}</div>
+             ${icon}
+             ${storyHtml}
+          </div>
+        `;
+      });
+
+      // Zabalení celé mapy
       main.innerHTML = `
-        <div style="text-align:center;padding:15px 10px;">
-          <h2 style="color:var(--col-active-tab);font-size:26px;margin-bottom:12px;">Spirálová výuka</h2>
-          <p style="color:var(--col-text-muted);font-size:16px;margin-bottom:6px;">Aktuální lekce:</p>
-          <p style="font-size:28px;font-weight:bold;margin-bottom:10px;">${currentLesson}</p>
-
-          <div class="bargraph-container" style="max-width:280px;margin:0 auto 20px auto;">
-            <div class="bargraph-header"><span>Postup lekce</span><span style="color:var(--col-green);">${currentPct} %</span></div>
-            <div class="bargraph-track" style="height:8px;"><div class="bargraph-fill" style="width:${currentPct}%;"></div></div>
-          </div>
-
-          <div class="action-btn green" style="padding:18px;font-size:20px;box-shadow: 0 6px 15px rgba(34,197,94,0.3);" onclick="if(typeof startCampaign==='function') startCampaign()">
-             ▶️ SPUSTIT DNEŠNÍ TRÉNINK
-          </div>
-          <p style="font-size:13px;color:var(--col-text-muted);margin-top:12px;">Udrž všech 5 ❤️ srdíček pro zisk zlaťáků!</p>
-
+        <div style="text-align:center; padding:15px 10px 0 10px;">
+          <h2 style="color:var(--col-active-tab);font-size:26px;margin-bottom:8px;">Cesta k mistrovství</h2>
           ${cefrHtml}
-          ${storiesHtml}
+        </div>
+        
+        <div style="position: relative; width: ${MAP_WIDTH}px; height: ${svgHeight}px; margin: 0 auto; overflow: visible;">
+           <svg width="${MAP_WIDTH}" height="${svgHeight}" style="position:absolute; top:0; left:0; z-index:1; pointer-events:none;">
+              <!-- Základní šedá cesta -->
+              <path d="${pathStringAll}" stroke="var(--col-card-border)" stroke-width="24" fill="none" stroke-linejoin="round" stroke-linecap="round" />
+              <path d="${pathStringAll}" stroke="var(--col-card-alt)" stroke-width="16" fill="none" stroke-linejoin="round" stroke-linecap="round" />
+              
+              <!-- Zelená splněná cesta -->
+              <path d="${pathStringDone}" stroke="#166534" stroke-width="24" fill="none" stroke-linejoin="round" stroke-linecap="round" />
+              <path d="${pathStringDone}" stroke="var(--col-green)" stroke-width="16" fill="none" stroke-linejoin="round" stroke-linecap="round" />
+           </svg>
+           
+           ${mapNodesHtml}
         </div>
       `;
+      
+      // Automatické odrolování na aktuální level s odsazením odshora
+      setTimeout(() => {
+         const activeNode = document.getElementById('active-lesson-node');
+         if (activeNode) {
+            activeNode.scrollIntoView({ behavior: 'smooth', block: 'center' });
+         }
+      }, 100);
     }
-
     // 7. VÝBĚR HRY (KLASICKÝ PŘEDMĚT)
     else if (currentScreen === "SELECT_GAME") {
       if(bSubj) { bSubj.style.display = "flex"; }

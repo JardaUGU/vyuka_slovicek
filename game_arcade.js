@@ -116,7 +116,14 @@ function clickArcadeChoice(choice) {
     if (arcadeScore % 7 === 0) { arcadeLevel++; arcadeSpeed += 0.35; sndFanfare(); }
     const el = document.getElementById("arcade-falling-elem");
     if (el) el.classList.add("hit");
-    setTimeout(spawnArcadeWord, 350);
+    
+    // NOVÉ: Přečte správné cizí slovo
+    if (typeof isAutoTTS !== "undefined" && isAutoTTS && typeof speakWord === "function") {
+        speakWord(arcadeCurrent.question, selectedSubject);
+    }
+    
+    // Zvýšená prodleva z 350ms na 650ms, aby dítě stihlo slovo doposlechnout
+    setTimeout(spawnArcadeWord, 650);
   } else {
     handleArcadeMiss();
   }
