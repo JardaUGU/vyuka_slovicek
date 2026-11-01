@@ -705,9 +705,7 @@ function renderActiveGame() {
             disp = typeof cleanCzechTranslation==='function'?cleanCzechTranslation(arcadeCurrent.answer):arcadeCurrent.answer;
         } else if (typeof arcadeMode!=='undefined' && (arcadeMode.includes("DER_DIE_DAS") || arcadeMode === "ARTICLES" || arcadeMode.includes("A_AN"))) {
             disp = arcadeCurrent.question.replace(/^(der|die|das|a|an)\s+/i, '');
-            let rawSub = typeof cleanCzechTranslation==='function'?cleanCzechTranslation(arcadeCurrent.answer):arcadeCurrent.answer;
-            // OPRAVA TAHÁKU: Odstraní vše v kulatých závorkách (např. "(ž. r.)")
-            subDisp = rawSub.replace(/\s*\([^)]*\)/g, '').trim(); 
+            subDisp = ""; // Zcela skryje český překlad
         } else {
             disp = arcadeCurrent.question;
             subDisp = typeof cleanCzechTranslation==='function'?cleanCzechTranslation(arcadeCurrent.answer):arcadeCurrent.answer;
