@@ -10,7 +10,13 @@ function renderScreen() {
     
     const main = document.getElementById("main-content");
     const bUser = document.getElementById("badge-user"); const bSubj = document.getElementById("badge-subj"); const bGroup = document.getElementById("badge-group");
-    if (bUser) bUser.innerText = currentUser ? currentUser.name : "Uživatel";
+    if (bUser) {
+      bUser.innerText = currentUser ? currentUser.name : "Uživatel";
+      bUser.onclick = () => {
+         if (currentUser) setScreen('SHOP');
+         else setScreen('SELECT_USER');
+      };
+    }
 
     // 1. VÝBĚR UŽIVATELE
     if (currentScreen === "SELECT_USER" || !currentUser) {
@@ -267,25 +273,20 @@ function renderScreen() {
       const vItems = typeof getVocabItems === 'function' ? getVocabItems() : [];
       let lessons = [...new Set(vItems.map(it => it.lesson))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
 
-      const subjNorm = selectedSubject.toLowerCase().replace(/[^a-z]/g, ""); let userMinLvl = 1;
-      if (currentUser && currentUser.startLevels) {
-        for (let k in currentUser.startLevels) { if (subjNorm.includes(k) || k.includes(subjNorm)) { userMinLvl = Number(currentUser.startLevels[k]) || 1; break; } }
-      }
-
-      // Výpočet aktuální pozice hráče na mapě (bez propadu dolů)
-      let currentLessonIndex = 0;
+      // Hledání nejvyššího dosaženého bodu (High Water Mark - NIKDY NEPADÁ ZPĚT)
+      let highestActive = 0;
       for (let i = 0; i < lessons.length; i++) {
-        let num = parseInt(lessons[i].replace(/\D/g, '')) || 1;
-        if (num <= userMinLvl) currentLessonIndex = i;
-      }
-      for (let i = currentLessonIndex; i < lessons.length; i++) {
-        currentLessonIndex = i; 
         let lItems = vItems.filter(it => it.lesson === lessons[i]);
         let pct = (typeof getGroupMasteryPercent === "function") ? getGroupMasteryPercent(lItems, selectedSubject) : 0;
-        if (pct < 60) break;
+        
+        if (pct > 0) highestActive = i; // Uživatel do této lekce už nakoukl
+        if (pct >= 95 && highestActive === i) highestActive = i + 1; // Lekce splněna, odemyká se další
       }
       
-      // CEFR bargraf - nyní tenký, kompaktní a funguje pro všechny hlavní jazyky
+      let currentLessonIndex = Math.min(highestActive, lessons.length - 1);
+      
+      // CEFR bargraf pro jazyky
+      const subjNorm = selectedSubject.toLowerCase().replace(/[^a-z]/g, "");
       let cefrHtml = "";
       if (/angli|nemc|spanel|franc|ital/i.test(subjNorm)) {
          const cefrPct = Math.min(100, Math.max(0, Math.round((currentLessonIndex / Math.max(1, lessons.length - 1)) * 100)));
@@ -304,7 +305,7 @@ function renderScreen() {
          `;
       }
 
-      // Propojení příběhů s konkrétními levely
+      // Propojení příběhů
       let storiesByLesson = {};
       const userG = parseInt(currentUser.grade) || 2;
       let allSubjectItems = (appData.items || []).filter(it => it.subject === selectedSubject && (typeof isItemAllowedForGrade==='function' ? isItemAllowedForGrade(it, userG) : true));
@@ -320,43 +321,36 @@ function renderScreen() {
       });
 
       // ==========================================
-      // VYKRESLENÍ MAPY A SVG CESTY
+      // DOKONALÉ VYKRESLENÍ MAPY (Fixní 340px okno)
       // ==========================================
-      
-      // Pole pro extrémnější klikatění (max +/- 100 zajistí, že to nepřeteče displej)
-      const offsets = [0, -40, -80, -30, 40, 90, 100, 50, 0, -50, -100, -60, -10, 40, 90, 100, 60, 20, -30, -70]; 
-      
-      const NODE_SIZE = 70;
-      const ROW_GAP = 30; 
-      const ROW_HEIGHT = NODE_SIZE + ROW_GAP; 
-      const PADDING_TOP = 20; 
+      const offsets = [0, -30, -60, -80, -40, 10, 50, 70, 40, -10, -50, -70, -30, 20, 60, 80, 50, 0, -40, -70]; 
+      const MAP_WIDTH = 340;
+      const CENTER_X = MAP_WIDTH / 2;
+      const ROW_HEIGHT = 90; 
+      const PADDING_TOP = 40; 
       
       let svgHeight = PADDING_TOP + (lessons.length * ROW_HEIGHT); 
 
-      // Generování bodů pro SVG
       let pathStringAll = "";
       let pathStringDone = "";
-      
-      lessons.forEach((l, i) => {
-        let offsetX = offsets[i % offsets.length];
-        let cx = 200 + offsetX; // Střed SVG je fixně 200
-        let cy = PADDING_TOP + (i * ROW_HEIGHT) + (NODE_SIZE / 2);
-        
-        let cmd = i === 0 ? "M" : "L";
-        pathStringAll += `${cmd} ${cx} ${cy} `;
-        if (i <= currentLessonIndex) {
-            pathStringDone += `${cmd} ${cx} ${cy} `;
-        }
-      });
-
-      // Generování HTML koleček
       let mapNodesHtml = "";
+      
       lessons.forEach((l, i) => {
         let isCompleted = i < currentLessonIndex;
         let isActive = i === currentLessonIndex;
         let isLocked = i > currentLessonIndex;
         
-        let offsetX = offsets[i % offsets.length];
+        let cx = CENTER_X + offsets[i % offsets.length];
+        let cy = PADDING_TOP + (i * ROW_HEIGHT);
+        
+        // Generování křivky (SVG path)
+        let cmd = i === 0 ? "M" : "L";
+        pathStringAll += `${cmd} ${cx} ${cy} `;
+        if (i <= currentLessonIndex) {
+            pathStringDone += `${cmd} ${cx} ${cy} `;
+        }
+        
+        // Generování HTML koleček
         let nodeClass = isActive ? "active" : (isCompleted ? "completed" : "locked");
         let icon = isActive ? "▶️" : (isCompleted ? "⭐" : "🔒");
         
@@ -367,15 +361,12 @@ function renderScreen() {
                let storyClass = isDone ? "done" : "";
                let storyIcon = isDone ? "📖" : "🎁";
                
-               // Chytré umístění: Příběh je vždy na OPAČNÉ straně, než kam je vychýlený level,
-               // takže se zaručeně vejde na displej a "tlačí" se ke středu telefonu.
-               let storySide = offsetX >= 0 ? `left: -70px;` : `right: -70px;`;
-               if (offsetX === 0) storySide = i % 2 === 0 ? `left: -70px;` : `right: -70px;`;
-               
+               // Chytré umístění: Pokud je bod vlevo (cx < CENTER), dáme příběh doprava. A naopak. (Nikdy neuteče)
+               let storySide = cx <= CENTER_X ? `left: 100%; margin-left: 12px;` : `right: 100%; margin-right: 12px;`;
                let clickAction = isLocked ? `alert('Tento příběh se odemkne, až se dostaneš do této lekce.')` : `if(typeof startStory==='function') startStory('${story.title.replace(/'/g, "\\'")}')`;
                
                storyHtml += `
-                 <div class="map-story-btn ${storyClass}" style="position: absolute; ${storySide} top: 50%; transform: translateY(-50%);" onclick="${clickAction}" title="${story.title}">
+                 <div class="map-story-btn ${storyClass}" style="position: absolute; ${storySide} top: 50%; transform: translateY(-50%); z-index: 5;" onclick="${clickAction}" title="${story.title}">
                     ${storyIcon}
                  </div>
                `;
@@ -387,35 +378,32 @@ function renderScreen() {
            clickAction = `if(typeof selectedGroupKey !== 'undefined') selectedGroupKey = '${l.replace(/'/g, "\\'")}'; if(typeof startCampaign==='function') startCampaign();`;
         }
 
+        // Kolečka jsou absolutně fixována na stejných souřadnicích jako SVG křivka
         mapNodesHtml += `
-          <div class="map-node-row" ${isActive ? 'id="active-lesson-node"' : ''} style="height: ${NODE_SIZE}px; margin-bottom: ${ROW_GAP}px; transform: translateX(${offsetX}px);">
+          <div class="map-node ${nodeClass}" ${isActive ? 'id="active-lesson-node"' : ''} style="position: absolute; left: ${cx}px; top: ${cy}px; transform: translate(-50%, -50%); z-index: 2;" onclick="${clickAction}">
              <div class="map-label ${isActive ? 'active' : ''}">${l}</div>
-             <div class="map-node ${nodeClass}" onclick="${clickAction}">
-                ${icon}
-             </div>
+             ${icon}
              ${storyHtml}
           </div>
         `;
       });
 
-      // Zabalení celé mapy včetně dynamického vektorového SVG
+      // Zabalení celé mapy
       main.innerHTML = `
         <div style="text-align:center; padding:15px 10px 0 10px;">
           <h2 style="color:var(--col-active-tab);font-size:26px;margin-bottom:8px;">Cesta k mistrovství</h2>
           ${cefrHtml}
         </div>
         
-        <div class="campaign-map-wrap" style="padding-top: ${PADDING_TOP}px; padding-bottom: 80px;">
-           <svg width="400" height="${svgHeight}" style="position:absolute; top:0; left:50%; transform:translateX(-50%); z-index:1; pointer-events:none;">
-              <!-- Základní šedá cesta (obrys + výplň) -->
+        <div style="position: relative; width: ${MAP_WIDTH}px; height: ${svgHeight + 50}px; margin: 0 auto; overflow: visible;">
+           <svg width="${MAP_WIDTH}" height="${svgHeight}" style="position:absolute; top:0; left:0; z-index:1; pointer-events:none;">
+              <!-- Základní cesta -->
               <path d="${pathStringAll}" stroke="var(--col-card-border)" stroke-width="24" fill="none" stroke-linejoin="round" stroke-linecap="round" />
               <path d="${pathStringAll}" stroke="var(--col-card-alt)" stroke-width="16" fill="none" stroke-linejoin="round" stroke-linecap="round" />
-              
-              <!-- Zelená splněná cesta (obrys + výplň) -->
+              <!-- Splněná cesta -->
               <path d="${pathStringDone}" stroke="#166534" stroke-width="24" fill="none" stroke-linejoin="round" stroke-linecap="round" />
               <path d="${pathStringDone}" stroke="var(--col-green)" stroke-width="16" fill="none" stroke-linejoin="round" stroke-linecap="round" />
            </svg>
-           
            ${mapNodesHtml}
         </div>
       `;
