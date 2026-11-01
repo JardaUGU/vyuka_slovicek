@@ -445,6 +445,10 @@ function renderScreen() {
       }
       html += `</div>`;
 
+      if (sItems.length > 0) {
+        html += `<div class="tile" style="border-color:var(--col-yellow);" onclick="if(typeof openSequenceMenu==='function') openSequenceMenu()"><h2 style="color:var(--col-yellow);">⏱️ Řada na čas</h2><p>${sItems.length} úloh</p></div>`;
+      }
+
       // ==========================================
       // SEKCE 2: HRY A VÝZVY
       // ==========================================
@@ -464,9 +468,7 @@ function renderScreen() {
         `;
       }
       
-      if (sItems.length > 0) {
-        html += `<div class="tile" style="border-color:var(--col-yellow);" onclick="if(typeof openSequenceMenu==='function') openSequenceMenu()"><h2 style="color:var(--col-yellow);">⏱️ Řada na čas</h2><p>${sItems.length} úloh</p></div>`;
-      }
+      
 
       // Arkáda: 1. Překlad (pokud jsou krátká slova)
       let translateEligible = vItems.filter(it => it.question.split(' ').length <= 2 && !it.question.includes('.')).length >= 3;
@@ -703,7 +705,9 @@ function renderActiveGame() {
             disp = typeof cleanCzechTranslation==='function'?cleanCzechTranslation(arcadeCurrent.answer):arcadeCurrent.answer;
         } else if (typeof arcadeMode!=='undefined' && (arcadeMode.includes("DER_DIE_DAS") || arcadeMode === "ARTICLES" || arcadeMode.includes("A_AN"))) {
             disp = arcadeCurrent.question.replace(/^(der|die|das|a|an)\s+/i, '');
-            subDisp = typeof cleanCzechTranslation==='function'?cleanCzechTranslation(arcadeCurrent.answer):arcadeCurrent.answer;
+            let rawSub = typeof cleanCzechTranslation==='function'?cleanCzechTranslation(arcadeCurrent.answer):arcadeCurrent.answer;
+            // OPRAVA TAHÁKU: Odstraní vše v kulatých závorkách (např. "(ž. r.)")
+            subDisp = rawSub.replace(/\s*\([^)]*\)/g, '').trim(); 
         } else {
             disp = arcadeCurrent.question;
             subDisp = typeof cleanCzechTranslation==='function'?cleanCzechTranslation(arcadeCurrent.answer):arcadeCurrent.answer;
