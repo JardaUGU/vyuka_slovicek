@@ -10,10 +10,12 @@ function renderScreen() {
     
     const main = document.getElementById("main-content");
     const bUser = document.getElementById("badge-user"); const bSubj = document.getElementById("badge-subj"); const bGroup = document.getElementById("badge-group");
+    
+    // OPRAVA TLAČÍTKA UŽIVATELE (Návrat do Předmětů)
     if (bUser) {
       bUser.innerText = currentUser ? currentUser.name : "Uživatel";
       bUser.onclick = () => {
-         if (currentUser) setScreen('SHOP');
+         if (currentUser) setScreen('SELECT_SUBJECT');
          else setScreen('SELECT_USER');
       };
     }
@@ -265,7 +267,7 @@ function renderScreen() {
       main.innerHTML = html;
     }
 
-    // 6. KAMPAŇ HUB (MAPA CESTY)
+   // 6. KAMPAŇ HUB (MAPA CESTY)
     else if (currentScreen === "CAMPAIGN_HUB") {
       if(bSubj) { bSubj.style.display = "flex"; bSubj.innerText = selectedSubject; }
       if(bGroup) bGroup.style.display = "none";
@@ -273,20 +275,45 @@ function renderScreen() {
       const vItems = typeof getVocabItems === 'function' ? getVocabItems() : [];
       let lessons = [...new Set(vItems.map(it => it.lesson))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
 
-      // Hledání nejvyššího dosaženého bodu (High Water Mark - NIKDY NEPADÁ ZPĚT)
-      let highestActive = 0;
+      let userMinLvl = 1;
+      const subjNorm = selectedSubject.toLowerCase().replace(/[^a-z]/g, ""); 
+      if (currentUser && currentUser.startLevels) {
+        for (let k in currentUser.startLevels) { if (subjNorm.includes(k) || k.includes(subjNorm)) { userMinLvl = Number(currentUser.startLevels[k]) || 1; break; } }
+      }
+
+      // =======================================================
+      // CHYTRÝ ALGORITMUS AKTUÁLNÍ LEKCE (Žádné skoky ani pády)
+      // =======================================================
+      let currentLessonIndex = 0;
+      for (let i = 0; i < lessons.length; i++) {
+        let num = parseInt(lessons[i].replace(/\D/g, '')) || 1;
+        if (num <= userMinLvl) currentLessonIndex = i;
+      }
+
       for (let i = 0; i < lessons.length; i++) {
         let lItems = vItems.filter(it => it.lesson === lessons[i]);
         let pct = (typeof getGroupMasteryPercent === "function") ? getGroupMasteryPercent(lItems, selectedSubject) : 0;
         
-        if (pct > 0) highestActive = i; // Uživatel do této lekce už nakoukl
-        if (pct >= 95 && highestActive === i) highestActive = i + 1; // Lekce splněna, odemyká se další
+        // 1. Zvládnuto na >= 85%: Jasně odemčena další lekce
+        if (pct >= 85) {
+            currentLessonIndex = Math.max(currentLessonIndex, i + 1);
+        } 
+        // 2. Částečně uděláno (>= 25%): Skutečně zde žák pracoval (není to jen náhodné staré slovíčko)
+        else if (pct >= 25) {
+            currentLessonIndex = Math.max(currentLessonIndex, i);
+        } 
+        // 3. Menší než 25%, ale víc než 0%: Může to být shoda slovíčka! Pustíme ho dál jen tehdy, pokud je předešlá lekce hodně hotová.
+        else if (pct > 0 && i > 0) {
+            let prevItems = vItems.filter(it => it.lesson === lessons[i-1]);
+            let prevPct = (typeof getGroupMasteryPercent === "function") ? getGroupMasteryPercent(prevItems, selectedSubject) : 0;
+            if (prevPct >= 60) {
+                currentLessonIndex = Math.max(currentLessonIndex, i);
+            }
+        }
       }
-      
-      let currentLessonIndex = Math.min(highestActive, lessons.length - 1);
+      currentLessonIndex = Math.min(currentLessonIndex, lessons.length - 1);
       
       // CEFR bargraf pro jazyky
-      const subjNorm = selectedSubject.toLowerCase().replace(/[^a-z]/g, "");
       let cefrHtml = "";
       if (/angli|nemc|spanel|franc|ital/i.test(subjNorm)) {
          const cefrPct = Math.min(100, Math.max(0, Math.round((currentLessonIndex / Math.max(1, lessons.length - 1)) * 100)));
@@ -321,15 +348,27 @@ function renderScreen() {
       });
 
       // ==========================================
-      // DOKONALÉ VYKRESLENÍ MAPY (Fixní 340px okno)
+      // VYKRESLENÍ ORGANICKÉ MAPY A SVG CESTY
       // ==========================================
-      const offsets = [0, -30, -60, -80, -40, 10, 50, 70, 40, -10, -50, -70, -30, 20, 60, 80, 50, 0, -40, -70]; 
+      
+      // X = Výchylky do stran (větší rozptyl k okrajům)
+      const offsetsX = [0, -35, -70, -90, -50, 10, 60, 85, 45, -15, -60, -85, -35, 25, 75, 95, 55, 0, -45, -80]; 
+      
+      // Y = Různě dlouhé vzdálenosti mezi levely (aby to nepůsobilo jako umělá mřížka)
+      const offsetsY = [120, 150, 110, 140, 160, 115, 135, 155, 125, 145]; 
+      
       const MAP_WIDTH = 340;
       const CENTER_X = MAP_WIDTH / 2;
-      const ROW_HEIGHT = 90; 
       const PADDING_TOP = 40; 
       
-      let svgHeight = PADDING_TOP + (lessons.length * ROW_HEIGHT); 
+      // Předpočítání Y souřadnic pro každý uzel
+      let nodeYPositions = [];
+      let currentY = PADDING_TOP;
+      for (let i = 0; i < lessons.length; i++) {
+         nodeYPositions.push(currentY);
+         currentY += offsetsY[i % offsetsY.length]; // K dalšímu přidáme náhodnou mezeru
+      }
+      let svgHeight = currentY + 30; // Trochu místa na spodní okraj
 
       let pathStringAll = "";
       let pathStringDone = "";
@@ -340,17 +379,15 @@ function renderScreen() {
         let isActive = i === currentLessonIndex;
         let isLocked = i > currentLessonIndex;
         
-        let cx = CENTER_X + offsets[i % offsets.length];
-        let cy = PADDING_TOP + (i * ROW_HEIGHT);
+        let cx = CENTER_X + offsetsX[i % offsetsX.length];
+        let cy = nodeYPositions[i];
         
-        // Generování křivky (SVG path)
         let cmd = i === 0 ? "M" : "L";
         pathStringAll += `${cmd} ${cx} ${cy} `;
         if (i <= currentLessonIndex) {
             pathStringDone += `${cmd} ${cx} ${cy} `;
         }
         
-        // Generování HTML koleček
         let nodeClass = isActive ? "active" : (isCompleted ? "completed" : "locked");
         let icon = isActive ? "▶️" : (isCompleted ? "⭐" : "🔒");
         
@@ -361,8 +398,8 @@ function renderScreen() {
                let storyClass = isDone ? "done" : "";
                let storyIcon = isDone ? "📖" : "🎁";
                
-               // Chytré umístění: Pokud je bod vlevo (cx < CENTER), dáme příběh doprava. A naopak. (Nikdy neuteče)
-               let storySide = cx <= CENTER_X ? `left: 100%; margin-left: 12px;` : `right: 100%; margin-right: 12px;`;
+               // Příběhy vždy odskakují směrem ke středu, takže nikdy nevyjedou mimo obrazovku
+               let storySide = cx <= CENTER_X ? `left: 100%; margin-left: 14px;` : `right: 100%; margin-right: 14px;`;
                let clickAction = isLocked ? `alert('Tento příběh se odemkne, až se dostaneš do této lekce.')` : `if(typeof startStory==='function') startStory('${story.title.replace(/'/g, "\\'")}')`;
                
                storyHtml += `
@@ -378,7 +415,6 @@ function renderScreen() {
            clickAction = `if(typeof selectedGroupKey !== 'undefined') selectedGroupKey = '${l.replace(/'/g, "\\'")}'; if(typeof startCampaign==='function') startCampaign();`;
         }
 
-        // Kolečka jsou absolutně fixována na stejných souřadnicích jako SVG křivka
         mapNodesHtml += `
           <div class="map-node ${nodeClass}" ${isActive ? 'id="active-lesson-node"' : ''} style="position: absolute; left: ${cx}px; top: ${cy}px; transform: translate(-50%, -50%); z-index: 2;" onclick="${clickAction}">
              <div class="map-label ${isActive ? 'active' : ''}">${l}</div>
@@ -395,20 +431,22 @@ function renderScreen() {
           ${cefrHtml}
         </div>
         
-        <div style="position: relative; width: ${MAP_WIDTH}px; height: ${svgHeight + 50}px; margin: 0 auto; overflow: visible;">
+        <div style="position: relative; width: ${MAP_WIDTH}px; height: ${svgHeight}px; margin: 0 auto; overflow: visible;">
            <svg width="${MAP_WIDTH}" height="${svgHeight}" style="position:absolute; top:0; left:0; z-index:1; pointer-events:none;">
-              <!-- Základní cesta -->
+              <!-- Základní šedá cesta -->
               <path d="${pathStringAll}" stroke="var(--col-card-border)" stroke-width="24" fill="none" stroke-linejoin="round" stroke-linecap="round" />
               <path d="${pathStringAll}" stroke="var(--col-card-alt)" stroke-width="16" fill="none" stroke-linejoin="round" stroke-linecap="round" />
-              <!-- Splněná cesta -->
+              
+              <!-- Zelená splněná cesta -->
               <path d="${pathStringDone}" stroke="#166534" stroke-width="24" fill="none" stroke-linejoin="round" stroke-linecap="round" />
               <path d="${pathStringDone}" stroke="var(--col-green)" stroke-width="16" fill="none" stroke-linejoin="round" stroke-linecap="round" />
            </svg>
+           
            ${mapNodesHtml}
         </div>
       `;
       
-      // Automatické odrolování na aktuální level
+      // Automatické odrolování na aktuální level s odsazením odshora
       setTimeout(() => {
          const activeNode = document.getElementById('active-lesson-node');
          if (activeNode) {
@@ -416,7 +454,6 @@ function renderScreen() {
          }
       }, 100);
     }
-
     // 7. VÝBĚR HRY (KLASICKÝ PŘEDMĚT)
     else if (currentScreen === "SELECT_GAME") {
       if(bSubj) { bSubj.style.display = "flex"; }
