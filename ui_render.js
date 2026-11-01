@@ -282,36 +282,38 @@ function renderScreen() {
       }
 
       // =======================================================
-      // CHYTRÝ ALGORITMUS AKTUÁLNÍ LEKCE (Žádné skoky ani pády)
+      // CHYTRÝ ALGORITMUS AKTUÁLNÍ LEKCE (Postup s výhledem)
       // =======================================================
       let currentLessonIndex = 0;
+      
+      // 1. Nastavíme výchozí pozici podle minimálního levelu uživatele
       for (let i = 0; i < lessons.length; i++) {
         let num = parseInt(lessons[i].replace(/\D/g, '')) || 1;
         if (num <= userMinLvl) currentLessonIndex = i;
       }
 
-      for (let i = 0; i < lessons.length; i++) {
+      // 2. Projdeme lekce postupně
+      for (let i = currentLessonIndex; i < lessons.length; i++) {
         let lItems = vItems.filter(it => it.lesson === lessons[i]);
         let pct = (typeof getGroupMasteryPercent === "function") ? getGroupMasteryPercent(lItems, selectedSubject) : 0;
         
-        // 1. Zvládnuto na >= 85%: Jasně odemčena další lekce
-        if (pct >= 85) {
-            currentLessonIndex = Math.max(currentLessonIndex, i + 1);
-        } 
-        // 2. Částečně uděláno (>= 25%): Skutečně zde žák pracoval (není to jen náhodné staré slovíčko)
-        else if (pct >= 25) {
-            currentLessonIndex = Math.max(currentLessonIndex, i);
-        } 
-        // 3. Menší než 25%, ale víc než 0%: Může to být shoda slovíčka! Pustíme ho dál jen tehdy, pokud je předešlá lekce hodně hotová.
-        else if (pct > 0 && i > 0) {
-            let prevItems = vItems.filter(it => it.lesson === lessons[i-1]);
-            let prevPct = (typeof getGroupMasteryPercent === "function") ? getGroupMasteryPercent(prevItems, selectedSubject) : 0;
-            if (prevPct >= 60) {
-                currentLessonIndex = Math.max(currentLessonIndex, i);
-            }
+        let nextPct = 0;
+        if (i + 1 < lessons.length) {
+            let nextItems = vItems.filter(it => it.lesson === lessons[i+1]);
+            nextPct = (typeof getGroupMasteryPercent === "function") ? getGroupMasteryPercent(nextItems, selectedSubject) : 0;
         }
+
+        // ZASTAVOVACÍ PRAVIDLO: 
+        // Pokud je v aktuální lekci slabý postup (< 20 %) A ZÁROVEŇ v další není vůbec nic (0 %),
+        // našli jsme skutečnou "hranici" vašeho studia.
+        if (pct < 20 && nextPct === 0) {
+            currentLessonIndex = i;
+            break;
+        }
+        
+        // Jinak pokračujeme v hledání (čímž automaticky přemosťujeme propady v zapomenutých starých lekcích)
+        currentLessonIndex = i;
       }
-      currentLessonIndex = Math.min(currentLessonIndex, lessons.length - 1);
       
       // CEFR bargraf pro jazyky
       let cefrHtml = "";
