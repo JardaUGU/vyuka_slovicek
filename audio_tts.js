@@ -110,9 +110,19 @@ function sndOk() {
   if (navigator.vibrate) try { navigator.vibrate(18); } catch(e) {}
   playTone(880, 'sine', 0.08); 
   setTimeout(() => playTone(1320, 'sine', 0.1), 80); 
+  
+  // NOVÉ: Vyhodí zelené plovoucí číslo při každé správné odpovědi
+  if (typeof showFloatingPoint === 'function') showFloatingPoint();
 }
+
 function sndErr() { 
   if (navigator.vibrate) try { navigator.vibrate([40, 40, 60]); } catch(e) {}
   playTone(220, 'square', 0.15); 
 }
-function sndFanfare() { [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => playTone(f, 'triangle', 0.1), i * 110)); }
+
+function sndFanfare() { 
+  [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => playTone(f, 'triangle', 0.1), i * 110)); 
+  
+  // NOVÉ: Odpálí konfety při fanfáře (dohrání levelu)
+  if (typeof triggerConfetti === 'function') triggerConfetti();
+}
