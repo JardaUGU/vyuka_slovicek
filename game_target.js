@@ -118,7 +118,7 @@ function checkTargetHit(slotIdx) {
   }
 }
 
-// Obsluha přetahování (Drag & Drop přes Pointer Events - funguje na dotyk i myš)
+// Obsluha přetahování s okamžitou detekcí dotyku (Kolize kruhu s terčem)
 function attachTargetDragHandlers() {
   const puck = document.getElementById("target-center-puck");
   if (!puck) return;
@@ -140,20 +140,37 @@ function attachTargetDragHandlers() {
     if (!isDragging) return;
     const dx = e.clientX - startX;
     const dy = e.clientY - startY;
-    puck.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px)) scale(1.08)`;
+    puck.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px)) scale(1.05)`;
 
-    // Zjistíme, zda jsme nad některým terčem po obvodu
-    targetHoveredIdx = -1;
+    // Skutečné souřadnice středu a poloměr taženého kruhu
+    const puckRect = puck.getBoundingClientRect();
+    const puckCenterX = puckRect.left + puckRect.width / 2;
+    const puckCenterY = puckRect.top + puckRect.height / 2;
+    // Poloměr zmenšíme o pár pixelů (0.38), aby stačil lehký překryv s terčem
+    const hitRadius = puckRect.width * 0.38; 
+
     for (let i = 0; i < 8; i++) {
       const slotEl = document.getElementById(`target-slot-${i}`);
       if (!slotEl) continue;
       const rect = slotEl.getBoundingClientRect();
-      const dist = Math.hypot(e.clientX - (rect.left + rect.width / 2), e.clientY - (rect.top + rect.height / 2));
-      if (dist < 52) {
-        targetHoveredIdx = i;
-        slotEl.classList.add("aimed");
-      } else {
-        slotEl.classList.remove("aimed");
+
+      // Najdeme nejbližší bod na obdélníku terče vůči středu našeho kruhu
+      const closestX = Math.max(rect.left, Math.min(puckCenterX, rect.right));
+      const closestY = Math.max(rect.top, Math.min(puckCenterY, rect.bottom));
+      const dist = Math.hypot(puckCenterX - closestX, puckCenterY - closestY);
+
+      // OKAMŽITÝ DOTYK! Nečekáme na puštění prstu/myši
+      if (dist <= hitRadius) {
+        isDragging = false; // Ukončíme aktuální tah
+        try { puck.releasePointerCapture(e.pointerId); } catch(err) {}
+        
+        // Pokud trefil špatně, vrátíme kruh plynule doprostřed (při správné trefě se překreslí celá hra)
+        puck.style.transition = "transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)";
+        puck.style.transform = "translate(-50%, -50%) scale(1)";
+        puck.style.zIndex = "20";
+
+        checkTargetHit(i);
+        return;
       }
     }
   };
@@ -164,14 +181,6 @@ function attachTargetDragHandlers() {
     puck.style.transition = "transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)";
     puck.style.transform = "translate(-50%, -50%) scale(1)";
     puck.style.zIndex = "20";
-
-    document.querySelectorAll(".target-node").forEach(el => el.classList.remove("aimed"));
-
-    if (targetHoveredIdx !== -1) {
-      const hitIdx = targetHoveredIdx;
-      targetHoveredIdx = -1;
-      checkTargetHit(hitIdx);
-    }
   };
 
   puck.onpointerup = endDrag;
