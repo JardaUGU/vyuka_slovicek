@@ -447,3 +447,76 @@ window.startStory = function(topicName) {
 
 // Spouštěč při startu
 document.addEventListener("DOMContentLoaded", () => { if(typeof loadData==='function') loadData(); });
+
+// =========================================================================
+// GAMIFIKACE: EFEKTY A VIZUÁLNÍ ODMĚNY
+// =========================================================================
+
+// Sledování poslední pozice kliknutí (abychom věděli, odkud má vyletět +1)
+window.lastClickX = window.innerWidth / 2;
+window.lastClickY = window.innerHeight / 2;
+window.addEventListener('pointerdown', (e) => {
+    window.lastClickX = e.clientX;
+    window.lastClickY = e.clientY;
+}, true);
+
+// Zobrazí plovoucí text (+1 ★) v místě posledního dotyku
+function showFloatingPoint(text = "+1 ★") {
+    // V Pexesu, Příběhu a Hadovi to ruší, tam to vynecháme
+    if (selectedGame === "PEXESO" || selectedGame === "STORY" || selectedGame === "SNAKE") return;
+
+    const el = document.createElement("div");
+    el.className = "floating-point";
+    el.innerText = text;
+    el.style.left = window.lastClickX + "px";
+    el.style.top = window.lastClickY + "px";
+    document.body.appendChild(el);
+    setTimeout(() => { if (el.parentNode) el.remove(); }, 850);
+}
+
+// Minimalistický Confetti engine (Canvas)
+function triggerConfetti() {
+    let canvas = document.getElementById('confetti-canvas');
+    if (!canvas) {
+        canvas = document.createElement('canvas');
+        canvas.id = 'confetti-canvas';
+        document.body.appendChild(canvas);
+    }
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    const ctx = canvas.getContext('2d');
+    
+    const particles = [];
+    const colors = ['#22c55e', '#3b82f6', '#facc15', '#ef4444', '#a855f7'];
+    
+    for (let i = 0; i < 80; i++) {
+        particles.push({
+            x: canvas.width / 2,
+            y: canvas.height / 2 + 50,
+            r: Math.random() * 6 + 4,
+            dx: Math.random() * 10 - 5,
+            dy: Math.random() * -10 - 5,
+            color: colors[Math.floor(Math.random() * colors.length)]
+        });
+    }
+
+    let frame = 0;
+    function animate() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        let active = false;
+        particles.forEach(p => {
+            p.x += p.dx;
+            p.y += p.dy;
+            p.dy += 0.4; // Gravitace
+            if (p.y < canvas.height) active = true;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+            ctx.fillStyle = p.color;
+            ctx.fill();
+        });
+        frame++;
+        if (active && frame < 150) requestAnimationFrame(animate);
+        else ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+    animate();
+}
