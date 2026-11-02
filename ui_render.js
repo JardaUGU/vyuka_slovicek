@@ -505,6 +505,9 @@ function _renderSelectGame(main, bSubj, bGroup) {
       <div class="tile" style="border-color:var(--col-green);" onclick="if(typeof startSnakeGame === 'function') startSnakeGame()">
         <h2 style="color:var(--col-green);">🐍 Had</h2><p>Pravopis na čas</p>
       </div>
+      <div class="tile" style="border-color:var(--col-active-tab);" onclick="if(typeof startTargetGame === 'function') startTargetGame()">
+        <h2 style="color:var(--col-active-tab);">🎯 Střelba</h2><p>Přetahování na čas</p>
+      </div>
     `;
   }
 
