@@ -44,6 +44,7 @@ function goBack() {
   if (typeof stopSnakeLoop === "function") stopSnakeLoop();
   if (typeof stopPexesoTimeout === "function") stopPexesoTimeout();
   if (typeof sendTimeHeartbeatToGoogle === "function") sendTimeHeartbeatToGoogle();
+  if (typeof stopTargetTimer === "function") stopTargetTimer();
 
   const isMinigame = (typeof isCampaignMinigame !== "undefined" && isCampaignMinigame && selectedGame !== "PROCEDURAL_MATH");
   const sLow = (typeof selectedSubject !== 'undefined' ? selectedSubject || "" : "").toLowerCase();
