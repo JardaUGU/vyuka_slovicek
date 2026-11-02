@@ -302,3 +302,75 @@ footer { height: 32px; background-color: var(--col-card); border-top: 1px solid 
   pointer-events: none; 
   z-index: 10000;
 }
+/* =========================================================
+   STŘELBA NA TERČ (TARGET ARENA)
+   ========================================================= */
+.target-arena {
+  position: relative;
+  flex: 1;
+  width: 100%;
+  min-height: 360px;
+  background: radial-gradient(circle at center, rgba(0, 188, 212, 0.12) 0%, transparent 70%);
+  border: 1px dashed var(--col-card-border);
+  border-radius: 16px;
+  overflow: hidden;
+  touch-action: none;
+}
+
+.target-node {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  background: var(--col-card);
+  border: 2px solid var(--col-card-border);
+  color: var(--col-text);
+  padding: 8px 10px;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: bold;
+  text-align: center;
+  max-width: 115px;
+  cursor: pointer;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+  transition: transform 0.15s, border-color 0.15s, background-color 0.15s;
+  z-index: 10;
+}
+
+.target-node.aimed {
+  transform: translate(-50%, -50%) scale(1.18);
+  border-color: var(--col-green);
+  background: var(--col-success-bg);
+  box-shadow: 0 0 15px rgba(34, 197, 94, 0.6);
+}
+
+.target-node.wrong {
+  background: var(--col-red) !important;
+  border-color: #fff !important;
+  color: #fff !important;
+  animation: shakeTile 0.35s both;
+}
+
+.target-puck {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 124px;
+  height: 124px;
+  border-radius: 50%;
+  background: var(--col-card-alt);
+  border: 4px solid var(--col-yellow);
+  color: var(--col-yellow);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 10px;
+  text-align: center;
+  font-size: 17px;
+  font-weight: bold;
+  cursor: grab;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.5), 0 0 15px rgba(250, 204, 21, 0.25);
+  z-index: 20;
+  touch-action: none;
+}
+.target-puck:active { cursor: grabbing; }
