@@ -581,6 +581,7 @@ function renderActiveGame() {
   else if (selectedGame === "SEQ") _renderGameSeq(main);
   else if (selectedGame === "SNAKE") _renderGameSnake(main);
   else if (selectedGame === "CAMPAIGN") _renderGameCampaign(main);
+  else if (selectedGame === "TARGET") _renderGameTarget(main);
 }
 
 // -------------------------------------------------------------
@@ -1297,4 +1298,69 @@ function _renderGameCampaign(main) {
     }
   }
   main.innerHTML = html;
+}
+
+function _renderGameTarget(main) {
+  const pct = Math.round((targetSolved / targetTotal) * 100);
+  const isHebrew = (selectedSubject || '').toLowerCase().includes('hebr') || selectedSubject === 'HE';
+
+  if (targetSolved >= targetTotal) {
+    const finalTime = (((Date.now() - targetStartTime) / 1000) + targetPenaltySec).toFixed(1);
+    main.innerHTML = `
+      <div style="text-align:center;padding:30px;">
+        <h2 style="color:var(--col-green);font-size:28px;margin-bottom:10px;">VŠE SESTŘELENO! 🎯</h2>
+        <p style="font-size:20px;color:inherit;margin-bottom:8px;">Tvůj výsledný čas: <b style="color:var(--col-yellow);">${finalTime} s</b></p>
+        ${targetPenaltySec > 0 ? `<p style="font-size:14px;color:var(--col-red);margin-bottom:20px;">(Z toho penalizace za chyby: +${targetPenaltySec} s)</p>` : '<p style="margin-bottom:20px;">Čistá práce bez jediné chyby! 🔥</p>'}
+        <div class="action-btn green" onclick="startTargetGame()">HRÁT ZNOVU ➔</div>
+        <div class="action-btn" onclick="setScreen('SELECT_GAME')">ZPĚT DO MENU</div>
+      </div>
+    `;
+    return;
+  }
+
+  // Souřadnice 8 terčů po obvodu (v procentech šířky a výšky arény)
+  const positions = [
+    { x: 50, y: 13 }, // Nahoře
+    { x: 80, y: 24 }, // Vpravo nahoře
+    { x: 84, y: 50 }, // Vpravo
+    { x: 80, y: 76 }, // Vpravo dole
+    { x: 50, y: 87 }, // Dole
+    { x: 20, y: 76 }, // Vlevo dole
+    { x: 16, y: 50 }, // Vlevo
+    { x: 20, y: 24 }  // Vlevo nahoře
+  ];
+
+  main.innerHTML = `
+    <div class="bargraph-container">
+      <div class="bargraph-header">
+        <span>🎯 Terče: ${targetSolved} / ${targetTotal}</span>
+        <span id="target-timer-ui" style="color:var(--col-yellow);font-weight:bold;">0.0 s</span>
+      </div>
+      <div class="bargraph-track"><div class="bargraph-fill" style="width:${pct}%;"></div></div>
+    </div>
+
+    <div class="target-arena">
+      ${positions.map((pos, idx) => {
+        const item = targetRing[idx];
+        if (!item) return '';
+        const cleanQ = item.question.replace(/\s*\([^)]*\)/g, '').trim();
+        return `
+          <div id="target-slot-${idx}" class="target-node ${isHebrew ? 'hebrew-text' : ''}" 
+               style="left:${pos.x}%; top:${pos.y}%;" 
+               onclick="checkTargetHit(${idx})">
+            ${cleanQ}
+          </div>
+        `;
+      }).join('')}
+
+      ${targetCurrent ? `
+        <div id="target-center-puck" class="target-puck">
+          <div style="font-size:10px;color:var(--col-text-muted);margin-bottom:2px;">PŘETÁHNI NA CÍL</div>
+          <div>${cleanCzechTranslation(targetCurrent.answer)}</div>
+        </div>
+      ` : ''}
+    </div>
+  `;
+
+  setTimeout(attachTargetDragHandlers, 20);
 }
