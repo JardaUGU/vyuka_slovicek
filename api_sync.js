@@ -139,3 +139,12 @@ async function saveWordMasteryToGoogle(itemQuestion, masteryLevel, direction) {
     fetch(API_URL, { method: "POST", mode: "no-cors", body: fd });
   } catch(e) {}
 }
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") {
+    sendTimeHeartbeatToGoogle();
+  } else if (document.visibilityState === "visible") {
+    checkDateRollover();
+    syncDataQuietly();
+  }
+});
