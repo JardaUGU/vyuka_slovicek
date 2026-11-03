@@ -11,9 +11,10 @@ let targetStartTime = 0;
 let targetPenaltySec = 0;
 let targetTimerInt = null;
 let targetLastSlotIdx = -1;
-let targetBestTime = null;      // Uložený rekord pro tuto lekci
+let targetBestTime = null;      // Rekord pro aktuální sadu slov
 let targetLastFinalTime = null; // Výsledný čas právě dohrané hry
 let targetIsNewRecord = false;
+let targetSavedSet = [];        // Uložená sada unikátních slov z minulého kola
 
 function stopTargetTimer() {
   if (targetTimerInt) { clearInterval(targetTimerInt); targetTimerInt = null; }
@@ -27,26 +28,35 @@ function getTargetRecordKey() {
   return `best_target_${u}_${s}_${g}_${mode}`;
 }
 
-function startTargetGame() {
+// keepSameSet = true zopakuje naprosto stejný výběr slov jako v minulém kole
+function startTargetGame(keepSameSet = false) {
   if (typeof stopArcadeLoop === "function") stopArcadeLoop();
   if (typeof stopSnakeLoop === "function") stopSnakeLoop();
   stopTargetTimer();
   if (typeof isCampaignMinigame !== "undefined") isCampaignMinigame = false;
 
-  const vItems = getVocabItems().filter(it => {
+  const allEligible = getVocabItems().filter(it => {
     const clean = it.question.replace(/\s*\([^)]*\)/g, '').trim();
     return clean.split(/\s+/).length <= 3 && clean.length <= 18;
   });
 
-  if (vItems.length < 4) {
+  if (allEligible.length < 4) {
     alert("V této lekci je příliš málo krátkých slov pro Střelbu na terč (minimum jsou 4).");
     return;
   }
 
-  initTargetSession(vItems, 20);
+  if (keepSameSet && targetSavedSet.length >= 4) {
+    // Opakujeme stejnou sadu slov -> porovnáváme se stejným rekordem
+    initTargetSession(targetSavedSet, 20, false);
+  } else {
+    // Vybíráme novou sadu max 12 unikátních slov (aby se v kole 20 terčů některá zopakovala a zafixovala)
+    targetSavedSet = [...allEligible].sort(() => Math.random() - 0.5).slice(0, 12);
+    // Pokud má lekce víc než 12 slov a losujeme novou sadu, vymažeme starý čas z jiné sady
+    const resetBest = allEligible.length > 12;
+    initTargetSession(targetSavedSet, 20, resetBest);
+  }
 }
 
-// Spuštění Střelby jako minihry na konci Kampaně (12 slov z aktuální a předchozích lekcí)
 function startCampaignTarget() {
   if (typeof stopArcadeLoop === "function") stopArcadeLoop();
   if (typeof stopSnakeLoop === "function") stopSnakeLoop();
@@ -63,20 +73,26 @@ function startCampaignTarget() {
     return;
   }
 
-  initTargetSession(vItems, 12);
+  targetSavedSet = [...vItems].sort(() => Math.random() - 0.5).slice(0, 10);
+  initTargetSession(targetSavedSet, 12, false);
 }
 
-function initTargetSession(vItems, count) {
+function initTargetSession(vItems, count, resetBest = false) {
   targetTotal = count;
   targetSolved = 0;
   targetPenaltySec = 0;
   targetLastSlotIdx = -1;
   targetIsNewRecord = false;
 
-  const savedBest = localStorage.getItem(getTargetRecordKey());
-  targetBestTime = savedBest ? parseFloat(savedBest) : null;
+  if (resetBest) {
+    targetBestTime = null;
+    localStorage.removeItem(getTargetRecordKey());
+  } else {
+    const savedBest = localStorage.getItem(getTargetRecordKey());
+    targetBestTime = savedBest ? parseFloat(savedBest) : null;
+  }
 
-  // Vytvoříme zamíchanou frontu bez opakování stejného slova za sebou
+  // Sestavíme balíček 20 terčů PŘESNĚ z naší sady vItems (zamíchané pořadí)
   let pool = [];
   while (pool.length < targetTotal) {
     let shuffled = [...vItems].sort(() => Math.random() - 0.5);
