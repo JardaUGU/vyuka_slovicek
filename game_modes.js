@@ -200,11 +200,25 @@ function resetInactivityTimer() {
   seqInactivityTimer = setTimeout(() => { seqHintActive = true; if(typeof renderActiveGame === 'function') renderActiveGame(); }, 3000);
 }
 
+let seqBestTime = null, seqLastFinalTime = null, seqIsNewRecord = false;
+
+function getSeqRecordKey() {
+  const u = (typeof currentUser !== 'undefined' && currentUser) ? currentUser.name.toLowerCase().trim() : 'user';
+  const s = (typeof selectedSubject !== 'undefined') ? selectedSubject : 'subj';
+  const g = (typeof selectedGroupKey !== 'undefined') ? selectedGroupKey : 'grp';
+  const idx = typeof selectedSeqIndex !== 'undefined' ? selectedSeqIndex : 0;
+  return `best_seq_${u}_${s}_${g}_${idx}`;
+}
+
 function initSequence() {
   const sItems = getSeqItems(); if (sItems.length === 0) return;
   const seqConfig = sItems[typeof selectedSeqIndex !== 'undefined' ? selectedSeqIndex : 0] || sItems[0];
   const itemsList = seqConfig.answer.split('|').map(s => s.trim()).filter(Boolean);
-  seqTargetIdx = 0; seqHintActive = false; seqSlots = [-1, -1, -1, -1];
+  seqTargetIdx = 0; seqHintActive = false; seqSlots = [-1, -1, -1, -1]; seqIsNewRecord = false;
+
+  const savedBest = localStorage.getItem(getSeqRecordKey());
+  seqBestTime = savedBest ? parseFloat(savedBest) : null;
+
   let initialCount = Math.min(4, itemsList.length);
   let pool = []; let poolSize = Math.min(itemsList.length - 1, 6);
   for (let i = 1; i <= poolSize; i++) pool.push(i);
@@ -217,7 +231,28 @@ function initSequence() {
   if (seqTimerInterval) clearInterval(seqTimerInterval);
   seqTimerInterval = setInterval(() => {
     const el = document.getElementById("seq-timer");
-    if (el && seqTargetIdx < itemsList.length) el.innerText = ((Date.now() - seqStartTime) / 1000).toFixed(1) + " s";
+    if (el && seqTargetIdx < itemsList.length) {
+      const elapsed = (Date.now() - seqStartTime) / 1000;
+      el.innerText = elapsed.toFixed(1) + " s";
+
+      // Živé porovnávání s rekordem
+      if (seqBestTime && seqTargetIdx > 0) {
+        const expected = (seqBestTime / itemsList.length) * seqTargetIdx;
+        const diff = elapsed - expected;
+        const paceText = document.getElementById("seq-pace-text");
+        const paceBar = document.getElementById("seq-pace-bar");
+        if (paceText) {
+          paceText.innerText = diff <= 0 ? `⚡ ${diff.toFixed(1)}s (Náskok!)` : `🐢 +${diff.toFixed(1)}s (Přidej!)`;
+          paceText.style.color = diff <= 0 ? "var(--col-green)" : "var(--col-red)";
+        }
+        if (paceBar) {
+          const pct = Math.min(50, Math.abs(diff / 5) * 50);
+          paceBar.style.left = diff <= 0 ? "50%" : (50 - pct) + "%";
+          paceBar.style.width = pct + "%";
+          paceBar.style.background = diff <= 0 ? "var(--col-green)" : "var(--col-red)";
+        }
+      }
+    }
   }, 100);
   resetInactivityTimer();
 }
@@ -232,6 +267,12 @@ function clickSeqSlot(slot) {
     seqTargetIdx++; seqHintActive = false;
     if (seqTargetIdx >= itemsList.length) {
       clearInterval(seqTimerInterval); if (seqInactivityTimer) clearTimeout(seqInactivityTimer);
+      seqLastFinalTime = parseFloat(((Date.now() - seqStartTime) / 1000).toFixed(1));
+      if (!seqBestTime || seqLastFinalTime < seqBestTime) {
+        seqBestTime = seqLastFinalTime;
+        seqIsNewRecord = true;
+        localStorage.setItem(getSeqRecordKey(), String(seqBestTime));
+      }
       sndFanfare(); addReward(3, typeof selectedGroupKey !== 'undefined' ? selectedGroupKey : "Řada");
       seqSlots[slot] = -1;
     } else {
