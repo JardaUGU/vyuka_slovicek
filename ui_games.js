@@ -536,22 +536,38 @@ function _renderGameSeq(main) {
     <div class="bargraph-container">
       <div class="bargraph-header">
         <span>Položka ${Math.min((typeof seqTargetIdx!=='undefined'?seqTargetIdx:0) + 1, itemsList.length)} z ${itemsList.length} ${(typeof seqHintActive!=='undefined'&&seqHintActive) ? '<b style="color:var(--col-yellow);">[NÁPOVĚDA]</b>' : ''}</span>
-        <span id="seq-timer" style="color:var(--col-yellow);font-weight:bold;">0.0 s</span>
+        <span>
+          <span id="seq-pace-text" style="margin-right:8px;font-size:12px;"></span>
+          <span id="seq-timer" style="color:var(--col-yellow);font-weight:bold;">${isFinished && seqLastFinalTime ? seqLastFinalTime + ' s' : '0.0 s'}</span>
+          ${seqBestTime ? `<span style="color:var(--col-text-muted);font-size:11px;margin-left:5px;">(🏆 ${seqBestTime}s)</span>` : ''}
+        </span>
       </div>
       <div class="bargraph-track"><div class="bargraph-fill" style="width:${pct}%;"></div></div>
+      ${seqBestTime && !isFinished ? `
+        <div class="pace-meter-track">
+          <div class="pace-meter-center"></div>
+          <div id="seq-pace-bar" class="pace-meter-fill"></div>
+        </div>
+      ` : ''}
     </div>
     <div class="prompt-box ${isHebrew ? 'hebrew-text' : ''}" style="margin:8px 0;min-height:56px;color:inherit;font-size:22px;">
       ${itemsList.slice(0, (typeof seqTargetIdx!=='undefined'?seqTargetIdx:0)).join(' ')} 
-      <span style="color:var(--col-yellow);">${(typeof seqHintActive!=='undefined'&&seqHintActive) ? `[ ${targetWord}! ]` : '[ ??? ]'}</span>
+      ${!isFinished ? `<span style="color:var(--col-yellow);">${(typeof seqHintActive!=='undefined'&&seqHintActive) ? `[ ${targetWord}! ]` : '[ ??? ]'}</span>` : ''}
     </div>
     ${!isFinished ? `
       <div class="grid-2">
         ${(typeof seqSlots!=='undefined'?seqSlots:[]).map((itemIdx, slot) => {
           const isHintSlot = ((typeof seqHintActive!=='undefined'&&seqHintActive) && itemIdx === (typeof seqTargetIdx!=='undefined'?seqTargetIdx:0));
-          return `<div id="seq-btn-${slot}" class="opt-btn ${isHebrew ? 'hebrew' : ''} ${isHintSlot ? 'hint' : ''}" onclick="if(typeof clickSeqSlot==='function') clickSeqSlot(${slot})">${itemIdx !== -1 ? itemsList[itemIdx] : ''}</div>`;
+          return `<div id="seq-btn-${slot}" class="opt-btn ${isHebrew ? 'hebrew-text' : ''} ${isHintSlot ? 'hint' : ''}" onclick="if(typeof clickSeqSlot==='function') clickSeqSlot(${slot})">${itemIdx !== -1 ? itemsList[itemIdx] : ''}</div>`;
         }).join('')}
       </div>
-    ` : `<div class="action-btn green" onclick="if(typeof initSequence==='function') { initSequence(); renderActiveGame(); }">DOKONČENO! HRÁT ZNOVU</div>`}
+    ` : `
+      <div style="text-align:center;padding:15px;">
+        <h2 style="color:var(--col-green);margin-bottom:6px;">${seqIsNewRecord ? '🏆 NOVÝ REKORD!' : 'DOKONČENO! 🎉'}</h2>
+        <p style="font-size:18px;margin-bottom:12px;">Čas: <b style="color:var(--col-yellow);">${seqLastFinalTime} s</b> &nbsp;|&nbsp; Rekord: <b>${seqBestTime} s</b></p>
+        <div class="action-btn green" onclick="if(typeof initSequence==='function') { initSequence(); renderActiveGame(); }">ZKUSIT ZNOVU A PŘEKONAT ČAS ➔</div>
+      </div>
+    `}
   `;
 }
 
@@ -740,38 +756,53 @@ function _renderGameTarget(main) {
   const isHebrew = (selectedSubject || '').toLowerCase().includes('hebr') || selectedSubject === 'HE';
 
   if (targetSolved >= targetTotal) {
-    const finalTime = (((Date.now() - targetStartTime) / 1000) + targetPenaltySec).toFixed(1);
+    if (typeof isCampaignMinigame !== 'undefined' && isCampaignMinigame) {
+      const bonusCoins = targetPenaltySec === 0 ? 3 : (targetPenaltySec <= 4 ? 2 : 1);
+      main.innerHTML = `
+        <div style="text-align:center;padding:30px;">
+          <h2 style="color:var(--col-green);font-size:28px;margin-bottom:10px;">TRÉNINK DOKONČEN! 🎯</h2>
+          <p style="font-size:20px;color:inherit;margin-bottom:15px;">Sestřeleno v čase: <b style="color:var(--col-yellow);">${targetLastFinalTime} s</b> (Bonus: +${bonusCoins} 💰)</p>
+          <div class="action-btn green" onclick="if(typeof finishCampaign==='function') finishCampaign(${campaignMinigameCoins + bonusCoins})">DOKONČIT A ZPĚT</div>
+        </div>
+      `;
+      return;
+    }
+
     main.innerHTML = `
       <div style="text-align:center;padding:30px;">
-        <h2 style="color:var(--col-green);font-size:28px;margin-bottom:10px;">VŠE SESTŘELENO! 🎯</h2>
-        <p style="font-size:20px;color:inherit;margin-bottom:8px;">Tvůj výsledný čas: <b style="color:var(--col-yellow);">${finalTime} s</b></p>
+        <h2 style="color:var(--col-green);font-size:28px;margin-bottom:10px;">${targetIsNewRecord ? '🏆 NOVÝ REKORD!' : 'VŠE SESTŘELENO! 🎯'}</h2>
+        <p style="font-size:20px;color:inherit;margin-bottom:6px;">Tvůj výsledný čas: <b style="color:var(--col-yellow);">${targetLastFinalTime} s</b></p>
+        <p style="font-size:16px;color:var(--col-active-tab);margin-bottom:12px;">🏆 Nejlepší čas lekce: <b>${targetBestTime} s</b></p>
         ${targetPenaltySec > 0 ? `<p style="font-size:14px;color:var(--col-red);margin-bottom:20px;">(Z toho penalizace za chyby: +${targetPenaltySec} s)</p>` : '<p style="margin-bottom:20px;">Čistá práce bez jediné chyby! 🔥</p>'}
-        <div class="action-btn green" onclick="startTargetGame()">HRÁT ZNOVU ➔</div>
+        <div class="action-btn green" onclick="startTargetGame()">ZKUSIT ZNOVU ➔</div>
         <div class="action-btn" onclick="setScreen('SELECT_GAME')">ZPĚT DO MENU</div>
       </div>
     `;
     return;
   }
 
-  // Souřadnice 8 terčů po obvodu (v procentech šířky a výšky arény)
   const positions = [
-    { x: 50, y: 13 }, // Nahoře
-    { x: 80, y: 24 }, // Vpravo nahoře
-    { x: 84, y: 50 }, // Vpravo
-    { x: 80, y: 76 }, // Vpravo dole
-    { x: 50, y: 87 }, // Dole
-    { x: 20, y: 76 }, // Vlevo dole
-    { x: 16, y: 50 }, // Vlevo
-    { x: 20, y: 24 }  // Vlevo nahoře
+    { x: 50, y: 12 }, { x: 80, y: 24 }, { x: 84, y: 50 }, { x: 80, y: 76 },
+    { x: 50, y: 88 }, { x: 20, y: 76 }, { x: 16, y: 50 }, { x: 20, y: 24 }
   ];
 
   main.innerHTML = `
     <div class="bargraph-container">
       <div class="bargraph-header">
         <span>🎯 Terče: ${targetSolved} / ${targetTotal}</span>
-        <span id="target-timer-ui" style="color:var(--col-yellow);font-weight:bold;">0.0 s</span>
+        <span>
+          <span id="target-pace-text" style="margin-right:8px;font-size:12px;"></span>
+          <span id="target-timer-ui" style="color:var(--col-yellow);font-weight:bold;">0.0 s</span>
+          ${targetBestTime ? `<span style="color:var(--col-text-muted);font-size:11px;margin-left:5px;">(🏆 ${targetBestTime}s)</span>` : ''}
+        </span>
       </div>
       <div class="bargraph-track"><div class="bargraph-fill" style="width:${pct}%;"></div></div>
+      ${targetBestTime ? `
+        <div class="pace-meter-track">
+          <div class="pace-meter-center"></div>
+          <div id="target-pace-bar" class="pace-meter-fill"></div>
+        </div>
+      ` : ''}
     </div>
 
     <div class="target-arena">
@@ -780,7 +811,7 @@ function _renderGameTarget(main) {
         if (!item) return '';
         const cleanQ = item.question.replace(/\s*\([^)]*\)/g, '').trim();
         return `
-          <div id="target-slot-${idx}" class="target-node ${isHebrew ? 'hebrew-text' : ''}" 
+          <div id="target-slot-${idx}" class="target-node ${isHebrew ? 'hebrew-target' : ''}" 
                style="left:${pos.x}%; top:${pos.y}%;" 
                onclick="checkTargetHit(${idx})">
             ${cleanQ}
@@ -790,7 +821,6 @@ function _renderGameTarget(main) {
 
       ${targetCurrent ? `
         <div id="target-center-puck" class="target-puck">
-          <div style="font-size:10px;color:var(--col-text-muted);margin-bottom:2px;">PŘETÁHNI NA CÍL</div>
           <div>${cleanCzechTranslation(targetCurrent.answer)}</div>
         </div>
       ` : ''}
