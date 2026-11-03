@@ -768,13 +768,17 @@ function _renderGameTarget(main) {
       return;
     }
 
+    const totalEligibleInLesson = getVocabItems().filter(it => it.question.replace(/\s*\([^)]*\)/g, '').trim().length <= 18).length;
+
     main.innerHTML = `
-      <div style="text-align:center;padding:30px;">
-        <h2 style="color:var(--col-green);font-size:28px;margin-bottom:10px;">${targetIsNewRecord ? '🏆 NOVÝ REKORD!' : 'VŠE SESTŘELENO! 🎯'}</h2>
+      <div style="text-align:center;padding:25px;">
+        <h2 style="color:var(--col-green);font-size:28px;margin-bottom:10px;">${targetIsNewRecord ? '🏆 NOVÝ REKORD SADY!' : 'VŠE SESTŘELENO! 🎯'}</h2>
         <p style="font-size:20px;color:inherit;margin-bottom:6px;">Tvůj výsledný čas: <b style="color:var(--col-yellow);">${targetLastFinalTime} s</b></p>
-        <p style="font-size:16px;color:var(--col-active-tab);margin-bottom:12px;">🏆 Nejlepší čas lekce: <b>${targetBestTime} s</b></p>
-        ${targetPenaltySec > 0 ? `<p style="font-size:14px;color:var(--col-red);margin-bottom:20px;">(Z toho penalizace za chyby: +${targetPenaltySec} s)</p>` : '<p style="margin-bottom:20px;">Čistá práce bez jediné chyby! 🔥</p>'}
-        <div class="action-btn green" onclick="startTargetGame()">ZKUSIT ZNOVU ➔</div>
+        <p style="font-size:16px;color:var(--col-active-tab);margin-bottom:12px;">🏆 Rekord této sady slov: <b>${targetBestTime} s</b></p>
+        ${targetPenaltySec > 0 ? `<p style="font-size:14px;color:var(--col-red);margin-bottom:18px;">(Z toho penalizace za chyby: +${targetPenaltySec} s)</p>` : '<p style="margin-bottom:18px;">Čistá práce bez jediné chyby! 🔥</p>'}
+        
+        <div class="action-btn green" onclick="startTargetGame(true)">🔄 ZOPAKOVAT STEJNOU SADU (PŘEKONAT ČAS)</div>
+        ${totalEligibleInLesson > 12 ? `<div class="action-btn" onclick="startTargetGame(false)">🎲 VYLOSOVAT JINÁ SLOVA Z LEKCE</div>` : ''}
         <div class="action-btn" onclick="setScreen('SELECT_GAME')">ZPĚT DO MENU</div>
       </div>
     `;
