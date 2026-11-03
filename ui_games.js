@@ -532,18 +532,20 @@ function _renderGameSeq(main) {
   const pct = Math.round(((typeof seqTargetIdx!=='undefined'?seqTargetIdx:0) / itemsList.length) * 100);
   const isHebrew = (selectedSubject || '').toLowerCase().includes('hebr') || selectedSubject === 'HE';
 
+  const diffFromPrev = (seqPrevBestTime && seqLastFinalTime) ? (seqPrevBestTime - seqLastFinalTime) : 0;
+
   main.innerHTML = `
     <div class="bargraph-container">
       <div class="bargraph-header">
         <span>Položka ${Math.min((typeof seqTargetIdx!=='undefined'?seqTargetIdx:0) + 1, itemsList.length)} z ${itemsList.length} ${(typeof seqHintActive!=='undefined'&&seqHintActive) ? '<b style="color:var(--col-yellow);">[NÁPOVĚDA]</b>' : ''}</span>
         <span>
-          <span id="seq-pace-text" style="margin-right:8px;font-size:12px;"></span>
+          <span id="seq-pace-text" style="margin-right:8px;font-size:12px;font-weight:bold;"></span>
           <span id="seq-timer" style="color:var(--col-yellow);font-weight:bold;">${isFinished && seqLastFinalTime ? seqLastFinalTime + ' s' : '0.0 s'}</span>
-          ${seqBestTime ? `<span style="color:var(--col-text-muted);font-size:11px;margin-left:5px;">(🏆 ${seqBestTime}s)</span>` : ''}
+          ${seqPrevBestTime ? `<span style="color:var(--col-text-muted);font-size:11px;margin-left:5px;">(🏆 ${seqPrevBestTime}s)</span>` : ''}
         </span>
       </div>
       <div class="bargraph-track"><div class="bargraph-fill" style="width:${pct}%;"></div></div>
-      ${seqBestTime && !isFinished ? `
+      ${seqPrevBestTime && !isFinished ? `
         <div class="pace-meter-track">
           <div class="pace-meter-center"></div>
           <div id="seq-pace-bar" class="pace-meter-fill"></div>
@@ -563,12 +565,18 @@ function _renderGameSeq(main) {
       </div>
     ` : `
       <div style="text-align:center;padding:15px;">
-        <h2 style="color:var(--col-green);margin-bottom:6px;">${seqIsNewRecord ? '🏆 NOVÝ REKORD!' : 'DOKONČENO! 🎉'}</h2>
-        <p style="font-size:18px;margin-bottom:12px;">Čas: <b style="color:var(--col-yellow);">${seqLastFinalTime} s</b> &nbsp;|&nbsp; Rekord: <b>${seqBestTime} s</b></p>
+        <h2 style="color:var(--col-green);margin-bottom:6px;">${seqIsNewRecord ? '🏆 NOVÝ REKORD! (+1 💰)' : 'DOKONČENO! 🎉'}</h2>
+        <p style="font-size:18px;margin-bottom:6px;">Tvůj čas: <b style="color:var(--col-yellow);">${seqLastFinalTime} s</b> &nbsp;|&nbsp; Rekord: <b>${seqBestTime} s</b></p>
+        ${seqPrevBestTime ? `
+          <p style="font-size:15px;font-weight:bold;color:${diffFromPrev >= 0 ? 'var(--col-green)' : 'var(--col-red)'};margin-bottom:14px;">
+            ${diffFromPrev >= 0 ? `⚡ Zlepšení oproti minule o ${diffFromPrev.toFixed(1)} s!` : `🐢 O ${Math.abs(diffFromPrev).toFixed(1)} s pomalejší než rekord`}
+          </p>
+        ` : ''}
         <div class="action-btn green" onclick="if(typeof initSequence==='function') { initSequence(); renderActiveGame(); }">ZKUSIT ZNOVU A PŘEKONAT ČAS ➔</div>
       </div>
     `}
   `;
+  if (!isFinished && typeof renderSeqSplitPace === 'function') renderSeqSplitPace();
 }
 
 function _renderGameSnake(main) {
@@ -680,9 +688,33 @@ function _renderGameSnake(main) {
 
 function _renderGameCampaign(main) {
   if (typeof cmpIdx === 'undefined' || typeof cmpQueue === 'undefined' || cmpIdx >= cmpQueue.length) {
+    // BOD 1: Pokud žák udělal chyby, ukážeme mu před minihrou rekapitulaci "Dnešní chytáky"
+    if (typeof cmpMistakes !== 'undefined' && cmpMistakes.length > 0 && !cmpSummaryShown) {
+      main.innerHTML = `
+        <div style="padding:15px;">
+          <h2 style="color:var(--col-yellow);text-align:center;margin-bottom:6px;">📝 Dnešní chytáky (${cmpMistakes.length})</h2>
+          <p style="text-align:center;font-size:13px;color:var(--col-text-muted);margin-bottom:14px;">Tato slovíčka ti dnes dala zabrat. Ještě jednou si je prohlédni:</p>
+          <div style="display:flex;flex-direction:column;gap:8px;max-height:55vh;overflow-y:auto;margin-bottom:15px;">
+            ${cmpMistakes.map(m => `
+              <div style="background:var(--col-card);border:1px solid var(--col-card-border);border-radius:8px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;">
+                <div>
+                  <b style="color:var(--col-yellow);font-size:17px;">${m.question}</b>
+                  <div style="color:var(--col-text);font-size:14px;margin-top:2px;">🇨🇿 ${cleanCzechTranslation(m.answer)}</div>
+                </div>
+                ${selectedSubject !== 'Matematika' ? `<span style="font-size:22px;cursor:pointer;" onclick="speakWord('${m.question.replace(/'/g, "\\'")}', '${selectedSubject}')">🔊</span>` : ''}
+              </div>
+            `).join('')}
+          </div>
+          <div class="action-btn green" onclick="cmpSummaryShown = true; renderActiveGame();">POKRAČOVAT DO MINIHRY 🎮 ➔</div>
+        </div>
+      `;
+      return;
+    }
+
     if (typeof launchCampaignMinigame === 'function') launchCampaignMinigame();
     return;
   }
+
   const isHebrew = (selectedSubject || '').toLowerCase().includes('hebr') || selectedSubject === 'HE';
   const task = cmpQueue[cmpIdx];
   const pct = Math.round((cmpIdx / cmpQueue.length) * 100);
@@ -702,7 +734,15 @@ function _renderGameCampaign(main) {
     const isEval = (typeof cmpState !== 'undefined' && cmpState === 'EVAL');
     let promptDisplay = typeof formatPromptText==='function' ? formatPromptText(task.prompt) : task.prompt;
 
-    if (isEval && task.type === 'KVIZ') {
+    // BOD 3: Audio poslechová úloha (skryje psané slovo, dokud žák neodpoví)
+    if (task.isAudioOnly && !isEval) {
+      promptDisplay = `
+        <div style="cursor:pointer;padding:10px;" onclick="speakWord('${task.data.question.replace(/'/g, "\\'")}', '${selectedSubject}')">
+          <div style="font-size:42px;margin-bottom:4px;">🎧 🔊</div>
+          <div style="font-size:15px;color:var(--col-active-tab);">Poslouchej a vyber správný překlad (Klikni pro přehrání)</div>
+        </div>
+      `;
+    } else if (isEval && task.type === 'KVIZ') {
       const fillHtml = `<span style="color:var(--col-green);font-weight:bold;text-decoration:underline;">${task.correctAns}</span>`;
       if (task.data.question.includes('___')) {
         promptDisplay = typeof formatPromptText==='function' ? formatPromptText(task.data.question.replace(/___+/g, fillHtml)) : task.data.question.replace(/___+/g, fillHtml);
@@ -713,7 +753,7 @@ function _renderGameCampaign(main) {
 
     html += `<div class="prompt-box" style="font-size:24px;color:inherit;margin:20px 0;">
                ${promptDisplay}
-               ${(isEval && typeof getTargetLang==='function' && getTargetLang(selectedSubject) !== 'cs-CZ' && task.type !== 'QUIZ_IN') ? `<span class="audio-btn" onclick="if(typeof speakWord==='function') speakWord('${(task.type==='KVIZ' && task.data.question.includes('___') ? task.data.question.replace(/___+/g, task.data.answer) : task.data.question).replace(/[*_]/g, '').replace(/'/g, "\\'")}', '${selectedSubject}')">🔊</span>` : ''}
+               ${((isEval || (task.type === 'QUIZ_IN' && !task.isAudioOnly)) && typeof getTargetLang==='function' && getTargetLang(selectedSubject) !== 'cs-CZ') ? `<span class="audio-btn" onclick="if(typeof speakWord==='function') speakWord('${(task.type==='KVIZ' && task.data.question.includes('___') ? task.data.question.replace(/___+/g, task.data.answer) : task.data.question).replace(/[*_]/g, '').replace(/'/g, "\\'")}', '${selectedSubject}')">🔊</span>` : ''}
              </div>`;
     
     html += `<div class="grid-2">`;
@@ -769,12 +809,18 @@ function _renderGameTarget(main) {
     }
 
     const totalEligibleInLesson = getVocabItems().filter(it => it.question.replace(/\s*\([^)]*\)/g, '').trim().length <= 18).length;
+    const diffFromPrev = (targetPrevBestTime && targetLastFinalTime) ? (targetPrevBestTime - targetLastFinalTime) : 0;
 
     main.innerHTML = `
       <div style="text-align:center;padding:25px;">
-        <h2 style="color:var(--col-green);font-size:28px;margin-bottom:10px;">${targetIsNewRecord ? '🏆 NOVÝ REKORD SADY!' : 'VŠE SESTŘELENO! 🎯'}</h2>
+        <h2 style="color:var(--col-green);font-size:28px;margin-bottom:10px;">${targetIsNewRecord ? '🏆 NOVÝ REKORD SADY! (+1 💰)' : 'VŠE SESTŘELENO! 🎯'}</h2>
         <p style="font-size:20px;color:inherit;margin-bottom:6px;">Tvůj výsledný čas: <b style="color:var(--col-yellow);">${targetLastFinalTime} s</b></p>
-        <p style="font-size:16px;color:var(--col-active-tab);margin-bottom:12px;">🏆 Rekord této sady slov: <b>${targetBestTime} s</b></p>
+        <p style="font-size:16px;color:var(--col-active-tab);margin-bottom:8px;">🏆 Rekord této sady slov: <b>${targetBestTime} s</b></p>
+        ${targetPrevBestTime ? `
+          <p style="font-size:16px;font-weight:bold;color:${diffFromPrev >= 0 ? 'var(--col-green)' : 'var(--col-red)'};margin-bottom:12px;">
+            ${diffFromPrev >= 0 ? `⚡ Zlepšil ses o ${diffFromPrev.toFixed(1)} s!` : `🐢 Zaostal jsi o ${Math.abs(diffFromPrev).toFixed(1)} s za rekordem`}
+          </p>
+        ` : ''}
         ${targetPenaltySec > 0 ? `<p style="font-size:14px;color:var(--col-red);margin-bottom:18px;">(Z toho penalizace za chyby: +${targetPenaltySec} s)</p>` : '<p style="margin-bottom:18px;">Čistá práce bez jediné chyby! 🔥</p>'}
         
         <div class="action-btn green" onclick="startTargetGame(true)">🔄 ZOPAKOVAT STEJNOU SADU (PŘEKONAT ČAS)</div>
@@ -795,13 +841,13 @@ function _renderGameTarget(main) {
       <div class="bargraph-header">
         <span>🎯 Terče: ${targetSolved} / ${targetTotal}</span>
         <span>
-          <span id="target-pace-text" style="margin-right:8px;font-size:12px;"></span>
+          <span id="target-pace-text" style="margin-right:8px;font-size:12px;font-weight:bold;"></span>
           <span id="target-timer-ui" style="color:var(--col-yellow);font-weight:bold;">0.0 s</span>
-          ${targetBestTime ? `<span style="color:var(--col-text-muted);font-size:11px;margin-left:5px;">(🏆 ${targetBestTime}s)</span>` : ''}
+          ${targetPrevBestTime ? `<span style="color:var(--col-text-muted);font-size:11px;margin-left:5px;">(🏆 ${targetPrevBestTime}s)</span>` : ''}
         </span>
       </div>
       <div class="bargraph-track"><div class="bargraph-fill" style="width:${pct}%;"></div></div>
-      ${targetBestTime ? `
+      ${targetPrevBestTime ? `
         <div class="pace-meter-track">
           <div class="pace-meter-center"></div>
           <div id="target-pace-bar" class="pace-meter-fill"></div>
@@ -810,6 +856,10 @@ function _renderGameTarget(main) {
     </div>
 
     <div class="target-arena">
+      <svg style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:15;">
+        <line id="target-laser-line" x1="50%" y1="50%" x2="50%" y2="50%" stroke="var(--col-yellow)" stroke-width="4" stroke-dasharray="6,6" stroke-linecap="round" style="display:none;opacity:0.85;" />
+      </svg>
+
       ${positions.map((pos, idx) => {
         const item = targetRing[idx];
         if (!item) return '';
@@ -831,5 +881,7 @@ function _renderGameTarget(main) {
     </div>
   `;
 
+  if (typeof renderTargetSplitPace === 'function') renderTargetSplitPace();
   setTimeout(attachTargetDragHandlers, 20);
 }
+
