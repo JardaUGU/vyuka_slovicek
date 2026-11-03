@@ -1,5 +1,5 @@
 // ==========================================
-// KAMPAŇ (SPIRÁLA) A MINIHRY
+// KAMPAŇ (SPIRÁLA), CHYTRÝ TRÉNINK A MINIHRY
 // ==========================================
 let cmpQueue = [];
 let cmpIdx = 0;
@@ -7,12 +7,13 @@ let cmpHearts = 5;
 let cmpState = 'PLAYING';
 let cmpChosenOpt = null;
 
+let cmpMistakes = [];        // Seznam slov, ve kterých žák během tréninku chyboval
+let cmpSummaryShown = false; // Zda už jsme ukázali závěrečný přehled chyb
+
 let isCampaignMinigame = false;
 let campaignMinigameCoins = 0;
 let campaignMinigamePool = [];
-// ==========================================
-// CHYTRÝ TRÉNINK PRO BĚŽNÉ LEKCE (MIX)
-// ==========================================
+
 // Inteligentní generátor falešných odpovědí pro Matematiku (zachovává jednotky i formát zlomků)
 function generateMathDistractors(correctStr, fallbackPool) {
   const s = String(correctStr).trim();
@@ -67,9 +68,14 @@ function generateMathDistractors(correctStr, fallbackPool) {
 
   return Array.from(distractors).slice(0, 3);
 }
+
+// ==========================================
+// CHYTRÝ TRÉNINK PRO BĚŽNÉ LEKCE (MIX)
+// ==========================================
 function startSmartMix() {
   if (typeof stopArcadeLoop === "function") stopArcadeLoop();
   if (typeof stopSnakeLoop === "function") stopSnakeLoop();
+  if (typeof stopTargetTimer === "function") stopTargetTimer();
 
   const allItems = activeItems.filter(it => 
     (typeof viewMode !== 'undefined' && viewMode === "LESSONS" ? it.lesson : it.topic) === selectedGroupKey
@@ -100,12 +106,11 @@ function startSmartMix() {
     });
   }
 
-// 3. Vytvořit 3 navazující vlny (1. Poznávání -> 2. Aktivní překlad -> 3. Skládání)
+  // 3. Vytvořit 3 navazující vlny (1. Poznávání -> 2. Aktivní překlad -> 3. Skládání)
   let wave1 = []; // Kvízy a Cizí -> CZ
   let wave2 = []; // CZ -> Cizí
   let wave3 = []; // Skládání (Scramble)
 
-  // Aby v jednom tréninku nebylo 45 úkolů, vezmeme do vln max 10 položek (cca 25-30 úkolů celkem)
   let wavePool = pool.slice(0, 10);
 
   wavePool.forEach(it => {
@@ -135,13 +140,11 @@ function startSmartMix() {
   wave2.sort(() => Math.random() - 0.5);
   wave3.sort(() => Math.random() - 0.5);
 
-  // ROBUSTNÍ POJISTKA (Anti-clustering): Prohledá vlnu a bezpečně vymění slovíčko,
-  // aniž by se vlnový systém rozbil nebo míchal typy úloh z jiných vln.
+  // Anti-clustering pojistka mezi vlnami
   const secureWaveTransition = (prevWave, nextWave) => {
     if (prevWave.length > 0 && nextWave.length > 1) {
       const lastQuestion = prevWave[prevWave.length - 1].data.question;
       if (nextWave[0].data.question === lastQuestion) {
-        // Najde ve vlně první úlohu, která se liší, a prohodí ji na 1. místo
         for (let i = 1; i < nextWave.length; i++) {
           if (nextWave[i].data.question !== lastQuestion) {
             let temp = nextWave[0];
@@ -155,16 +158,13 @@ function startSmartMix() {
   };
 
   secureWaveTransition(wave1, wave2);
-  
-  // Zjistíme, která vlna byla před vlnou 3 skutečně poslední (wave2 může být výjimečně prázdná)
   const activePrevWave = wave2.length > 0 ? wave2 : wave1;
   secureWaveTransition(activePrevWave, wave3);
 
   let q = [...wave1, ...wave2, ...wave3];
-  // Zvýšen limit na 35, aby se zbytečně neodstřihávala fáze "Skládání" (wave3) na konci
   if (q.length > 35) q = q.slice(0, 35);
 
-  // 4. Doplnit možnosti a grafémy
+  // 4. Doplnit možnosti, grafémy a poslechové výzvy
   const vItemsOnly = allItems.filter(i => i.type === "SLOVO");
   q.forEach(task => {
     if (task.type === 'QUIZ_OUT' || task.type === 'QUIZ_IN') {
@@ -172,7 +172,7 @@ function startSmartMix() {
        const correctAns = isOut ? task.data.question : cleanCzechTranslation(task.data.answer);
        
        let shortItems = vItemsOnly.filter(i => {
-         if (selectedSubject === "Matematika") return true; // V matematice bereme všechny odpovědi
+         if (selectedSubject === "Matematika") return true;
          const qWords = i.question.replace(/\s*\([^)]*\)/g, '').trim().split(/\s+/).length;
          const aWords = cleanCzechTranslation(i.answer).replace(/\s*\([^)]*\)/g, '').trim().split(/\s+/).length;
          const isSentence = /[.?!]$/.test(i.question.trim());
@@ -181,16 +181,26 @@ function startSmartMix() {
        if (shortItems.length < 4) shortItems = vItemsOnly;
 
        let falsePool = [...new Set(shortItems.map(i => isOut ? i.question : cleanCzechTranslation(i.answer)))].filter(ans => ans !== correctAns);
-       if (falsePool.length > 0) { while (falsePool.length < 3) falsePool.push(falsePool[Math.floor(Math.random() * falsePool.length)]); } 
-       else falsePool = ["...", "...", "..."];
+       
+       if (selectedSubject === "Matematika") {
+         falsePool = generateMathDistractors(correctAns, falsePool);
+       } else if (falsePool.length > 0) {
+         while (falsePool.length < 3) falsePool.push(falsePool[Math.floor(Math.random() * falsePool.length)]);
+       } else {
+         falsePool = ["...", "...", "..."];
+       }
        
        falsePool.sort(() => Math.random() - 0.5);
        task.opts = [correctAns, ...falsePool.slice(0, 3)].sort(() => Math.random() - 0.5);
        task.correctAns = correctAns;
        
-       // OPRAVA: Pro matematiku proženeme zadání přes formatPromptText, aby byly zlomky hezké!
        let rawPrompt = isOut ? cleanCzechTranslation(task.data.answer) : task.data.question;
        task.prompt = typeof formatPromptText === 'function' ? formatPromptText(rawPrompt) : rawPrompt;
+
+       // Poslechová výzva 🎧 pro 35 % pasivních otázek v cizích jazycích
+       if (task.type === 'QUIZ_IN' && selectedSubject !== "Matematika" && typeof isAutoTTS !== "undefined" && isAutoTTS && getTargetLang(selectedSubject) !== 'cs-CZ') {
+         if (Math.random() < 0.35) task.isAudioOnly = true;
+       }
 
     } else if (task.type === 'SCRAMBLE') {
        const raw = task.data.question.replace(/\s*\([^)]*\)/g, '').trim();
@@ -205,11 +215,22 @@ function startSmartMix() {
   });
 
   cmpQueue = q; cmpIdx = 0; cmpHearts = 5; cmpState = 'PLAYING'; cmpChosenOpt = null; isCampaignMinigame = false;
+  cmpMistakes = []; cmpSummaryShown = false;
   selectedGame = 'CAMPAIGN'; 
   setScreen('PLAYING');
-  if (typeof isAutoTTS !== "undefined" && isAutoTTS && cmpQueue[0] && cmpQueue[0].type === 'QUIZ_IN') speakWord(cmpQueue[0].prompt, selectedSubject);
+  if (typeof isAutoTTS !== "undefined" && isAutoTTS && cmpQueue[0] && cmpQueue[0].type === 'QUIZ_IN') {
+    speakWord(cmpQueue[0].data.question, selectedSubject);
+  }
 }
+
+// ==========================================
+// SPIRÁLOVÁ KAMPAŇ (CESTA)
+// ==========================================
 function startCampaign() {
+  if (typeof stopArcadeLoop === "function") stopArcadeLoop();
+  if (typeof stopSnakeLoop === "function") stopSnakeLoop();
+  if (typeof stopTargetTimer === "function") stopTargetTimer();
+
   let q = [];
   let allVItems = getVocabItems();
   let allQItems = getQuizItems();
@@ -223,20 +244,17 @@ function startCampaign() {
   if (olderVItems.length > 0) {
       let shuffledOlder = olderVItems.sort(() => Math.random() - 0.5).slice(0, 5);
       shuffledOlder.forEach(it => {
-          if (it.question.trim().includes(' ')) qRevision.push({ type: 'SCRAMBLE', data: it });
-          else qRevision.push({ type: 'QUIZ_IN', data: it });
+          if (it.question.trim().includes(' ')) qRevision.push({ type: 'SCRAMBLE', data: it, wave: 1 });
+          else qRevision.push({ type: 'QUIZ_IN', data: it, wave: 1 });
       });
   }
 
-  // Upřednostníme slova, která ještě nemají plné mistrovství (2 hvězdy v obou směrech)
   let unmasteredVItems = currentVItems.filter(it => 
     getSavedMastery(it.question, 'DIR_IN') < 2 || getSavedMastery(it.question, 'DIR_OUT') < 2
   );
   
   let targetVItems = [...unmasteredVItems].sort(() => Math.random() - 0.5);
 
-  // OPRAVA: Pokud je nezvládnutých slov málo, doplníme zvládnutá slova.
-  // Zvýšíme limit na 15 slov, což zaručí cca 30 - 40 úkolů v tréninku.
   if (targetVItems.length < 15) {
     let masteredVItems = currentVItems.filter(it => !unmasteredVItems.includes(it)).sort(() => Math.random() - 0.5);
     targetVItems = [...targetVItems, ...masteredVItems];
@@ -245,19 +263,18 @@ function startCampaign() {
   targetVItems = targetVItems.slice(0, 15);
 
   targetVItems.forEach(it => {
-      // Vynutíme testování i u slov, která už mají 2 hvězdy, aby měl trénink správnou délku
       let forceTest = (getSavedMastery(it.question, 'DIR_IN') === 2 && getSavedMastery(it.question, 'DIR_OUT') === 2);
       
       if (it.question.trim().includes(' ') || it.question.trim().includes('-')) {
-          qSentences.push({ type: 'SCRAMBLE', data: it });
+          qSentences.push({ type: 'SCRAMBLE', data: it, wave: 3 });
       } else {
-          if (getSavedMastery(it.question, 'DIR_IN') < 2 || forceTest) qNewPassive.push({ type: 'QUIZ_IN', data: it });
-          if (getSavedMastery(it.question, 'DIR_OUT') < 2 || forceTest) qNewActive.push({ type: 'QUIZ_OUT', data: it });
-          qSentences.push({ type: 'SCRAMBLE', data: it });
+          if (getSavedMastery(it.question, 'DIR_IN') < 2 || forceTest) qNewPassive.push({ type: 'QUIZ_IN', data: it, wave: 1 });
+          if (getSavedMastery(it.question, 'DIR_OUT') < 2 || forceTest) qNewActive.push({ type: 'QUIZ_OUT', data: it, wave: 2 });
+          qSentences.push({ type: 'SCRAMBLE', data: it, wave: 3 });
       }
   });
 
-  currentQItems.forEach(it => qGrammar.push({ type: 'KVIZ', data: it }));
+  currentQItems.forEach(it => qGrammar.push({ type: 'KVIZ', data: it, wave: 2 }));
 
   qRevision.sort(() => Math.random() - 0.5); qNewPassive.sort(() => Math.random() - 0.5); 
   qNewActive.sort(() => Math.random() - 0.5); qGrammar.sort(() => Math.random() - 0.5); qSentences.sort(() => Math.random() - 0.5);
@@ -271,28 +288,37 @@ function startCampaign() {
        const correctAns = isOut ? task.data.question : cleanCzechTranslation(task.data.answer);
        let localItems = [...currentVItems, ...olderVItems];
        
-       // OPRAVA: Pro jednoslovné kvízy bereme do možností pouze krátké výrazy (1-2 slova, ne celé věty)
        let shortItems = localItems.filter(i => {
          const qWords = i.question.replace(/\s*\([^)]*\)/g, '').trim().split(/\s+/).length;
          const aWords = cleanCzechTranslation(i.answer).replace(/\s*\([^)]*\)/g, '').trim().split(/\s+/).length;
          const isSentence = /[.?!]$/.test(i.question.trim());
          return qWords <= 2 && aWords <= 3 && !isSentence;
        });
-       // Pojistka: pokud by v lekci bylo méně než 4 krátká slova, doplníme z celé lekce
        if (shortItems.length < 4) shortItems = localItems;
 
        let pool = [...new Set(shortItems.map(i => isOut ? i.question : cleanCzechTranslation(i.answer)))].filter(ans => ans !== correctAns);
        
-       if (pool.length > 0) { while (pool.length < 3) pool.push(pool[Math.floor(Math.random() * pool.length)]); } 
-       else pool = ["...", "...", "..."];
+       if (selectedSubject === "Matematika") {
+         pool = generateMathDistractors(correctAns, pool);
+       } else if (pool.length > 0) {
+         while (pool.length < 3) pool.push(pool[Math.floor(Math.random() * pool.length)]);
+       } else {
+         pool = ["...", "...", "..."];
+       }
        
        pool.sort(() => Math.random() - 0.5);
        task.opts = [correctAns, ...pool.slice(0, 3)].sort(() => Math.random() - 0.5);
        task.correctAns = correctAns;
        task.prompt = isOut ? cleanCzechTranslation(task.data.answer) : task.data.question;
 
+       // Poslechová výzva 🎧 pro 35 % pasivních otázek v cizích jazycích
+       if (task.type === 'QUIZ_IN' && selectedSubject !== "Matematika" && typeof isAutoTTS !== "undefined" && isAutoTTS && getTargetLang(selectedSubject) !== 'cs-CZ') {
+         if (Math.random() < 0.35) task.isAudioOnly = true;
+       }
+
     } else if (task.type === 'SCRAMBLE') {
-       const raw = task.data.question.trim();
+       // OPRAVA: Odstranění závorek před rozpadem na kostičky i v Kampani
+       const raw = task.data.question.replace(/\s*\([^)]*\)/g, '').trim();
        const isWordMode = (raw.split(/\s+/).length >= 3 || raw.length > 15);
        const tokens = isWordMode ? (raw.includes('-') ? raw.split('-').map(s=>s.trim()) : raw.split(/\s+/)) : getGraphemes(raw);
        task.tokens = tokens;
@@ -304,11 +330,13 @@ function startCampaign() {
   });
 
   cmpQueue = q; cmpIdx = 0; cmpHearts = 5; cmpState = 'PLAYING'; cmpChosenOpt = null; isCampaignMinigame = false;
+  cmpMistakes = []; cmpSummaryShown = false;
   selectedGame = 'CAMPAIGN'; setScreen('PLAYING');
-  if (isAutoTTS && cmpQueue[0] && cmpQueue[0].type === 'QUIZ_IN') speakWord(cmpQueue[0].prompt, selectedSubject);
+  if (typeof isAutoTTS !== "undefined" && isAutoTTS && cmpQueue[0] && cmpQueue[0].type === 'QUIZ_IN') {
+    speakWord(cmpQueue[0].data.question, selectedSubject);
+  }
 }
 
-// Nahrazení funkce clickCmpQuizOpt (aby uměla ukládat mastery i pro Kvízy!)
 function clickCmpQuizOpt(opt) {
   if (cmpState !== 'PLAYING') return;
   const task = cmpQueue[cmpIdx]; cmpChosenOpt = opt; cmpState = 'EVAL';
@@ -322,9 +350,13 @@ function clickCmpQuizOpt(opt) {
     }
   } else {
     sndErr(); cmpHearts = Math.max(0, cmpHearts - 1);
+    if (task.data && !cmpMistakes.some(m => m.question === task.data.question)) {
+      cmpMistakes.push(task.data);
+    }
     let newTask = JSON.parse(JSON.stringify(task));
+    newTask.isAudioOnly = false; // Při opravě chyby už ukážeme i psaný text
     if (newTask.opts) newTask.opts.sort(() => Math.random() - 0.5);
-    requeueFailedTask(newTask); // <--- UPRAVENO: vloží na konec aktuální vlny
+    requeueFailedTask(newTask);
     
     if (task.type === 'QUIZ_OUT' || task.type === 'QUIZ_IN' || task.type === 'KVIZ') {
         const dir = task.type === 'QUIZ_OUT' ? 'DIR_OUT' : (task.type === 'KVIZ' ? 'DIR_OUT' : 'DIR_IN');
@@ -332,14 +364,13 @@ function clickCmpQuizOpt(opt) {
     }
   }
 
-  if (typeof isAutoTTS !== "undefined" && isAutoTTS && task.type !== 'QUIZ_IN') {
+  if (typeof isAutoTTS !== "undefined" && isAutoTTS && (task.type !== 'QUIZ_IN' || task.isAudioOnly)) {
     let toRead = task.type === 'KVIZ' ? task.data.question.replace(/___+/g, task.data.answer) : task.data.question;
     speakWord(toRead.replace(/[*_]/g, ''), selectedSubject);
   }
   renderActiveGame();
 }
 
-// Zařadí zkaženou úlohu na konec její aktuální vlny (místo úplného konce tréninku)
 function requeueFailedTask(newTask) {
   if (!newTask.wave) {
     cmpQueue.push(newTask);
@@ -377,21 +408,21 @@ function clickCmpScrambleTile(idx) {
         if (mOut < 2) saveWordMasteryToGoogle(task.data.question, Math.min(2, mOut + step), 'DIR_OUT');
       }
     } else {
-      // VYLEPŠENÍ: Zjistíme, jaké písmeno/slovo je na řadě teď
       const nextExpected = task.tokens[task.placed.length];
-      // Odblokujeme POUZE ta červená písmena, která se shodují s tím, co teď hledáme
       task.tiles.forEach(t => { 
         if (t.text === nextExpected) t.isWrong = false; 
       });
     }
   } else {
     sndErr(); 
-    tile.isWrong = true; // Označí písmeno jako chybné (zčervená a nepůjde kliknout)
+    tile.isWrong = true;
     
-    // Ochrana srdíček: Potrestáme ho jen při PRVNÍ chybě v daném slově
     if (!task.hadMistake) {
       cmpHearts = Math.max(0, cmpHearts - 1); 
       task.hadMistake = true;
+      if (task.data && !cmpMistakes.some(m => m.question === task.data.question)) {
+        cmpMistakes.push(task.data);
+      }
       let newTask = { type: 'SCRAMBLE', data: task.data, tokens: task.tokens, isWordMode: task.isWordMode, hadMistake: false, wave: task.wave };
       newTask.tiles = task.tokens.map((t, i) => ({ text: t, used: false, id: i })).sort(() => Math.random() - 0.5);
       newTask.placed = []; 
@@ -403,7 +434,9 @@ function clickCmpScrambleTile(idx) {
 
 function nextCmpTask() {
   cmpIdx++; cmpState = 'PLAYING'; cmpChosenOpt = null; renderActiveGame();
-  if (cmpIdx < cmpQueue.length && isAutoTTS && cmpQueue[cmpIdx].type === 'QUIZ_IN') speakWord(cmpQueue[cmpIdx].prompt, selectedSubject);
+  if (cmpIdx < cmpQueue.length && isAutoTTS && cmpQueue[cmpIdx].type === 'QUIZ_IN') {
+    speakWord(cmpQueue[cmpIdx].data.question, selectedSubject);
+  }
 }
 
 function launchCampaignMinigame() {
@@ -417,13 +450,12 @@ function launchCampaignMinigame() {
     }).sort(() => Math.random() - 0.5);
 
     campaignMinigamePool = [...currentSingle, ...olderSingle].slice(0, 30);
-    // OKAMŽITÉ PŘIPSÁNÍ ZLAŤÁKŮ ZA DOKONČENÝ TRÉNINK (i kdyby hráč z minihry odešel)
     if (cmpHearts > 0) {
       addCoins(currentUser.name, cmpHearts);
     }
     addReward(1, "Trénink: " + selectedGroupKey);
     isCampaignMinigame = true; 
-    campaignMinigameCoins = 0; // Zlaťáky za srdíčka už jsou v kapse, v minihře se hraje jen o bonus
+    campaignMinigameCoins = 0;
 
     if (campaignMinigamePool.length > 0 && campaignMinigamePool.length < 10) {
         let tempPool = [...campaignMinigamePool];
@@ -456,11 +488,9 @@ function finishCampaign(bonusCoins) {
   }
   
   const sLow = (selectedSubject || "").toLowerCase();
-  // Pokud hrajeme běžný předmět (např. Hebrejštinu), vrátíme se do výběru her
   if (sLow.includes("cesta") || sLow.includes("postupn") || sLow.includes("inteligentn")) {
     setScreen("CAMPAIGN_HUB");
   } else {
     setScreen("SELECT_GAME");
   }
 }
-

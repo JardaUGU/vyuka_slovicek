@@ -1,6 +1,5 @@
 /**
- * MODUL PRO VYKRESLOVÁNÍ UŽIVATELSKÉHO ROZHRANÍ (UI RENDERER)
- * Refaktorováno do izolovaných komponent pro maximální bezpečnost a přehlednost.
+ * MODUL PRO VYKRESLOVÁNÍ MENU A OBRAZOVEK (UI MENUS)
  */
 
 function renderScreen() {
@@ -53,7 +52,7 @@ function renderScreen() {
     else if (currentScreen === "PLAYING") {
       if (bSubj) { bSubj.style.display = "flex"; bSubj.innerText = selectedSubject; }
       if (bGroup) { bGroup.style.display = "flex"; bGroup.innerText = selectedGroupKey; }
-      renderActiveGame(main);
+      if (typeof renderActiveGame === "function") renderActiveGame(main);
     }
 
   } catch (err) {
@@ -63,7 +62,7 @@ function renderScreen() {
 }
 
 // -------------------------------------------------------------
-// JEDNOTLIVÉ OBRAZOVKY (KOMPONENTY)
+// JEDNOTLIVÉ OBRAZOVKY MENU (KOMPONENTY)
 // -------------------------------------------------------------
 
 function _renderSelectUser(main, bSubj, bGroup) {
@@ -178,7 +177,6 @@ function _renderShop(main, bSubj, bGroup) {
   const u = (appData.users || []).find(x => x.name.toLowerCase().trim() === uKey);
   const hasPin = !!(u && u.pin) || !!localStorage.getItem(`user_pin_${uKey}`);
 
-  // VÝPOČET STATISTIK
   let masteredSet = new Set();
   let storiesSet = new Set();
   const prog = (appData.progress && appData.progress[uKey]) ? appData.progress[uKey] : {};
@@ -197,7 +195,6 @@ function _renderShop(main, bSubj, bGroup) {
 
   main.innerHTML = `
     <div style="padding:4px;">
-      <!-- PRŮKAZ STUDENTA (STATISTIKY) -->
       <div style="background:var(--col-card); border:1px solid var(--col-card-border); border-radius:12px; padding:15px; margin-bottom:15px; text-align:center;">
          <h2 style="color:var(--col-active-tab); font-size:19px; margin-bottom:12px;">🎓 Průkaz studenta</h2>
          <div style="display:flex; justify-content:space-around; align-items:center;">
@@ -329,7 +326,6 @@ function _renderCampaignHub(main, bSubj, bGroup) {
     for (let k in currentUser.startLevels) { if (subjNorm.includes(k) || k.includes(subjNorm)) { userMinLvl = Number(currentUser.startLevels[k]) || 1; break; } }
   }
 
-  // ALGORITMUS AKTUÁLNÍ LEKCE
   let currentLessonIndex = 0;
   for (let i = 0; i < lessons.length; i++) {
     let num = parseInt(lessons[i].replace(/\D/g, '')) || 1;
@@ -353,7 +349,6 @@ function _renderCampaignHub(main, bSubj, bGroup) {
     currentLessonIndex = i;
   }
   
-  // CEFR bargraf pro jazyky
   let cefrHtml = "";
   if (/angli|nemc|spanel|franc|ital/i.test(subjNorm)) {
      const cefrPct = Math.min(100, Math.max(0, Math.round((currentLessonIndex / Math.max(1, lessons.length - 1)) * 100)));
@@ -549,6 +544,19 @@ function _renderSelectSeqItem(main, bSubj, bGroup) {
           <p>${it.answer.split('|').length} položek v řadě</p>
         </div>
       `).join('')}
+    </div>
+  `;
+}
+
+function _renderSelectPexesoSize(main, bSubj, bGroup) {
+  if (bGroup) { bGroup.style.display = "flex"; bGroup.innerText = selectedGroupKey; }
+  main.innerHTML = `
+    <h2 style="font-size:18px;margin-bottom:12px;text-align:center;color:var(--col-yellow);">Vyber velikost pexesa:</h2>
+    <div class="grid-2">
+      <div class="tile" onclick="if(typeof startPexesoGame === 'function') startPexesoGame(3)"><h2>6 KARET</h2><p>3 dvojice</p></div>
+      <div class="tile" onclick="if(typeof startPexesoGame === 'function') startPexesoGame(4)"><h2>8 KARET</h2><p>4 dvojice</p></div>
+      <div class="tile" onclick="if(typeof startPexesoGame === 'function') startPexesoGame(6)"><h2>12 KARET</h2><p>6 dvojic</p></div>
+      <div class="tile" onclick="if(typeof startPexesoGame === 'function') startPexesoGame(8)"><h2>16 KARET</h2><p>8 dvojic</p></div>
     </div>
   `;
 }
