@@ -6,6 +6,8 @@ let cmpIdx = 0;
 let cmpHearts = 5;
 let cmpState = 'PLAYING';
 let cmpChosenOpt = null;
+let cmpMistakes = [];        // Seznam slov, ve kterých žák během tréninku chyboval
+let cmpSummaryShown = false; // Zda už jsme ukázali závěrečný přehled chyb
 
 let isCampaignMinigame = false;
 let campaignMinigameCoins = 0;
@@ -205,6 +207,7 @@ function startSmartMix() {
   });
 
   cmpQueue = q; cmpIdx = 0; cmpHearts = 5; cmpState = 'PLAYING'; cmpChosenOpt = null; isCampaignMinigame = false;
+  cmpMistakes = []; cmpSummaryShown = false;
   selectedGame = 'CAMPAIGN'; 
   setScreen('PLAYING');
   if (typeof isAutoTTS !== "undefined" && isAutoTTS && cmpQueue[0] && cmpQueue[0].type === 'QUIZ_IN') speakWord(cmpQueue[0].prompt, selectedSubject);
@@ -304,6 +307,7 @@ function startCampaign() {
   });
 
   cmpQueue = q; cmpIdx = 0; cmpHearts = 5; cmpState = 'PLAYING'; cmpChosenOpt = null; isCampaignMinigame = false;
+  cmpMistakes = []; cmpSummaryShown = false;
   selectedGame = 'CAMPAIGN'; setScreen('PLAYING');
   if (isAutoTTS && cmpQueue[0] && cmpQueue[0].type === 'QUIZ_IN') speakWord(cmpQueue[0].prompt, selectedSubject);
 }
@@ -330,6 +334,9 @@ function clickCmpQuizOpt(opt) {
         const dir = task.type === 'QUIZ_OUT' ? 'DIR_OUT' : (task.type === 'KVIZ' ? 'DIR_OUT' : 'DIR_IN');
         saveWordMasteryToGoogle(task.data.question, 0, dir);
     }
+    if (task.data && !cmpMistakes.some(m => m.question === task.data.question)) {
+  cmpMistakes.push(task.data);
+}
   }
 
   if (typeof isAutoTTS !== "undefined" && isAutoTTS && task.type !== 'QUIZ_IN') {
@@ -396,6 +403,9 @@ function clickCmpScrambleTile(idx) {
       newTask.tiles = task.tokens.map((t, i) => ({ text: t, used: false, id: i })).sort(() => Math.random() - 0.5);
       newTask.placed = []; 
       requeueFailedTask(newTask); 
+    }
+     if (task.data && !cmpMistakes.some(m => m.question === task.data.question)) {
+      cmpMistakes.push(task.data);
     }
   }
   renderActiveGame();
