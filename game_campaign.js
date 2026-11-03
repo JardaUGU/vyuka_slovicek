@@ -13,6 +13,60 @@ let campaignMinigamePool = [];
 // ==========================================
 // CHYTRÝ TRÉNINK PRO BĚŽNÉ LEKCE (MIX)
 // ==========================================
+// Inteligentní generátor falešných odpovědí pro Matematiku (zachovává jednotky i formát zlomků)
+function generateMathDistractors(correctStr, fallbackPool) {
+  const s = String(correctStr).trim();
+  const distractors = new Set();
+
+  // 1. Pokud odpověď obsahuje zlomek ve tvaru [a/b] nebo a/b
+  const fracMatch = s.match(/(\[?)(\d+)\s*\/\s*(\d+)(\]?)/);
+  if (fracMatch) {
+    let n = parseInt(fracMatch[2], 10);
+    let d = parseInt(fracMatch[3], 10);
+    const deltas = [[1, 0], [-1, 0], [0, 1], [0, -1], [2, 0], [1, 1], [-1, 1]];
+    for (let [dn, dd] of deltas) {
+      let nn = Math.max(1, n + dn);
+      let nd = Math.max(2, d + dd);
+      if (nn === n && nd === d) continue;
+      let fake = s.replace(fracMatch[0], `${fracMatch[1]}${nn}/${nd}${fracMatch[4]}`);
+      if (fake !== s) distractors.add(fake);
+      if (distractors.size >= 3) break;
+    }
+  }
+
+  // 2. Pokud odpověď obsahuje číslo (celé nebo desetinné) + libovolné jednotky (např. "15 cm²", "-4", "3,5 kg")
+  const numMatch = s.match(/-?\d+([.,]\d+)?/);
+  if (distractors.size < 3 && numMatch) {
+    const rawNum = numMatch[0];
+    const hasComma = rawNum.includes(',');
+    const isFloat = rawNum.includes('.') || hasComma;
+    const val = parseFloat(rawNum.replace(',', '.'));
+    
+    let tries = 0;
+    while (distractors.size < 3 && tries < 30) {
+      tries++;
+      let step = isFloat ? (Math.floor(Math.random() * 5) + 1) * 0.5 : (Math.floor(Math.random() * 5) + 1);
+      if (Math.abs(val) >= 50 && !isFloat) step *= (Math.random() > 0.5 ? 10 : 2);
+      let fakeVal = val + (Math.random() > 0.5 ? step : -step);
+      if (val >= 0 && fakeVal < 0) fakeVal = val + step + tries; // U kladných úloh negenerujeme záporné
+      
+      let fakeNumStr = isFloat ? fakeVal.toFixed(rawNum.split(/[.,]/)[1].length) : String(Math.round(fakeVal));
+      if (hasComma) fakeNumStr = fakeNumStr.replace('.', ',');
+      
+      let fakeFull = s.replace(rawNum, fakeNumStr);
+      if (fakeFull !== s) distractors.add(fakeFull);
+    }
+  }
+
+  // 3. Pojistka, kdyby byla odpověď čistě slovní (např. "rovnostranný")
+  for (let item of fallbackPool) {
+    if (distractors.size >= 3) break;
+    if (item !== s) distractors.add(item);
+  }
+  while (distractors.size < 3) distractors.add(s + " ?");
+
+  return Array.from(distractors).slice(0, 3);
+}
 function startSmartMix() {
   if (typeof stopArcadeLoop === "function") stopArcadeLoop();
   if (typeof stopSnakeLoop === "function") stopSnakeLoop();
@@ -378,18 +432,21 @@ function launchCampaignMinigame() {
         finishCampaign(campaignMinigameCoins); return; 
     }
 
-    let r = Math.random(); let isGerman = getTargetLang(selectedSubject).startsWith('de');
+    let r = Math.random(); 
+    let isGerman = getTargetLang(selectedSubject).startsWith('de');
     let articlesCount = campaignMinigamePool.filter(it => /^(der|die|das)\s/i.test(it.question)).length;
 
     if (isGerman && articlesCount >= 8) {
-        if (r < 0.25) startCampaignArcade("ARTICLES");
-        else if (r < 0.50) startCampaignArcade("TRANSLATE");
-        else if (r < 0.75) startCampaignPexeso();
-        else if (typeof startCampaignSnake === "function") startCampaignSnake();
+        if (r < 0.20) startCampaignArcade("ARTICLES");
+        else if (r < 0.40) startCampaignArcade("TRANSLATE");
+        else if (r < 0.60) startCampaignPexeso();
+        else if (r < 0.80 && typeof startCampaignSnake === "function") startCampaignSnake();
+        else if (typeof startCampaignTarget === "function") startCampaignTarget();
     } else {
-        if (r < 0.33) startCampaignArcade("TRANSLATE");
-        else if (r < 0.66) startCampaignPexeso();
-        else if (typeof startCampaignSnake === "function") startCampaignSnake();
+        if (r < 0.25) startCampaignArcade("TRANSLATE");
+        else if (r < 0.50) startCampaignPexeso();
+        else if (r < 0.75 && typeof startCampaignSnake === "function") startCampaignSnake();
+        else if (typeof startCampaignTarget === "function") startCampaignTarget();
     }
 }
 
