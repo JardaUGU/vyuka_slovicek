@@ -11,10 +11,12 @@ let targetStartTime = 0;
 let targetPenaltySec = 0;
 let targetTimerInt = null;
 let targetLastSlotIdx = -1;
-let targetBestTime = null;      // Rekord pro aktuální sadu slov
+let targetBestTime = null;      // Aktuální rekord sady
+let targetPrevBestTime = null;  // Původní rekord před startem kola (pro výpočet zlepšení)
 let targetLastFinalTime = null; // Výsledný čas právě dohrané hry
 let targetIsNewRecord = false;
-let targetSavedSet = [];        // Uložená sada unikátních slov z minulého kola
+let targetSavedSet = [];        // Uložená sada unikátních slov
+let targetLastSplitDiff = 0;    // Poslední změřený náskok (+) nebo ztráta (-) na mezičase
 
 function stopTargetTimer() {
   if (targetTimerInt) { clearInterval(targetTimerInt); targetTimerInt = null; }
@@ -28,7 +30,6 @@ function getTargetRecordKey() {
   return `best_target_${u}_${s}_${g}_${mode}`;
 }
 
-// keepSameSet = true zopakuje naprosto stejný výběr slov jako v minulém kole
 function startTargetGame(keepSameSet = false) {
   if (typeof stopArcadeLoop === "function") stopArcadeLoop();
   if (typeof stopSnakeLoop === "function") stopSnakeLoop();
@@ -46,12 +47,9 @@ function startTargetGame(keepSameSet = false) {
   }
 
   if (keepSameSet && targetSavedSet.length >= 4) {
-    // Opakujeme stejnou sadu slov -> porovnáváme se stejným rekordem
     initTargetSession(targetSavedSet, 20, false);
   } else {
-    // Vybíráme novou sadu max 12 unikátních slov (aby se v kole 20 terčů některá zopakovala a zafixovala)
     targetSavedSet = [...allEligible].sort(() => Math.random() - 0.5).slice(0, 12);
-    // Pokud má lekce víc než 12 slov a losujeme novou sadu, vymažeme starý čas z jiné sady
     const resetBest = allEligible.length > 12;
     initTargetSession(targetSavedSet, 20, resetBest);
   }
@@ -83,16 +81,18 @@ function initTargetSession(vItems, count, resetBest = false) {
   targetPenaltySec = 0;
   targetLastSlotIdx = -1;
   targetIsNewRecord = false;
+  targetLastSplitDiff = 0;
 
   if (resetBest) {
     targetBestTime = null;
+    targetPrevBestTime = null;
     localStorage.removeItem(getTargetRecordKey());
   } else {
     const savedBest = localStorage.getItem(getTargetRecordKey());
     targetBestTime = savedBest ? parseFloat(savedBest) : null;
+    targetPrevBestTime = targetBestTime;
   }
 
-  // Sestavíme balíček 20 terčů PŘESNĚ z naší sady vItems (zamíchané pořadí)
   let pool = [];
   while (pool.length < targetTotal) {
     let shuffled = [...vItems].sort(() => Math.random() - 0.5);
@@ -107,7 +107,6 @@ function initTargetSession(vItems, count, resetBest = false) {
   targetRing = new Array(8).fill(null);
   targetQueue = [...pool];
 
-  // Nasadíme prvních až 8 unikátních slov na obvod
   let usedQuestions = new Set();
   let slot = 0;
   for (let i = 0; i < targetQueue.length && slot < 8; i++) {
@@ -131,31 +130,37 @@ function updateTargetTimerUI() {
   if (!el || targetSolved >= targetTotal) return;
   const elapsed = ((Date.now() - targetStartTime) / 1000) + targetPenaltySec;
   el.innerText = elapsed.toFixed(1) + " s";
+}
 
-  // Živé porovnávání s rekordem (Pacer)
-  if (targetBestTime && targetSolved > 0) {
-    const expectedTime = (targetBestTime / targetTotal) * targetSolved;
-    const diff = elapsed - expectedTime; // záporné = jsme rychlejší (zelená), kladné = pomalejší (červená)
-    const paceText = document.getElementById("target-pace-text");
-    const paceBar = document.getElementById("target-pace-bar");
+// Vykreslí stav mezičasu (volá se po každém zásahu nebo chybě)
+function renderTargetSplitPace() {
+  if (!targetPrevBestTime || targetSolved === 0) return;
+  const paceText = document.getElementById("target-pace-text");
+  const paceBar = document.getElementById("target-pace-bar");
 
-    if (paceText) {
-      const sign = diff > 0 ? "+" : "";
-      paceText.innerText = diff <= 0 ? `⚡ ${sign}${diff.toFixed(1)}s (Náskok!)` : `🐢 +${diff.toFixed(1)}s (Přidej!)`;
-      paceText.style.color = diff <= 0 ? "var(--col-green)" : "var(--col-red)";
+  // targetLastSplitDiff > 0 znamená JSEM RYCHLEJŠÍ (v plusu!), < 0 znamená JSEM POMALEJŠÍ
+  const diff = targetLastSplitDiff;
+  if (paceText) {
+    if (diff >= 0) {
+      paceText.innerText = `⚡ +${diff.toFixed(1)}s v plusu`;
+      paceText.style.color = "var(--col-green)";
+    } else {
+      paceText.innerText = `🐢 ${diff.toFixed(1)}s ztráta`;
+      paceText.style.color = "var(--col-red)";
     }
-    if (paceBar) {
-      const maxScaleSec = 5; // Plný bargraf při náskoku/ztrátě 5 sekund
-      const pct = Math.min(50, Math.abs(diff / maxScaleSec) * 50);
-      if (diff <= 0) {
-        paceBar.style.left = "50%";
-        paceBar.style.width = pct + "%";
-        paceBar.style.background = "var(--col-green)";
-      } else {
-        paceBar.style.left = (50 - pct) + "%";
-        paceBar.style.width = pct + "%";
-        paceBar.style.background = "var(--col-red)";
-      }
+  }
+  if (paceBar) {
+    // Plná šířka poloviny bargrafu (50 %) odpovídá 25 % celkového rekordu (např. 10s u 40s rekordu)
+    const maxScaleSec = Math.max(3, targetPrevBestTime * 0.25);
+    const pct = Math.min(50, (Math.abs(diff) / maxScaleSec) * 50);
+    if (diff >= 0) {
+      paceBar.style.left = "50%";
+      paceBar.style.width = pct + "%";
+      paceBar.style.background = "var(--col-green)";
+    } else {
+      paceBar.style.left = (50 - pct) + "%";
+      paceBar.style.width = pct + "%";
+      paceBar.style.background = "var(--col-red)";
     }
   }
 }
@@ -170,12 +175,10 @@ function pickNextTargetCenter() {
     return;
   }
 
-  // OCHRANA PROTI SEKVENCÍM: Nikdy nevybereme stejný slot, který hráč právě trefil (pokud je na výběr jiný)
   let candidates = availableIndices;
   if (availableIndices.length > 1 && targetLastSlotIdx !== -1) {
     candidates = availableIndices.filter(idx => idx !== targetLastSlotIdx);
   }
-  // A pokud to jde, nevybereme ani stejné slovo jako minule
   if (candidates.length > 1 && targetCurrent) {
     const diffWords = candidates.filter(idx => targetRing[idx].question !== targetCurrent.question);
     if (diffWords.length > 0) candidates = diffWords;
@@ -197,7 +200,14 @@ function checkTargetHit(slotIdx) {
     targetSolved++;
     targetLastSlotIdx = slotIdx;
 
-    // Doplníme na uvolněné místo slovo ze zásobníku (které ideálně ještě na obvodu neleží)
+    // VÝPOČET MEZIČASU PŘESNĚ V OKAMŽIKU ZÁSAHU!
+    if (targetPrevBestTime) {
+      const elapsedNow = ((Date.now() - targetStartTime) / 1000) + targetPenaltySec;
+      const expectedTime = (targetPrevBestTime / targetTotal) * targetSolved;
+      // Kladné číslo = kolik sekund jsme ušetřili oproti rekordu!
+      targetLastSplitDiff = expectedTime - elapsedNow;
+    }
+
     if (targetQueue.length > 0) {
       const onRingSet = new Set(targetRing.filter(Boolean).map(x => x.question));
       let nextIdx = targetQueue.findIndex(x => !onRingSet.has(x.question));
@@ -210,11 +220,20 @@ function checkTargetHit(slotIdx) {
     if (targetSolved >= targetTotal) {
       stopTargetTimer();
       targetLastFinalTime = parseFloat((((Date.now() - targetStartTime) / 1000) + targetPenaltySec).toFixed(1));
-      if (!targetBestTime || targetLastFinalTime < targetBestTime) {
-        targetBestTime = targetLastFinalTime;
+      
+      // Pokud překonal již existující rekord, dostane +1 zlaťák!
+      if (targetPrevBestTime && targetLastFinalTime < targetPrevBestTime) {
         targetIsNewRecord = true;
+        targetBestTime = targetLastFinalTime;
+        localStorage.setItem(getTargetRecordKey(), String(targetBestTime));
+        if (typeof currentUser !== "undefined" && currentUser && typeof addCoins === "function") {
+          addCoins(currentUser.name, 1);
+        }
+      } else if (!targetPrevBestTime) {
+        targetBestTime = targetLastFinalTime;
         localStorage.setItem(getTargetRecordKey(), String(targetBestTime));
       }
+
       sndFanfare();
       if (typeof isCampaignMinigame === "undefined" || !isCampaignMinigame) {
         addReward(2, "Střelba: " + selectedGroupKey);
@@ -228,7 +247,9 @@ function checkTargetHit(slotIdx) {
     // VEDLE! (+2s penalizace)
     sndErr();
     targetPenaltySec += 2;
+    targetLastSplitDiff -= 2; // Okamžitě zhorší i mezičas o 2s
     updateTargetTimerUI();
+    renderTargetSplitPace();
     const nodeEl = document.getElementById(`target-slot-${slotIdx}`);
     if (nodeEl) {
       nodeEl.classList.add("wrong");
@@ -237,10 +258,12 @@ function checkTargetHit(slotIdx) {
   }
 }
 
-// Přetahování s úzkým kolizním jádrem (nezavadí o okolní slova při průletu)
+// Přetahování s vykreslováním laserového paprsku (gumičky) ze středu
 function attachTargetDragHandlers() {
   const puck = document.getElementById("target-center-puck");
-  if (!puck) return;
+  const laserLine = document.getElementById("target-laser-line");
+  const arena = document.querySelector(".target-arena");
+  if (!puck || !arena) return;
 
   let isDragging = false;
   let startX = 0, startY = 0;
@@ -253,6 +276,7 @@ function attachTargetDragHandlers() {
     puck.setPointerCapture(e.pointerId);
     puck.style.transition = "none";
     puck.style.zIndex = "100";
+    if (laserLine) laserLine.style.display = "block";
   };
 
   puck.onpointermove = (e) => {
@@ -261,11 +285,20 @@ function attachTargetDragHandlers() {
     const dy = e.clientY - startY;
     puck.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px)) scale(1.04)`;
 
+    // Aktualizace laserové čáry ze středu arény do středu puku
+    if (laserLine) {
+      const arenaRect = arena.getBoundingClientRect();
+      const cx = arenaRect.width / 2;
+      const cy = arenaRect.height / 2;
+      laserLine.setAttribute("x1", cx);
+      laserLine.setAttribute("y1", cy);
+      laserLine.setAttribute("x2", cx + dx);
+      laserLine.setAttribute("y2", cy + dy);
+    }
+
     const puckRect = puck.getBoundingClientRect();
     const puckCenterX = puckRect.left + puckRect.width / 2;
     const puckCenterY = puckRect.top + puckRect.height / 2;
-    
-    // OPRAVA ZAVADĚNÍ: Pouze úzké jádro středu puku (14px) aktivuje terč!
     const coreHitRadius = 14; 
 
     for (let i = 0; i < 8; i++) {
@@ -273,7 +306,6 @@ function attachTargetDragHandlers() {
       if (!slotEl) continue;
       const rect = slotEl.getBoundingClientRect();
 
-      // Mírně zmenšíme i samotný hitbox terče o 4px z každé strany, aby šlo projet těsně kolem
       const closestX = Math.max(rect.left + 4, Math.min(puckCenterX, rect.right - 4));
       const closestY = Math.max(rect.top + 4, Math.min(puckCenterY, rect.bottom - 4));
       const dist = Math.hypot(puckCenterX - closestX, puckCenterY - closestY);
@@ -281,6 +313,7 @@ function attachTargetDragHandlers() {
       if (dist <= coreHitRadius) {
         isDragging = false;
         try { puck.releasePointerCapture(e.pointerId); } catch(err) {}
+        if (laserLine) laserLine.style.display = "none";
         
         puck.style.transition = "transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)";
         puck.style.transform = "translate(-50%, -50%) scale(1)";
@@ -295,6 +328,7 @@ function attachTargetDragHandlers() {
   const endDrag = () => {
     if (!isDragging) return;
     isDragging = false;
+    if (laserLine) laserLine.style.display = "none";
     puck.style.transition = "transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)";
     puck.style.transform = "translate(-50%, -50%) scale(1)";
     puck.style.zIndex = "20";
