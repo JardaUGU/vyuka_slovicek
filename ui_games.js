@@ -58,11 +58,17 @@ function _renderGameAdaptive(main) {
 
   if (stats.masteredCount >= stats.totalWords) {
     main.innerHTML = `
-      <div style="text-align:center;padding:30px;">
-        <h2 style="color:var(--col-green);margin-bottom:10px;">${typeof isAdaptiveBatchMode!=='undefined' && isAdaptiveBatchMode ? 'BLOK ZVLÁDNUT! 🎉' : 'KOMPLETNĚ ZVLÁDNUTO! 🎉'}</h2>
-        <p style="color:inherit;margin-bottom:15px;">Všech ${stats.totalWords} položek bloku umíš na 2 ★!</p>
-        <div class="action-btn" onclick="if(typeof startScrambleFromAdaptiveBatch==='function') startScrambleFromAdaptiveBatch()">SKLÁDAT TĚCHTO ${stats.totalWords} SLOV 🧩</div>
-        ${typeof isAdaptiveBatchMode!=='undefined' && isAdaptiveBatchMode ? `<div class="action-btn green" onclick="if(typeof initGameState==='function') { initGameState(); renderActiveGame(); }">DALŠÍ BLOK (15 SLOV) ➔</div>` : ''}
+      <div style="text-align:center;padding:20px;">
+        <h2 style="color:var(--col-green);margin-bottom:6px;">${typeof isAdaptiveBatchMode!=='undefined' && isAdaptiveBatchMode ? 'BLOK ZVLÁDNUT! 🎉' : 'KOMPLETNĚ ZVLÁDNUTO! 🎉'}</h2>
+        <p style="color:inherit;margin-bottom:14px;">Všech ${stats.totalWords} položek bloku umíš na 2 ★! Procvič si je ve hře:</p>
+        
+        <div class="action-btn" onclick="if(typeof startScrambleFromAdaptiveBatch==='function') startScrambleFromAdaptiveBatch()">🧩 SKLÁDAT TĚCHTO ${stats.totalWords} SLOV</div>
+        <div class="grid-2" style="margin-top:8px;">
+          <div class="action-btn" style="margin-top:0;background:#0284c7;" onclick="if(typeof startTargetFromAdaptiveBatch==='function') startTargetFromAdaptiveBatch()">🎯 STŘELBA</div>
+          <div class="action-btn" style="margin-top:0;background:#7c3aed;" onclick="if(typeof startPexesoFromAdaptiveBatch==='function') startPexesoFromAdaptiveBatch()">🃏 PEXESO</div>
+        </div>
+
+        ${typeof isAdaptiveBatchMode!=='undefined' && isAdaptiveBatchMode ? `<div class="action-btn green" style="margin-top:14px;" onclick="if(typeof initGameState==='function') { initGameState(); renderActiveGame(); }">DALŠÍ BLOK (15 SLOV) ➔</div>` : ''}
         <div class="action-btn" onclick="if(typeof toggleTestingDirection==='function') toggleTestingDirection()">PŘEPNOUT SMĚR (${isDirOut ? 'Cizí ➔ 🇨🇿' : '🇨🇿 ➔ Cizí'}) ⇄</div>
         <div class="action-btn" onclick="if(typeof setScreen==='function') setScreen('SELECT_GAME')">ZPĚT DO MENU</div>
       </div>
