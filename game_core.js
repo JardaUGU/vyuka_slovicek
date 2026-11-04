@@ -32,10 +32,15 @@ function getSavedMastery(itemQuestion, direction) {
 function getGroupMasteryPercent(groupItems, subjName) {
   if (!currentUser || !groupItems || groupItems.length === 0) return 0;
   const vList = groupItems.filter(it => it.type === "SLOVO");
-  if (vList.length === 0) return 0;
+  const qList = groupItems.filter(it => it.type === "KVIZ");
+  if (vList.length === 0 && qList.length === 0) return 0;
+  
   let points = 0;
+  let maxPoints = (vList.length * 4) + (qList.length * 2);
   vList.forEach(it => { points += getSavedMastery(it.question, "DIR_OUT") + getSavedMastery(it.question, "DIR_IN"); });
-  return Math.min(100, Math.round((points / (vList.length * 4)) * 100));
+  qList.forEach(it => { points += getSavedMastery(it.question, "DIR_OUT"); });
+  
+  return Math.min(100, Math.round((points / maxPoints) * 100));
 }
 
 // Opravené tlačítko ZPĚT, které plně respektuje, z jakého předmětu jsme přišli
