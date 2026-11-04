@@ -393,7 +393,7 @@ function clickCmpScrambleTile(idx) {
   if (tile.used || tile.isWrong) return; 
 
   if (tile.text === task.tokens[task.placed.length]) {
-    sndOk(); 
+    sndOk(false); 
     tile.used = true; 
     task.placed.push(tile.text);
     
