@@ -263,7 +263,7 @@ footer { height: 32px; background-color: var(--col-card); border-top: 1px solid 
 .map-label { position: absolute; top: -22px; font-size: 13px; font-weight: bold; color: var(--col-text-muted); background: var(--col-card); padding: 2px 10px; border-radius: 12px; border: 2px solid var(--col-card-border); white-space: nowrap; z-index: 3; box-shadow: 0 2px 5px rgba(0,0,0,0.3); }
 .map-label.active { color: var(--col-yellow); border-color: var(--col-yellow); background: #451a03; top: -26px; font-size: 15px; }
 
-.map-story-btn { position: absolute; width: 48px; height: 48px; border-radius: 50%; background: var(--col-yellow); border: 3px solid #fef08a; box-shadow: 0 4px 0 #b45309; display: flex; align-items: center; justify-content: center; font-size: 22px; cursor: pointer; transition: transform 0.1s; z-index: 3; animation: floatStory 3s ease-in-out infinite; }
+.map-story-btn { position: absolute; width: 48px; height: 48px; border-radius: 50%; background: var(--col-yellow); border: 3px solid #fef08a; box-shadow: 0 4px 0 #b45309; display: flex; align-items: center; justify-content: center; font-size: 22px; cursor: pointer; transition: transform 0.1s; z-index: 3; }
 .map-story-btn.done { background: var(--col-card); border-color: var(--col-green); box-shadow: 0 4px 0 #166534; animation: none; filter: grayscale(0.2); }
 .map-story-btn:active { transform: translateY(-50%) scale(0.92) !important; box-shadow: 0 0 0 transparent; }
 
