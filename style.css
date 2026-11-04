@@ -265,7 +265,7 @@ footer { height: 32px; background-color: var(--col-card); border-top: 1px solid 
 
 .map-story-btn { position: absolute; width: 48px; height: 48px; border-radius: 50%; background: var(--col-yellow); border: 3px solid #fef08a; box-shadow: 0 4px 0 #b45309; display: flex; align-items: center; justify-content: center; font-size: 22px; cursor: pointer; transition: transform 0.1s; z-index: 3; animation: floatStory 3s ease-in-out infinite; }
 .map-story-btn.done { background: var(--col-card); border-color: var(--col-green); box-shadow: 0 4px 0 #166534; animation: none; filter: grayscale(0.2); }
-.map-story-btn:active { transform: translateY(4px) !important; box-shadow: 0 0 0 transparent; }
+.map-story-btn:active { transform: translateY(-50%) scale(0.92) !important; box-shadow: 0 0 0 transparent; }
 
 @keyframes pulseNode { 
   0% { box-shadow: 0 6px 0 #0369a1, 0 0 0 0 rgba(2, 132, 199, 0.7); } 
