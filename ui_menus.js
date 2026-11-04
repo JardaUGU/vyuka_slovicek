@@ -333,16 +333,11 @@ function _renderCampaignHub(main, bSubj, bGroup) {
   }
 
   for (let i = currentLessonIndex; i < lessons.length; i++) {
-    let lItems = vItems.filter(it => it.lesson === lessons[i]);
+    let lItems = activeItems.filter(it => it.lesson === lessons[i]);
     let pct = (typeof getGroupMasteryPercent === "function") ? getGroupMasteryPercent(lItems, selectedSubject) : 0;
     
-    let nextPct = 0;
-    if (i + 1 < lessons.length) {
-        let nextItems = vItems.filter(it => it.lesson === lessons[i+1]);
-        nextPct = (typeof getGroupMasteryPercent === "function") ? getGroupMasteryPercent(nextItems, selectedSubject) : 0;
-    }
-
-    if (pct < 20 && nextPct === 0) {
+    // Lekce je považována za dokončenou až při zvládnutí na 85 %!
+    if (pct < 85) {
         currentLessonIndex = i;
         break;
     }
@@ -412,7 +407,10 @@ function _renderCampaignHub(main, bSubj, bGroup) {
            let isDone = (typeof isStoryCompleted === "function") && isStoryCompleted(story.title, story.items);
            let storyClass = isDone ? "done" : ""; let storyIcon = isDone ? "📖" : "🎁";
            let storySide = cx <= CENTER_X ? `left: 100%; margin-left: 14px;` : `right: 100%; margin-right: 14px;`;
-           let clickAction = isLocked ? `alert('Tento příběh se odemkne, až se dostaneš do této lekce.')` : `if(typeof startStory==='function') startStory('${story.title.replace(/'/g, "\\'")}')`;
+           // OPRAVA (Bod 4): event.stopPropagation() zabrání spuštění lekce pod příběhem!
+           let clickAction = isLocked 
+             ? `event.stopPropagation(); alert('Tento příběh se odemkne, až se dostaneš do této lekce.');` 
+             : `event.stopPropagation(); if(typeof startStory==='function') startStory('${story.title.replace(/'/g, "\\'")}');`;
            storyHtml += `<div class="map-story-btn ${storyClass}" style="position: absolute; ${storySide} top: 50%; transform: translateY(-50%); z-index: 5;" onclick="${clickAction}" title="${story.title}">${storyIcon}</div>`;
        });
     }
