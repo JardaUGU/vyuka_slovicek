@@ -5,18 +5,18 @@
 let targetQueue = [];
 let targetRing = [];
 let targetCurrent = null;
-let targetTotal = 20;
+let targetTotal = 15;
 let targetSolved = 0;
 let targetStartTime = 0;
 let targetPenaltySec = 0;
 let targetTimerInt = null;
 let targetLastSlotIdx = -1;
-let targetBestTime = null;      // Aktuální rekord sady
-let targetPrevBestTime = null;  // Původní rekord před startem kola (pro výpočet zlepšení)
-let targetLastFinalTime = null; // Výsledný čas právě dohrané hry
+let targetBestTime = null;
+let targetPrevBestTime = null;
+let targetLastFinalTime = null;
 let targetIsNewRecord = false;
-let targetSavedSet = [];        // Uložená sada unikátních slov
-let targetLastSplitDiff = 0;    // Poslední změřený náskok (+) nebo ztráta (-) na mezičase
+let targetSavedSet = [];
+let targetLastSplitDiff = 0;
 
 function stopTargetTimer() {
   if (targetTimerInt) { clearInterval(targetTimerInt); targetTimerInt = null; }
@@ -26,8 +26,29 @@ function getTargetRecordKey() {
   const u = (typeof currentUser !== 'undefined' && currentUser) ? currentUser.name.toLowerCase().trim() : 'user';
   const s = (typeof selectedSubject !== 'undefined') ? selectedSubject : 'subj';
   const g = (typeof selectedGroupKey !== 'undefined') ? selectedGroupKey : 'grp';
-  const mode = (typeof isCampaignMinigame !== 'undefined' && isCampaignMinigame) ? 'cmp12' : 'std20';
-  return `best_target_${u}_${s}_${g}_${mode}`;
+  const mode = (typeof isCampaignMinigame !== 'undefined' && isCampaignMinigame) ? 'cmp' : 'std';
+  return `best_target_${u}_${s}_${g}_${mode}_${targetTotal}`;
+}
+
+// Spuštění Střelby přímo s 15 slovy z právě dokončeného bloku Zkoušení (Bod 3)
+function startTargetFromAdaptiveBatch() {
+  if (typeof stopArcadeLoop === "function") stopArcadeLoop();
+  if (typeof stopSnakeLoop === "function") stopSnakeLoop();
+  stopTargetTimer();
+  if (typeof isCampaignMinigame !== "undefined") isCampaignMinigame = false;
+
+  const vItems = getVocabItems();
+  let batchWords = (typeof isAdaptiveBatchMode !== 'undefined' && isAdaptiveBatchMode && adaptiveBatchIndices.length > 0)
+    ? adaptiveBatchIndices.map(i => vItems[i]).filter(Boolean)
+    : vItems;
+
+  const eligible = batchWords.filter(it => it.question.replace(/\s*\([^)]*\)/g, '').trim().length <= 20);
+  if (eligible.length < 3) {
+    alert("V tomto bloku jsou příliš dlouhé věty pro Střelbu na terč.");
+    return;
+  }
+  targetSavedSet = [...eligible];
+  initTargetSession(targetSavedSet, false);
 }
 
 function startTargetGame(keepSameSet = false) {
@@ -38,20 +59,21 @@ function startTargetGame(keepSameSet = false) {
 
   const allEligible = getVocabItems().filter(it => {
     const clean = it.question.replace(/\s*\([^)]*\)/g, '').trim();
-    return clean.split(/\s+/).length <= 3 && clean.length <= 18;
+    return clean.split(/\s+/).length <= 3 && clean.length <= 20;
   });
 
-  if (allEligible.length < 4) {
-    alert("V této lekci je příliš málo krátkých slov pro Střelbu na terč (minimum jsou 4).");
+  if (allEligible.length < 3) {
+    alert("V této lekci je příliš málo krátkých slov pro Střelbu na terč.");
     return;
   }
 
-  if (keepSameSet && targetSavedSet.length >= 4) {
-    initTargetSession(targetSavedSet, 20, false);
+  if (keepSameSet && targetSavedSet.length >= 3) {
+    initTargetSession(targetSavedSet, false);
   } else {
-    targetSavedSet = [...allEligible].sort(() => Math.random() - 0.5).slice(0, 12);
-    const resetBest = allEligible.length > 12;
-    initTargetSession(targetSavedSet, 20, resetBest);
+    // Vybereme max 15 UNIKÁTNÍCH slov (každé půjde v kole přesně 1x!)
+    targetSavedSet = [...allEligible].sort(() => Math.random() - 0.5).slice(0, 15);
+    const resetBest = allEligible.length > 15;
+    initTargetSession(targetSavedSet, resetBest);
   }
 }
 
@@ -63,20 +85,32 @@ function startCampaignTarget() {
 
   const vItems = (typeof campaignMinigamePool !== "undefined" ? campaignMinigamePool : []).filter(it => {
     const clean = it.question.replace(/\s*\([^)]*\)/g, '').trim();
-    return clean.split(/\s+/).length <= 3 && clean.length <= 18;
+    return clean.split(/\s+/).length <= 3 && clean.length <= 20;
   });
 
-  if (vItems.length < 4) {
+  // Odstraníme případné duplicity v campaignMinigamePool
+  const uniqueItems = [];
+  const seen = new Set();
+  for (let it of vItems) {
+    if (!seen.has(it.question)) {
+      seen.add(it.question);
+      uniqueItems.push(it);
+    }
+  }
+
+  if (uniqueItems.length < 4) {
     if (typeof startCampaignPexeso === "function") startCampaignPexeso();
     return;
   }
 
-  targetSavedSet = [...vItems].sort(() => Math.random() - 0.5).slice(0, 10);
-  initTargetSession(targetSavedSet, 12, false);
+  targetSavedSet = uniqueItems.sort(() => Math.random() - 0.5).slice(0, 12);
+  initTargetSession(targetSavedSet, false);
 }
 
-function initTargetSession(vItems, count, resetBest = false) {
-  targetTotal = count;
+// OPRAVA (Bod 5): Žádné opakování slov! Každé slovo ze sady vItems je použito přesně jednou.
+function initTargetSession(vItems, resetBest = false) {
+  let pool = [...vItems].sort(() => Math.random() - 0.5);
+  targetTotal = pool.length;
   targetSolved = 0;
   targetPenaltySec = 0;
   targetLastSlotIdx = -1;
@@ -93,28 +127,13 @@ function initTargetSession(vItems, count, resetBest = false) {
     targetPrevBestTime = targetBestTime;
   }
 
-  let pool = [];
-  while (pool.length < targetTotal) {
-    let shuffled = [...vItems].sort(() => Math.random() - 0.5);
-    if (pool.length > 0 && shuffled[0].question === pool[pool.length - 1].question && shuffled.length > 1) {
-      shuffled.push(shuffled.shift());
-    }
-    for (let it of shuffled) {
-      if (pool.length < targetTotal) pool.push(it);
-    }
-  }
-
   targetRing = new Array(8).fill(null);
   targetQueue = [...pool];
 
-  let usedQuestions = new Set();
-  let slot = 0;
-  for (let i = 0; i < targetQueue.length && slot < 8; i++) {
-    if (!usedQuestions.has(targetQueue[i].question)) {
-      usedQuestions.add(targetQueue[i].question);
-      targetRing[slot++] = targetQueue.splice(i, 1)[0];
-      i--;
-    }
+  // Nasadíme prvních až 8 slov na obvod, zbytek čeká v targetQueue
+  const initialRingCount = Math.min(8, targetQueue.length);
+  for (let i = 0; i < initialRingCount; i++) {
+    targetRing[i] = targetQueue.shift();
   }
 
   pickNextTargetCenter();

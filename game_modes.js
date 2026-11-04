@@ -163,7 +163,7 @@ function clickScrambleTile(idx) {
   const target = scrambleIsWordMode ? (cleanTarget.includes('-') ? cleanTarget.split('-').map(s=>s.trim()) : cleanTarget.split(/\s+/)) : getGraphemes(cleanTarget);
 
   if (item.text === target[scramblePlaced.length]) {
-    sndOk(); 
+    sndOk(false); 
     item.used = true; 
     scramblePlaced.push(item.text);
     

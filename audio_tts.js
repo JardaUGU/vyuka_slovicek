@@ -29,12 +29,14 @@ function getTargetLang(subjectName) {
   return 'cs-CZ';
 }
 
+let speakTimeoutId = null;
 // DŮLEŽITÉ (BUGFIX): Nečte závorky, jména postav ani emotikony.
 function speakWord(text, subjectName) {
   if (!('speechSynthesis' in window)) return;
-  // ZÁKAZ ČTENÍ PRO MATEMATIKU
   if (subjectName === "Matematika") return; 
   
+  // OPRAVA (Bod 1): Zrušíme případný čekající timeout předchozího slova, aby nám neutnul nové čtení
+  if (speakTimeoutId) { clearTimeout(speakTimeoutId); speakTimeoutId = null; }
   window.speechSynthesis.cancel();
   
   setTimeout(() => {
@@ -106,13 +108,13 @@ function playTone(freq, type, duration) {
     osc.start(); osc.stop(audioCtx.currentTime + duration);
   } catch(e) {}
 }
-function sndOk() { 
+function sndOk(showStar = true) { 
   if (navigator.vibrate) try { navigator.vibrate(18); } catch(e) {}
   playTone(880, 'sine', 0.08); 
   setTimeout(() => playTone(1320, 'sine', 0.1), 80); 
   
-  // NOVÉ: Vyhodí zelené plovoucí číslo při každé správné odpovědi
-  if (typeof showFloatingPoint === 'function') showFloatingPoint();
+  // Zelená hvězda vyskočí jen když showStar není false
+  if (showStar && typeof showFloatingPoint === 'function') showFloatingPoint();
 }
 
 function sndErr() { 

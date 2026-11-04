@@ -29,6 +29,19 @@ function startPexesoGame(pairCount) {
   initPexesoBoard(shuffled);
 }
 
+function startPexesoFromAdaptiveBatch() {
+  stopPexesoTimeout();
+  isCampaignMinigame = false;
+  pexesoPairCount = 6;
+  selectedGame = "PEXESO";
+  const vItems = getVocabItems();
+  const batchWords = (typeof isAdaptiveBatchMode !== 'undefined' && isAdaptiveBatchMode && adaptiveBatchIndices.length > 0)
+    ? adaptiveBatchIndices.map(i => vItems[i]).filter(Boolean)
+    : vItems;
+  const shuffled = [...batchWords].sort(() => Math.random() - 0.5).slice(0, pexesoPairCount);
+  initPexesoBoard(shuffled);
+}
+
 function startCampaignPexeso() {
   isCampaignMinigame = true;
   pexesoPairCount = 6;
