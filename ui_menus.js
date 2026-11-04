@@ -411,7 +411,7 @@ function _renderCampaignHub(main, bSubj, bGroup) {
            let clickAction = isLocked 
              ? `event.stopPropagation(); alert('Tento příběh se odemkne, až se dostaneš do této lekce.');` 
              : `event.stopPropagation(); if(typeof startStory==='function') startStory('${story.title.replace(/'/g, "\\'")}');`;
-           storyHtml += `<div class="map-story-btn ${storyClass}" style="position: absolute; ${storySide} top: 50%; transform: translateY(-50%); z-index: 5;" onclick="${clickAction}" title="${story.title}">${storyIcon}</div>`;
+           storyHtml += `<div class="map-story-btn ${storyClass}" style="position: absolute; ${storySide} top: 50%; transform: translateY(-50%); z-index: 10;" onpointerdown="event.stopPropagation();" onclick="${clickAction}" title="${story.title}">${storyIcon}</div>`;
        });
     }
 
