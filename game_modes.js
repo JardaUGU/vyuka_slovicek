@@ -190,7 +190,7 @@ function clickQuizOpt(optIdx) {
   if (qAnswered) return;
   const q = qActiveList[qCurStep]; const chosen = q.options[optIdx];
   qAnswered = true; qChosenOpt = chosen;
-  if (chosen === q.answer) { sndOk(); addReward(1, typeof selectedGroupKey !== 'undefined' ? selectedGroupKey : ""); } else sndErr();
+  if (chosen === q.answer) { sndOk(false); addReward(1, typeof selectedGroupKey !== 'undefined' ? selectedGroupKey : ""); } else sndErr();
   if(typeof renderActiveGame === 'function') renderActiveGame();
 }
 function nextQuizStep() { qCurStep++; qAnswered = false; qChosenOpt = null; if(typeof renderActiveGame === 'function') renderActiveGame(); }
