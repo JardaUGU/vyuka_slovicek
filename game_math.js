@@ -318,7 +318,7 @@ function makeNumOpts(correct, step = 1) {
 function clickMathChoice(opt) {
   if (mathChosenAnswer !== null) return;
   mathChosenAnswer = opt;
-  if (String(opt) === String(mathTask.ans)) { sndOk(); mathStreak++; addReward(1, "Matematika"); } 
+  if (String(opt) === String(mathTask.ans)) { sndOk(false); mathStreak++; addReward(1, "Matematika"); } 
   else { sndErr(); mathStreak = 0; }
   renderActiveGame();
 }
