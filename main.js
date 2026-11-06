@@ -353,9 +353,10 @@ function registerUserAction() {
     unlockAudioForiOS();
   }
 }
-window.addEventListener('click', registerUserAction, true);
+window.addEventListener('touchstart', registerUserAction, true);
 window.addEventListener('touchend', registerUserAction, true);
-window.addEventListener('pointerup', registerUserAction, true);
+window.addEventListener('pointerdown', registerUserAction, true);
+window.addEventListener('click', registerUserAction, true);
 window.addEventListener('keydown', registerUserAction, true);
 
 setInterval(() => {
