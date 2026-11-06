@@ -1,23 +1,14 @@
 /**
  * MODUL PRO ZVUKOVÉ EFEKTY A SYNTÉZU ŘEČI (TTS)
- * Optimalizováno pro iOS Safari (iPhone SE / 14 Pro fix)
+ * Čistá, stabilní verze s opraveným WebAudio cinkáním pro iPhone SE i 14 Pro
  */
 
 let isAutoTTS = localStorage.getItem("auto_tts") !== "false";
 let cachedVoices = [];
-let audioCtx = null;
-let iosAudioUnlocked = false;
+let speakTimeoutId = null;
 
-// Globální úložiště pro Utterance (zabraňuje smazání zvuku Garbage Collectorem na iOS!)
+// Globální reference zabraňuje smazání přehrávaného slova pamětí v Safari
 window._activeUtterance = null;
-
-function getAudioCtx() {
-  if (!audioCtx) {
-    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-    if (AudioContextClass) audioCtx = new AudioContextClass();
-  }
-  return audioCtx;
-}
 
 function updateVoices() {
   if ('speechSynthesis' in window) {
@@ -28,41 +19,6 @@ function updateVoices() {
 if ('speechSynthesis' in window) {
   updateVoices();
   window.speechSynthesis.onvoiceschanged = updateVoices;
-}
-
-// SPECIÁLNÍ ODEMYKAČ ZVUKU PRO iPHONE / iPAD (Spustí se při prvním klepnutí v aplikaci)
-function unlockAudioForiOS() {
-  // 1. Odemknutí a probuzení Web Audio API (pípání)
-  try {
-    const ctx = getAudioCtx();
-    if (ctx) {
-      if (ctx.state === "suspended") ctx.resume();
-      if (!iosAudioUnlocked) {
-        const buffer = ctx.createBuffer(1, 1, 22050);
-        const source = ctx.createBufferSource();
-        source.buffer = buffer;
-        source.connect(ctx.destination);
-        source.start(0);
-      }
-    }
-  } catch (e) {}
-
-  // 2. Odemknutí a předehřátí TTS (čtení slov) v iOS Safari
-  if ('speechSynthesis' in window) {
-    updateVoices();
-    if (window.speechSynthesis.paused) {
-      window.speechSynthesis.resume();
-    }
-    if (!iosAudioUnlocked) {
-      try {
-        const warmUp = new SpeechSynthesisUtterance(" ");
-        warmUp.volume = 0; // Neslyšitelné, ale probudí hlasový engine v iOS
-        warmUp.rate = 1;
-        window.speechSynthesis.speak(warmUp);
-      } catch (e) {}
-    }
-  }
-  iosAudioUnlocked = true;
 }
 
 function toggleAutoTTS() {
@@ -93,28 +49,32 @@ function speakWord(text, subjectName) {
   if (!('speechSynthesis' in window) || !text) return;
   if (subjectName === "Matematika") return;
 
+  if (speakTimeoutId) {
+    clearTimeout(speakTimeoutId);
+    speakTimeoutId = null;
+  }
+
   try {
-    // Zrušíme předchozí čtení a probudíme případně zaseknutou frontu v iOS
     window.speechSynthesis.cancel();
     if (window.speechSynthesis.paused) {
       window.speechSynthesis.resume();
     }
+  } catch (e) {}
 
+  speakTimeoutId = setTimeout(() => {
     let toSpeak = String(text).trim();
-    toSpeak = toSpeak.replace(/^[^:]{1,30}:\s*/, ''); // Odstranění jmen postav před dvojtečkou
+
+    toSpeak = toSpeak.replace(/^[^:]{1,30}:\s*/, ''); // Odstranění jmen postav
     toSpeak = toSpeak.replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, '').trim(); // Odstranění smajlíků
     toSpeak = toSpeak.replace(/\s*\([^)]*\)/g, ''); // Odstranění závorek
 
     toSpeak = toSpeak.replace(/\bNo\b/g, 'no').replace(/\bOh no\b/gi, 'oh nou');
 
-    // Oprava hebrejštiny (Jméno Boží -> Adonaj)
+    // Oprava hebrejštiny (Boží jméno Adonaj + koncovka -av místo -aju u slov jako Elohav)
     const regexLadonaj = /\u05DC[\u0591-\u05C7]*\u05D9[\u0591-\u05C7]*\u05D4[\u0591-\u05C7]*\u05D5[\u0591-\u05C7]*\u05D4/g;
     const regexAdonaj = /\u05D9[\u0591-\u05C7]*\u05D4[\u0591-\u05C7]*\u05D5[\u0591-\u05C7]*\u05D4/g;
     toSpeak = toSpeak.replace(regexLadonaj, 'לַאדֹנָי').replace(regexAdonaj, 'אֲדֹנָי');
-    // OPRAVA KONCOVKY "-av" (např. Elohav אֱלֹהָיו, panav פָּנָיו):
-    // Odstraní tichý Jod (\u05D9) mezi samohláskou kamac/patach (\u05B7,\u05B8) a koncovým Vav (\u05D5), aby TTS nečetlo "-aju"
     toSpeak = toSpeak.replace(/([\u05B7\u05B8])\u05D9\u05D5(?=\s|$)/g, '$1\u05D5');
-    
     toSpeak = toSpeak.replace(/l'?(jahve|jahveh|yahweh|yahwe|jehova|jhvh|yhwh|jhwh|jvhv)/gi, "Ladonaj");
     toSpeak = toSpeak.replace(/(jahve|jahveh|yahweh|yahwe|jehova|jhvh|yhwh|jhwh|jvhv)/gi, "Adonaj");
 
@@ -125,93 +85,135 @@ function speakWord(text, subjectName) {
     if (!toSpeak) return;
 
     const u = new SpeechSynthesisUtterance(toSpeak);
-    window._activeUtterance = u; // Udržení v globální paměti kvůli iPhone SE!
+    window._activeUtterance = u;
 
     const targetLang = getTargetLang(subjectName);
     const langPrefix = targetLang.split('-')[0];
     u.lang = targetLang;
     u.rate = 0.88;
-    u.volume = 1;
+    u.volume = 1.0;
 
     if (cachedVoices.length === 0) updateVoices();
-    const voices = cachedVoices.length ? cachedVoices : window.speechSynthesis.getVoices();
+    let voices = cachedVoices.length ? cachedVoices : window.speechSynthesis.getVoices();
 
-    if (voices && voices.length > 0) {
-      const isTarget = v => {
-        const vLang = (v.lang || '').toLowerCase().replace('_', '-');
-        return vLang === targetLang.toLowerCase() || vLang.startsWith(langPrefix);
-      };
-
-      // Na iOS preferujeme lokálně stažené hlasy (localService === true), které nemají výpadek u prvních 4 slov!
-      let match = voices.find(v => isTarget(v) && v.localService && /(daniel|anna|zuzana|iveta|samantha|carmit|jorge)/i.test(v.name));
-      if (!match) match = voices.find(v => isTarget(v) && /(enhanced|premium|natural|pro)/i.test(v.name));
-      if (!match) {
-        let bestNames = [];
-        if (targetLang === 'en-GB') bestNames = ['daniel', 'oliver', 'serena', 'stephanie', 'arthur', 'martha', 'kate'];
-        else if (targetLang === 'de-DE') bestNames = ['anna', 'petra', 'markus', 'yannick', 'helena', 'martin'];
-        else if (targetLang === 'cs-CZ') bestNames = ['zuzana', 'iveta'];
-        else if (targetLang === 'es-ES') bestNames = ['jorge', 'monica', 'carmen', 'diego'];
-        else if (targetLang === 'he-IL') bestNames = ['carmit'];
-        for (let name of bestNames) {
-          match = voices.find(v => isTarget(v) && v.name.toLowerCase().includes(name));
-          if (match) break;
+    const playVoice = () => {
+      if (voices && voices.length > 0) {
+        const isTarget = v => (v.lang || '').toLowerCase().replace('_', '-') === targetLang.toLowerCase() || (v.lang || '').toLowerCase().replace('_', '-').startsWith(langPrefix);
+        let match = voices.find(v => isTarget(v) && /(enhanced|premium|natural|pro)/i.test(v.name));
+        if (!match) {
+          let bestNames = [];
+          if (targetLang === 'en-GB') bestNames = ['daniel', 'oliver', 'serena', 'stephanie', 'arthur', 'martha', 'kate'];
+          else if (targetLang === 'de-DE') bestNames = ['anna', 'petra', 'markus', 'yannick', 'helena', 'martin'];
+          else if (targetLang === 'cs-CZ') bestNames = ['iveta', 'zuzana'];
+          else if (targetLang === 'es-ES') bestNames = ['jorge', 'monica', 'carmen', 'diego'];
+          else if (targetLang === 'he-IL') bestNames = ['carmit'];
+          else if (targetLang === 'en-US') bestNames = ['samantha', 'alex', 'karen', 'ava', 'tom'];
+          for (let name of bestNames) {
+            match = voices.find(v => isTarget(v) && v.name.toLowerCase().includes(name));
+            if (match) break;
+          }
+        }
+        if (!match) match = voices.find(v => isTarget(v) && /siri/i.test(v.name));
+        if (!match) match = voices.find(v => isTarget(v) && !/compact/i.test(v.name));
+        if (!match) match = voices.find(isTarget);
+        if (match) {
+          u.voice = match;
+          u.lang = match.lang;
         }
       }
-      if (!match) match = voices.find(v => isTarget(v) && v.localService);
-      if (!match) match = voices.find(isTarget);
+      u.onend = () => { window._activeUtterance = null; };
+      u.onerror = () => { window._activeUtterance = null; };
+      window.speechSynthesis.speak(u);
+    };
 
-      if (match) {
-        u.voice = match;
-        u.lang = match.lang;
-      }
+    if ((!voices || voices.length === 0) && 'speechSynthesis' in window) {
+      setTimeout(() => {
+        updateVoices();
+        voices = cachedVoices.length ? cachedVoices : window.speechSynthesis.getVoices();
+        playVoice();
+      }, 50);
+    } else {
+      playVoice();
     }
+  }, 40);
+}
 
-    u.onend = () => { window._activeUtterance = null; };
-    u.onerror = () => { window._activeUtterance = null; };
+// =========================================================================
+// OPRAVENÉ WEB AUDIO API CINKÁNÍ PRO iOS (iPhone 14 Pro i iPhone SE)
+// =========================================================================
+let audioCtx = null;
+let isAudioUnlocked = false;
 
-    // DŮLEŽITÉ PRO iOS: Voláme synchronně IHNED (žádný setTimeout!), aby Safari neztratilo user-gesture token
-    window.speechSynthesis.speak(u);
-
-    // Pojistka pro iOS, pokud by fronta zůstala viset v pauze
-    if (window.speechSynthesis.paused) {
-      window.speechSynthesis.resume();
-    }
-  } catch (e) {
-    console.warn("TTS chyba:", e);
+function getAudioCtx() {
+  if (!audioCtx) {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (AudioCtx) audioCtx = new AudioCtx();
   }
+  return audioCtx;
+}
+
+// Volá se při jakémkoliv dotyku na obrazovku (odemkne zvukový čip v iPhonu)
+function unlockAudioForiOS() {
+  try {
+    const ctx = getAudioCtx();
+    if (!ctx) return;
+    if (ctx.state !== "running") {
+      ctx.resume().catch(() => {});
+    }
+    if (!isAudioUnlocked && ctx.state === "running") {
+      const buffer = ctx.createBuffer(1, 1, 22050);
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+      source.connect(ctx.destination);
+      source.start(0);
+      isAudioUnlocked = true;
+    }
+  } catch (e) {}
 }
 
 function playTone(freq, type, duration) {
   try {
     const ctx = getAudioCtx();
     if (!ctx) return;
-    if (ctx.state === "suspended") ctx.resume();
 
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = type;
-    osc.frequency.setValueAtTime(freq, ctx.currentTime);
-    gain.gain.setValueAtTime(0.1, ctx.currentTime);
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start();
-    osc.stop(ctx.currentTime + duration);
+    const startOscillator = () => {
+      try {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, ctx.currentTime);
+        // Mírně vyšší hlasitost (0.18), aby bylo cinknutí na iPhonu jasně slyšet
+        gain.gain.setValueAtTime(0.18, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + duration);
+      } catch (e) {}
+    };
+
+    // KRITICKÁ OPRAVA PRO iPHONE 14 PRO & SE:
+    // Pokud je AudioContext uspaný (suspended/interrupted), musíme počkat na dokončení resume()!
+    if (ctx.state !== "running") {
+      ctx.resume().then(startOscillator).catch(() => {});
+    } else {
+      startOscillator();
+    }
   } catch (e) {}
 }
 
 function sndOk(showStar = true) {
   if (navigator.vibrate) try { navigator.vibrate(18); } catch (e) {}
   playTone(880, 'sine', 0.08);
-  setTimeout(() => playTone(1320, 'sine', 0.1), 80);
-  if (showStar && typeof showFloatingPoint === 'function') showFloatingPoint();
+  setTimeout(() => playTone(1320, 'sine', 0.12), 80);
 }
 
 function sndErr() {
   if (navigator.vibrate) try { navigator.vibrate([40, 40, 60]); } catch (e) {}
-  playTone(220, 'square', 0.15);
+  playTone(220, 'square', 0.16);
 }
 
 function sndFanfare() {
-  [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => playTone(f, 'triangle', 0.1), i * 110));
+  [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => playTone(f, 'triangle', 0.12), i * 110));
   if (typeof triggerConfetti === 'function') triggerConfetti();
 }
