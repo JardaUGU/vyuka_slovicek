@@ -342,7 +342,7 @@ function clickCmpQuizOpt(opt) {
   const task = cmpQueue[cmpIdx]; cmpChosenOpt = opt; cmpState = 'EVAL';
 
   if (opt === task.correctAns) {
-    sndOk();
+    sndOk(false);
     if (task.type === 'QUIZ_OUT' || task.type === 'QUIZ_IN' || task.type === 'KVIZ') {
       const dir = task.type === 'QUIZ_OUT' ? 'DIR_OUT' : (task.type === 'KVIZ' ? 'DIR_OUT' : 'DIR_IN');
       const mVal = getSavedMastery(task.data.question, dir);

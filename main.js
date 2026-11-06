@@ -1,7 +1,29 @@
 /**
  * HLAVNÍ JÁDRO APLIKACE (Globální data, Zabezpečení, Ekologie, Časomíra)
  */
-const API_URL = "https://script.google.com/macros/s/AKfycbxaxBIXP-ECpWstcqRDw8RuT_ds6UwcplU_3pZ9_-ksELN5FVeGt5EHjjexkJVmx1FR_w/exec";
+/**
+ * AUTOMATICKÉ PŘEPÍNÁNÍ DATABÁZE (Pro kolegy a více tříd/rodin)
+ * - Tvůj výchozí odkaz funguje bez parametrů.
+ * - Kolega otevře odkaz s parametrem ?db=JEHO_URL (stačí jednou, uloží se do localStorage).
+ */
+const DEFAULT_API_URL = "https://script.google.com/macros/s/AKfycbxaxBIXP-ECpWstcqRDw8RuT_ds6UwcplU_3pZ9_-ksELN5FVeGt5EHjjexkJVmx1FR_w/exec";
+
+const urlParams = new URLSearchParams(window.location.search);
+if (urlParams.has('db')) {
+  const customDb = urlParams.get('db').trim();
+  if (customDb === 'reset' || customDb === 'default') {
+    localStorage.removeItem('custom_api_url');
+  } else if (customDb.startsWith('http')) {
+    localStorage.setItem('custom_api_url', customDb);
+    // Vymažeme starou cache z předchozí databáze
+    localStorage.removeItem('app_data');
+    localStorage.removeItem('cur_user');
+  }
+  // Očistíme adresní řádek, aby tam nestrašil dlouhý odkaz
+  window.history.replaceState({}, document.title, window.location.pathname);
+}
+
+const API_URL = localStorage.getItem('custom_api_url') || DEFAULT_API_URL;
 const APP_VERSION = "7.4";
 
 let appData = { users: [], progress: {}, items: [], syncDate: "" };

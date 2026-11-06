@@ -38,7 +38,7 @@ window.buySnakeShieldInGame = function(e) {
     setTimeout(resizeSnakeCanvas, 10);
     runSnakeLoop();
   } else if (snakeLives <= 1) {
-    alert("Nemůžeš obětovat své poslední srdíčko! ❤️");
+    alert("Nemůžeš obětovat své poslední srdíčko! ❤️ Koupit štít můžeš za zlaťáky.");
   }
 };
 
@@ -46,8 +46,8 @@ window.buySnakeShieldWithCoins = function(e) {
   if (e) { e.preventDefault(); e.stopPropagation(); }
   if (typeof currentUser === "undefined" || !currentUser) return;
   const coins = getUserCoins(currentUser.name);
-  if (coins >= 15 && snakeShieldLetters <= 0) {
-    addCoins(currentUser.name, -15);
+  if (coins >= 1 && snakeShieldLetters <= 0) {
+    addCoins(currentUser.name, -1);
     snakeShieldLetters = 20;
     if (typeof sndFanfare === "function") sndFanfare();
     
@@ -59,7 +59,7 @@ window.buySnakeShieldWithCoins = function(e) {
     setTimeout(resizeSnakeCanvas, 10);
     runSnakeLoop();
   } else {
-    alert("Potřebuješ alespoň 15 zlaťáků! 💰");
+    alert("Potřebuješ alespoň 1 zlaťák! 💰");
   }
 };
 
@@ -67,7 +67,29 @@ window.resumeSnakeWithoutShield = function(e) {
   if (e) { e.preventDefault(); e.stopPropagation(); }
   isSnakeWaitingForInput = true;
   snakeState = "WAITING";
-  snakeStatusMsg = "Hraješ bez štítu. Potáhni nebo stiskni šipku!";
+  snakeStatusMsg = "Potáhni prstem nebo stiskni šipku pro START!";
+  if (typeof renderActiveGame === "function") renderActiveGame();
+  setTimeout(resizeSnakeCanvas, 10);
+  runSnakeLoop();
+};
+
+// NOVÉ: Nákup životů na konci hry (1 život za 1 💰, nebo 5 životů za 3 💰)
+window.buySnakeRevive = function(livesToAdd, cost, e) {
+  if (e) { e.preventDefault(); e.stopPropagation(); }
+  if (typeof currentUser === "undefined" || !currentUser) return;
+  const coins = getUserCoins(currentUser.name);
+  if (coins < cost) {
+    alert(`Nemáš dostatek zlaťáků! Potřebuješ ${cost} 💰.`);
+    return;
+  }
+  addCoins(currentUser.name, -cost);
+  snakeLives += livesToAdd;
+  if (typeof sndFanfare === "function") sndFanfare();
+
+  isSnakeWaitingForInput = true;
+  snakeState = "WAITING";
+  snakeStatusMsg = `❤️ Přidáno +${livesToAdd} životů! Potáhni do volného směru!`;
+
   if (typeof renderActiveGame === "function") renderActiveGame();
   setTimeout(resizeSnakeCanvas, 10);
   runSnakeLoop();
@@ -110,7 +132,7 @@ function startSnakeGame() {
   snakeLevel = 1;
   snakeSpeed = 220;
   snakeShieldLetters = 0;
-  snakeState = "WAITING";
+  snakeState = "PRE_START";
   isSnakeWaitingForInput = true;
   selectedGame = "SNAKE";
 
@@ -154,7 +176,7 @@ function startCampaignSnake() {
   snakeLevel = 1;
   snakeSpeed = 220;
   snakeShieldLetters = 0;
-  snakeState = "WAITING";
+  snakeState = "PRE_START";
   isSnakeWaitingForInput = true;
   selectedGame = "SNAKE";
 
@@ -355,6 +377,7 @@ function runSnakeLoop() {
 }
 
 function setSnakeDirection(dx, dy) {
+  if (snakeState === "PRE_START" || snakeState === "SHIELD_EXPIRED_PAUSE" || snakeState === "GAMEOVER") return;
   if (typeof registerUserAction === "function") registerUserAction();
   
   if ((snakeDir.x !== 0 && snakeDir.x === -dx) || (snakeDir.y !== 0 && snakeDir.y === -dy)) {
