@@ -206,7 +206,6 @@ function sndOk(showStar = true) {
   if (navigator.vibrate) try { navigator.vibrate(18); } catch (e) {}
   playTone(880, 'sine', 0.08);
   setTimeout(() => playTone(1320, 'sine', 0.12), 80);
-  if (showStar && typeof showFloatingPoint === 'function') showFloatingPoint();
 }
 
 function sndErr() {
