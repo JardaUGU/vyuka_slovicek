@@ -342,17 +342,20 @@ function updateUserStreak(userName, targetMinutes) {
 }
 
 function registerUserAction() {
-  checkDateRollover(); lastUserActivityTime = Date.now();
-  if (isTimerPaused) { isTimerPaused = false; updateStudyTimerUI(); }
-  if (typeof updateVoices === "function" && typeof cachedVoices !== "undefined" && cachedVoices.length === 0) updateVoices();
-
-  // NOVÝ BLOK: Probudí uspáný AudioContext na iOS (iPhone/iPad) ihned při prvním dotyku
-  if (typeof audioCtx !== "undefined" && audioCtx.state === "suspended") {
-    audioCtx.resume().catch(() => {});
+  checkDateRollover();
+  lastUserActivityTime = Date.now();
+  if (isTimerPaused) {
+    isTimerPaused = false;
+    updateStudyTimerUI();
+  }
+  // Okamžitě odemkne a probudí zvuk i TTS na iPhonu / iPadu
+  if (typeof unlockAudioForiOS === "function") {
+    unlockAudioForiOS();
   }
 }
 window.addEventListener('click', registerUserAction, true);
-window.addEventListener('touchstart', registerUserAction, true);
+window.addEventListener('touchend', registerUserAction, true);
+window.addEventListener('pointerup', registerUserAction, true);
 window.addEventListener('keydown', registerUserAction, true);
 
 setInterval(() => {
