@@ -1,15 +1,19 @@
 /**
  * MODUL PRO ZVUKOVÉ EFEKTY A SYNTÉZU ŘEČI (TTS)
- * Optimalizováno pro iOS Safari (iPhone SE / 14 Pro fix)
+ * Verze s ochranou proti zamrznutí iOS Safari + Cloud Audio Fallback
  */
 
 let isAutoTTS = localStorage.getItem("auto_tts") !== "false";
 let cachedVoices = [];
 let audioCtx = null;
 let iosAudioUnlocked = false;
+let fallbackAudioEl = null; // Záložní HTML5 Audio přehrávač pro iPhone SE
 
-// Globální úložiště pro Utterance (zabraňuje smazání zvuku Garbage Collectorem na iOS!)
 window._activeUtterance = null;
+
+// Detekce iOS (iPhone / iPad)
+const isIOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+                    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
 function getAudioCtx() {
   if (!audioCtx) {
@@ -30,39 +34,26 @@ if ('speechSynthesis' in window) {
   window.speechSynthesis.onvoiceschanged = updateVoices;
 }
 
-// SPECIÁLNÍ ODEMYKAČ ZVUKU PRO iPHONE / iPAD (Spustí se při prvním klepnutí v aplikaci)
+// Odemknutí zvuku při prvním dotyku (BEZ volání speechSynthesis.speak, aby se nepobil s klikem na 🔊!)
 function unlockAudioForiOS() {
-  // 1. Odemknutí a probuzení Web Audio API (pípání)
+  if (iosAudioUnlocked) return;
   try {
     const ctx = getAudioCtx();
     if (ctx) {
       if (ctx.state === "suspended") ctx.resume();
-      if (!iosAudioUnlocked) {
-        const buffer = ctx.createBuffer(1, 1, 22050);
-        const source = ctx.createBufferSource();
-        source.buffer = buffer;
-        source.connect(ctx.destination);
-        source.start(0);
-      }
+      const buffer = ctx.createBuffer(1, 1, 22050);
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+      source.connect(ctx.destination);
+      source.start(0);
     }
+    // Připravíme záložní HTML5 Audio element během gesta uživatele
+    if (!fallbackAudioEl) {
+      fallbackAudioEl = new Audio();
+      fallbackAudioEl.volume = 1.0;
+    }
+    iosAudioUnlocked = true;
   } catch (e) {}
-
-  // 2. Odemknutí a předehřátí TTS (čtení slov) v iOS Safari
-  if ('speechSynthesis' in window) {
-    updateVoices();
-    if (window.speechSynthesis.paused) {
-      window.speechSynthesis.resume();
-    }
-    if (!iosAudioUnlocked) {
-      try {
-        const warmUp = new SpeechSynthesisUtterance(" ");
-        warmUp.volume = 0; // Neslyšitelné, ale probudí hlasový engine v iOS
-        warmUp.rate = 1;
-        window.speechSynthesis.speak(warmUp);
-      } catch (e) {}
-    }
-  }
-  iosAudioUnlocked = true;
 }
 
 function toggleAutoTTS() {
@@ -89,95 +80,114 @@ function getTargetLang(subjectName) {
   return 'cs-CZ';
 }
 
+// Záložní přehrání řeči přes HTML5 Audio (když na iPhonu SE selže nebo chybí systémový hlas)
+function playCloudFallbackTTS(text, langCode) {
+  try {
+    if (!fallbackAudioEl) fallbackAudioEl = new Audio();
+    const shortLang = langCode.split('-')[0]; // např. 'he', 'de', 'en', 'cs'
+    const url = `https://translate.googleapis.com/translate_tts?client=gtx&ie=UTF-8&tl=${encodeURIComponent(shortLang)}&q=${encodeURIComponent(text)}`;
+    fallbackAudioEl.src = url;
+    fallbackAudioEl.play().catch(err => console.warn("Fallback TTS blokován:", err));
+  } catch (e) {}
+}
+
 function speakWord(text, subjectName) {
-  if (!('speechSynthesis' in window) || !text) return;
-  if (subjectName === "Matematika") return;
+  if (!text || subjectName === "Matematika") return;
+
+  let toSpeak = String(text).trim();
+  toSpeak = toSpeak.replace(/^[^:]{1,30}:\s*/, ''); // Odstranění jmen postav před dvojtečkou
+  toSpeak = toSpeak.replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, '').trim(); // Odstranění smajlíků
+  toSpeak = toSpeak.replace(/\s*\([^)]*\)/g, ''); // Odstranění závorek
+
+  toSpeak = toSpeak.replace(/\bNo\b/g, 'no').replace(/\bOh no\b/gi, 'oh nou');
+
+  // Oprava hebrejštiny (Jméno Boží -> Adonaj + koncovka -av místo -aju)
+  const regexLadonaj = /\u05DC[\u0591-\u05C7]*\u05D9[\u0591-\u05C7]*\u05D4[\u0591-\u05C7]*\u05D5[\u0591-\u05C7]*\u05D4/g;
+  const regexAdonaj = /\u05D9[\u0591-\u05C7]*\u05D4[\u0591-\u05C7]*\u05D5[\u0591-\u05C7]*\u05D4/g;
+  toSpeak = toSpeak.replace(regexLadonaj, 'לַאדֹנָי').replace(regexAdonaj, 'אֲדֹנָי');
+  toSpeak = toSpeak.replace(/([\u05B7\u05B8])\u05D9\u05D5(?=\s|$)/g, '$1\u05D5');
+  toSpeak = toSpeak.replace(/l'?(jahve|jahveh|yahweh|yahwe|jehova|jhvh|yhwh|jhwh|jvhv)/gi, "Ladonaj");
+  toSpeak = toSpeak.replace(/(jahve|jahveh|yahweh|yahwe|jehova|jhvh|yhwh|jhwh|jvhv)/gi, "Adonaj");
+
+  if (/read\s*-\s*read\s*-\s*read/i.test(toSpeak)) toSpeak = "read, red, red";
+  else toSpeak = toSpeak.replace(/\//g, ' or ').replace(/\s*-\s*/g, ', ');
+  if (/^\s*I\s*[.!?]?\s*$/i.test(toSpeak)) toSpeak = "eye";
+
+  if (!toSpeak) return;
+
+  const targetLang = getTargetLang(subjectName);
+  const langPrefix = targetLang.split('-')[0];
+
+  if (!('speechSynthesis' in window)) {
+    playCloudFallbackTTS(toSpeak, targetLang);
+    return;
+  }
 
   try {
-    // Zrušíme předchozí čtení a probudíme případně zaseknutou frontu v iOS
-    window.speechSynthesis.cancel();
+    // KRITICKÁ OPRAVA PRO iOS: cancel() voláme POUZE pokud čtečka zrovna skutečně mluví!
+    // Jinak cancel() v iOS Safari okamžitě zabije i nově spouštěné slovo.
+    if (window.speechSynthesis.speaking || window.speechSynthesis.pending) {
+      window.speechSynthesis.cancel();
+    }
     if (window.speechSynthesis.paused) {
       window.speechSynthesis.resume();
     }
 
-    let toSpeak = String(text).trim();
-    toSpeak = toSpeak.replace(/^[^:]{1,30}:\s*/, ''); // Odstranění jmen postav před dvojtečkou
-    toSpeak = toSpeak.replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, '').trim(); // Odstranění smajlíků
-    toSpeak = toSpeak.replace(/\s*\([^)]*\)/g, ''); // Odstranění závorek
-
-    toSpeak = toSpeak.replace(/\bNo\b/g, 'no').replace(/\bOh no\b/gi, 'oh nou');
-
-    // Oprava hebrejštiny (Jméno Boží -> Adonaj)
-    const regexLadonaj = /\u05DC[\u0591-\u05C7]*\u05D9[\u0591-\u05C7]*\u05D4[\u0591-\u05C7]*\u05D5[\u0591-\u05C7]*\u05D4/g;
-    const regexAdonaj = /\u05D9[\u0591-\u05C7]*\u05D4[\u0591-\u05C7]*\u05D5[\u0591-\u05C7]*\u05D4/g;
-    toSpeak = toSpeak.replace(regexLadonaj, 'לַאדֹנָי').replace(regexAdonaj, 'אֲדֹנָי');
-    // OPRAVA KONCOVKY "-av" (např. Elohav אֱלֹהָיו, panav פָּנָיו):
-    // Odstraní tichý Jod (\u05D9) mezi samohláskou kamac/patach (\u05B7,\u05B8) a koncovým Vav (\u05D5), aby TTS nečetlo "-aju"
-    toSpeak = toSpeak.replace(/([\u05B7\u05B8])\u05D9\u05D5(?=\s|$)/g, '$1\u05D5');
-    
-    toSpeak = toSpeak.replace(/l'?(jahve|jahveh|yahweh|yahwe|jehova|jhvh|yhwh|jhwh|jvhv)/gi, "Ladonaj");
-    toSpeak = toSpeak.replace(/(jahve|jahveh|yahweh|yahwe|jehova|jhvh|yhwh|jhwh|jvhv)/gi, "Adonaj");
-
-    if (/read\s*-\s*read\s*-\s*read/i.test(toSpeak)) toSpeak = "read, red, red";
-    else toSpeak = toSpeak.replace(/\//g, ' or ').replace(/\s*-\s*/g, ', ');
-    if (/^\s*I\s*[.!?]?\s*$/i.test(toSpeak)) toSpeak = "eye";
-
-    if (!toSpeak) return;
-
     const u = new SpeechSynthesisUtterance(toSpeak);
-    window._activeUtterance = u; // Udržení v globální paměti kvůli iPhone SE!
-
-    const targetLang = getTargetLang(subjectName);
-    const langPrefix = targetLang.split('-')[0];
+    window._activeUtterance = u;
     u.lang = targetLang;
     u.rate = 0.88;
-    u.volume = 1;
+    u.volume = 1.0;
 
     if (cachedVoices.length === 0) updateVoices();
     const voices = cachedVoices.length ? cachedVoices : window.speechSynthesis.getVoices();
 
-    if (voices && voices.length > 0) {
-      const isTarget = v => {
-        const vLang = (v.lang || '').toLowerCase().replace('_', '-');
-        return vLang === targetLang.toLowerCase() || vLang.startsWith(langPrefix);
-      };
+    const isTarget = v => {
+      const vLang = (v.lang || '').toLowerCase().replace('_', '-');
+      return vLang === targetLang.toLowerCase() || vLang.startsWith(langPrefix);
+    };
 
-      // Na iOS preferujeme lokálně stažené hlasy (localService === true), které nemají výpadek u prvních 4 slov!
-      let match = voices.find(v => isTarget(v) && v.localService && /(daniel|anna|zuzana|iveta|samantha|carmit|jorge)/i.test(v.name));
-      if (!match) match = voices.find(v => isTarget(v) && /(enhanced|premium|natural|pro)/i.test(v.name));
-      if (!match) {
-        let bestNames = [];
-        if (targetLang === 'en-GB') bestNames = ['daniel', 'oliver', 'serena', 'stephanie', 'arthur', 'martha', 'kate'];
-        else if (targetLang === 'de-DE') bestNames = ['anna', 'petra', 'markus', 'yannick', 'helena', 'martin'];
-        else if (targetLang === 'cs-CZ') bestNames = ['zuzana', 'iveta'];
-        else if (targetLang === 'es-ES') bestNames = ['jorge', 'monica', 'carmen', 'diego'];
-        else if (targetLang === 'he-IL') bestNames = ['carmit'];
-        for (let name of bestNames) {
-          match = voices.find(v => isTarget(v) && v.name.toLowerCase().includes(name));
-          if (match) break;
-        }
-      }
-      if (!match) match = voices.find(v => isTarget(v) && v.localService);
+    const hasSystemVoiceForLang = voices && voices.some(isTarget);
+
+    // Pokud iPhone vůbec nemá v systému nainstalovaný hlas pro daný jazyk (často hebrejština),
+    // rovnou přehrajeme zvuk přes záložní Cloud MP3!
+    if (isIOSDevice && voices && voices.length > 0 && !hasSystemVoiceForLang) {
+      playCloudFallbackTTS(toSpeak, targetLang);
+      return;
+    }
+
+    // Na PC/Androidu vybereme nejlepší hlas; na iOS necháme výběr na u.lang (zabrání chybě tichého hlasu na SE)
+    if (!isIOSDevice && voices && voices.length > 0) {
+      let match = voices.find(v => isTarget(v) && /(enhanced|premium|natural|pro)/i.test(v.name));
       if (!match) match = voices.find(isTarget);
-
       if (match) {
         u.voice = match;
         u.lang = match.lang;
       }
     }
 
+    let startedSpeaking = false;
+    u.onstart = () => { startedSpeaking = true; };
     u.onend = () => { window._activeUtterance = null; };
-    u.onerror = () => { window._activeUtterance = null; };
+    u.onerror = () => {
+      window._activeUtterance = null;
+      // Pokud systémové TTS hodí chybu, zachrání to Cloud MP3
+      if (!startedSpeaking) playCloudFallbackTTS(toSpeak, targetLang);
+    };
 
-    // DŮLEŽITÉ PRO iOS: Voláme synchronně IHNED (žádný setTimeout!), aby Safari neztratilo user-gesture token
     window.speechSynthesis.speak(u);
 
-    // Pojistka pro iOS, pokud by fronta zůstala viset v pauze
-    if (window.speechSynthesis.paused) {
-      window.speechSynthesis.resume();
+    // Pojistka pro iPhone SE: Pokud se do 350 ms čtečka vůbec nerozjede (zamrzlý iOS speechsynthesisd),
+    // automaticky přehrajeme slovo přes Cloud Audio!
+    if (isIOSDevice) {
+      setTimeout(() => {
+        if (!startedSpeaking && !window.speechSynthesis.speaking) {
+          playCloudFallbackTTS(toSpeak, targetLang);
+        }
+      }, 350);
     }
   } catch (e) {
-    console.warn("TTS chyba:", e);
+    playCloudFallbackTTS(toSpeak, targetLang);
   }
 }
 
