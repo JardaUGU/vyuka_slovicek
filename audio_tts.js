@@ -111,6 +111,10 @@ function speakWord(text, subjectName) {
     const regexLadonaj = /\u05DC[\u0591-\u05C7]*\u05D9[\u0591-\u05C7]*\u05D4[\u0591-\u05C7]*\u05D5[\u0591-\u05C7]*\u05D4/g;
     const regexAdonaj = /\u05D9[\u0591-\u05C7]*\u05D4[\u0591-\u05C7]*\u05D5[\u0591-\u05C7]*\u05D4/g;
     toSpeak = toSpeak.replace(regexLadonaj, 'לַאדֹנָי').replace(regexAdonaj, 'אֲדֹנָי');
+    // OPRAVA KONCOVKY "-av" (např. Elohav אֱלֹהָיו, panav פָּנָיו):
+    // Odstraní tichý Jod (\u05D9) mezi samohláskou kamac/patach (\u05B7,\u05B8) a koncovým Vav (\u05D5), aby TTS nečetlo "-aju"
+    toSpeak = toSpeak.replace(/([\u05B7\u05B8])\u05D9\u05D5(?=\s|$)/g, '$1\u05D5');
+    
     toSpeak = toSpeak.replace(/l'?(jahve|jahveh|yahweh|yahwe|jehova|jhvh|yhwh|jhwh|jvhv)/gi, "Ladonaj");
     toSpeak = toSpeak.replace(/(jahve|jahveh|yahweh|yahwe|jehova|jhvh|yhwh|jhwh|jvhv)/gi, "Adonaj");
 
