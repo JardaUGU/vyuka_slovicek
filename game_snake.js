@@ -22,12 +22,14 @@ let snakeStatusMsg = "";
 let snakeShieldLetters = 0;
 let snakeTouchStartX = 0, snakeTouchStartY = 0;
 let isSnakeWaitingForInput = true;
+let snakeUsedBoosts = false; // Sleduje, zda hráč použil štít nebo dokoupil životy (pro férový rekord)
 
 window.buySnakeShieldInGame = function(e) {
   if (e) { e.preventDefault(); e.stopPropagation(); }
   if (snakeLives > 1 && snakeShieldLetters <= 0) {
     snakeLives--;
     snakeShieldLetters = 20;
+    snakeUsedBoosts = true; // Použil vylepšení -> nepočítá se do rekordu
     if (typeof sndFanfare === "function") sndFanfare();
     
     isSnakeWaitingForInput = true;
@@ -38,7 +40,7 @@ window.buySnakeShieldInGame = function(e) {
     setTimeout(resizeSnakeCanvas, 10);
     runSnakeLoop();
   } else if (snakeLives <= 1) {
-    alert("Nemůžeš obětovat své poslední srdíčko! ❤️ Koupit štít můžeš za zlaťáky.");
+    alert("Nemůžeš obětovat své poslední srdíčko! ❤️ Koupit štít můžeš za 1 zlaťák.");
   }
 };
 
@@ -49,12 +51,36 @@ window.buySnakeShieldWithCoins = function(e) {
   if (coins >= 1 && snakeShieldLetters <= 0) {
     addCoins(currentUser.name, -1);
     snakeShieldLetters = 20;
+    snakeUsedBoosts = true; // Použil vylepšení -> nepočítá se do rekordu
     if (typeof sndFanfare === "function") sndFanfare();
     
     isSnakeWaitingForInput = true;
     snakeState = "WAITING";
-    snakeStatusMsg = "🛡️ Štít koupen! Potáhni nebo stiskni šipku.";
+    snakeStatusMsg = "🛡️ Štít na 20 písmen koupen! Potáhni nebo stiskni šipku.";
     
+    if (typeof renderActiveGame === "function") renderActiveGame();
+    setTimeout(resizeSnakeCanvas, 10);
+    runSnakeLoop();
+  } else {
+    alert("Potřebuješ alespoň 1 zlaťák! 💰");
+  }
+};
+
+// Nákup +1 života před startem (nebo v pauze) za 1 zlaťák
+window.buySnakeExtraLife = function(e) {
+  if (e) { e.preventDefault(); e.stopPropagation(); }
+  if (typeof currentUser === "undefined" || !currentUser) return;
+  const coins = getUserCoins(currentUser.name);
+  if (coins >= 1) {
+    addCoins(currentUser.name, -1);
+    snakeLives++;
+    snakeUsedBoosts = true; // Použil vylepšení -> nepočítá se do rekordu
+    if (typeof sndFanfare === "function") sndFanfare();
+
+    isSnakeWaitingForInput = true;
+    snakeState = "WAITING";
+    snakeStatusMsg = "❤️ Život přikoupen! Potáhni nebo stiskni šipku pro START.";
+
     if (typeof renderActiveGame === "function") renderActiveGame();
     setTimeout(resizeSnakeCanvas, 10);
     runSnakeLoop();
@@ -73,7 +99,7 @@ window.resumeSnakeWithoutShield = function(e) {
   runSnakeLoop();
 };
 
-// NOVÉ: Nákup životů na konci hry (1 život za 1 💰, nebo 5 životů za 3 💰)
+// Nákup životů na konci hry (1 život za 1 💰, nebo 5 životů za 3 💰)
 window.buySnakeRevive = function(livesToAdd, cost, e) {
   if (e) { e.preventDefault(); e.stopPropagation(); }
   if (typeof currentUser === "undefined" || !currentUser) return;
@@ -84,6 +110,7 @@ window.buySnakeRevive = function(livesToAdd, cost, e) {
   }
   addCoins(currentUser.name, -cost);
   snakeLives += livesToAdd;
+  snakeUsedBoosts = true; // Použil vylepšení -> nepočítá se do rekordu
   if (typeof sndFanfare === "function") sndFanfare();
 
   isSnakeWaitingForInput = true;
