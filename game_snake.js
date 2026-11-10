@@ -156,6 +156,7 @@ function startSnakeGame() {
 
   snakeLives = 3;
   snakeScore = 0;
+  snakeUsedBoosts = false;
   snakeLevel = 1;
   snakeSpeed = 220;
   snakeShieldLetters = 0;
@@ -200,6 +201,7 @@ function startCampaignSnake() {
 
   snakeLives = 3;
   snakeScore = 0;
+  snakeUsedBoosts = false;
   snakeLevel = 1;
   snakeSpeed = 220;
   snakeShieldLetters = 0;
@@ -531,7 +533,10 @@ function handleShieldExpired() {
 }
 
 function handleSnakeWordComplete() {
-   if (typeof saveSnakeRecord === "function") saveSnakeRecord(snakeBody.length);
+   // Rekord délky hada se ukládá POUZE tehdy, pokud hráč nepoužil štít ani si nepřikoupil životy!
+  if (!snakeUsedBoosts && typeof saveSnakeRecord === "function") {
+    saveSnakeRecord(snakeBody.length);
+  }
   if (typeof sndFanfare === "function") sndFanfare();
   snakeScore++;
   if (typeof addReward === "function") addReward(1, "Had");
@@ -549,7 +554,10 @@ function handleSnakeWordComplete() {
 }
 
 function handleSnakeDeath(reason) {
-  if (typeof saveSnakeRecord === "function") saveSnakeRecord(snakeBody.length);
+ // Rekord délky hada se ukládá POUZE tehdy, pokud hráč nepoužil štít ani si nepřikoupil životy!
+  if (!snakeUsedBoosts && typeof saveSnakeRecord === "function") {
+    saveSnakeRecord(snakeBody.length);
+  }
   if (typeof sndErr === "function") sndErr();
   snakeLives--;
   
