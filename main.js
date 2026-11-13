@@ -28,7 +28,7 @@ const APP_VERSION = "7.4";
 
 let appData = { users: [], progress: {}, items: [], syncDate: "" };
 let currentUser = JSON.parse(localStorage.getItem("cur_user") || 'null');
-let filterExactGradeOnly = false;
+let filterExactGradeOnly = true;
 let viewMode = "LESSONS";
 
 let currentScreen = "SELECT_USER";
@@ -176,9 +176,13 @@ function getQuickChoiceMode() {
 
 function isItemAllowedForGrade(it, userG) {
   const subjLow = (it.subject || '').toLowerCase();
+  // Kampaně (Cesty) mají vlastní řízení postupu podle lekcí
   if (subjLow.includes('cesta') || subjLow.includes('postupn') || subjLow.includes('inteligentn')) return true;
-  if (((it.lesson||'').toLowerCase().includes('sloves') || (it.topic||'').toLowerCase().includes('sloves')) && userG >= 5) return true;
-  if (!filterExactGradeOnly || userG >= 90) return true;
+  
+  // Dospělý (třída >= 90) vidí vždy všechny ročníky
+  if (userG >= 90) return true;
+
+  // Žáci vidí striktně pouze úlohy určené pro jejich třídu (MinTrida === Trida žáka)
   return (parseInt(it.minGrade) || 2) === userG;
 }
 
