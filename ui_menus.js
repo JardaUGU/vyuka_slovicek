@@ -122,12 +122,11 @@ function _renderSelectSubject(main, bSubj, bGroup) {
   const skinCount = unlocked.length;
 
   let html = `
-    <div class="filter-bar">
-      <span>Filtr: ${typeof filterExactGradeOnly !== 'undefined' && filterExactGradeOnly ? 'Jen ' + userG + '. třída' : 'Všechny ročníky'}</span>
-      <button class="toggle-btn ${typeof filterExactGradeOnly !== 'undefined' && filterExactGradeOnly ? 'on' : ''}" onclick="if(typeof filterExactGradeOnly !== 'undefined') { filterExactGradeOnly=!filterExactGradeOnly; renderScreen(); }">
-        ${typeof filterExactGradeOnly !== 'undefined' && filterExactGradeOnly ? 'Jen má třída' : 'Všechny ročníky'}
-      </button>
-    </div>
+    ${userG >= 90 ? `
+      <div class="filter-bar">
+        <span>👑 Režim Dospělý: Vidíš úlohy ze všech ročníků</span>
+      </div>
+    ` : ''}
 
     <div class="tile" style="border-color:var(--col-yellow);margin-bottom:10px;padding:12px 14px;cursor:pointer;" onclick="if(typeof setScreen==='function') setScreen('SHOP')">
       <div style="display:flex;align-items:center;justify-content:space-between;width:100%;">
