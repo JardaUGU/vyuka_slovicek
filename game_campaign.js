@@ -7,6 +7,22 @@ let cmpHearts = 5;
 let cmpState = 'PLAYING';
 let cmpChosenOpt = null;
 
+let cmpCapOneLevelPerSession = false;
+let cmpSessionAdvanced = new Set();
+
+function advanceCmpMastery(question, dir, step = 1) {
+  const advKey = `${question}:::${dir}`;
+  if (cmpCapOneLevelPerSession) {
+    if (cmpSessionAdvanced.has(advKey)) return;
+    cmpSessionAdvanced.add(advKey);
+    step = 1;
+  }
+  const cur = getSavedMastery(question, dir);
+  if (cur < 2) {
+    saveWordMasteryToGoogle(question, Math.min(2, cur + step), dir);
+  }
+}
+
 let cmpMistakes = [];        // Seznam slov, ve kterých žák během tréninku chyboval
 let cmpSummaryShown = false; // Zda už jsme ukázali závěrečný přehled chyb
 
@@ -80,6 +96,9 @@ function startSmartMix() {
   const allItems = activeItems.filter(it => 
     (typeof viewMode !== 'undefined' && viewMode === "LESSONS" ? it.lesson : it.topic) === selectedGroupKey
   );
+  
+  cmpCapOneLevelPerSession = false;
+  cmpSessionAdvanced = new Set();
   
   if (allItems.length === 0) return;
 
@@ -253,14 +272,27 @@ function startCampaign() {
     getSavedMastery(it.question, 'DIR_IN') < 2 || getSavedMastery(it.question, 'DIR_OUT') < 2
   );
   
-  let targetVItems = [...unmasteredVItems].sort(() => Math.random() - 0.5);
+  cmpCapOneLevelPerSession = true;
+  cmpSessionAdvanced = new Set();
 
-  if (targetVItems.length < 15) {
+  let unmasteredVItems = currentVItems.filter(it => 
+    getSavedMastery(it.question, 'DIR_IN') < 2 || getSavedMastery(it.question, 'DIR_OUT') < 2
+  );
+
+  // Přednost mají slova s 0 ★ před těmi, co už mají 1 ★
+  unmasteredVItems.sort((a, b) => {
+    const scoreA = getSavedMastery(a.question, 'DIR_IN') + getSavedMastery(a.question, 'DIR_OUT');
+    const scoreB = getSavedMastery(b.question, 'DIR_IN') + getSavedMastery(b.question, 'DIR_OUT');
+    if (scoreA !== scoreB) return scoreA - scoreB;
+    return Math.random() - 0.5;
+  });
+
+  let targetVItems = [...unmasteredVItems];
+  if (targetVItems.length < 10) {
     let masteredVItems = currentVItems.filter(it => !unmasteredVItems.includes(it)).sort(() => Math.random() - 0.5);
     targetVItems = [...targetVItems, ...masteredVItems];
   }
-  
-  targetVItems = targetVItems.slice(0, 15);
+  targetVItems = targetVItems.slice(0, 10);
 
   targetVItems.forEach(it => {
       let forceTest = (getSavedMastery(it.question, 'DIR_IN') === 2 && getSavedMastery(it.question, 'DIR_OUT') === 2);
@@ -344,9 +376,8 @@ function clickCmpQuizOpt(opt) {
   if (opt === task.correctAns) {
     sndOk(false);
     if (task.type === 'QUIZ_OUT' || task.type === 'QUIZ_IN' || task.type === 'KVIZ') {
-      const dir = task.type === 'QUIZ_OUT' ? 'DIR_OUT' : (task.type === 'KVIZ' ? 'DIR_OUT' : 'DIR_IN');
-      const mVal = getSavedMastery(task.data.question, dir);
-      if (mVal < 2) saveWordMasteryToGoogle(task.data.question, mVal + 1, dir);
+      const dir = (task.type === 'QUIZ_OUT' || task.type === 'KVIZ') ? 'DIR_OUT' : 'DIR_IN';
+      advanceCmpMastery(task.data.question, dir, 1);
     }
   } else {
     sndErr(); cmpHearts = Math.max(0, cmpHearts - 1);
@@ -354,13 +385,14 @@ function clickCmpQuizOpt(opt) {
       cmpMistakes.push(task.data);
     }
     let newTask = JSON.parse(JSON.stringify(task));
-    newTask.isAudioOnly = false; // Při opravě chyby už ukážeme i psaný text
+    newTask.isAudioOnly = false;
     if (newTask.opts) newTask.opts.sort(() => Math.random() - 0.5);
     requeueFailedTask(newTask);
     
     if (task.type === 'QUIZ_OUT' || task.type === 'QUIZ_IN' || task.type === 'KVIZ') {
-        const dir = task.type === 'QUIZ_OUT' ? 'DIR_OUT' : (task.type === 'KVIZ' ? 'DIR_OUT' : 'DIR_IN');
+        const dir = (task.type === 'QUIZ_OUT' || task.type === 'KVIZ') ? 'DIR_OUT' : 'DIR_IN';
         saveWordMasteryToGoogle(task.data.question, 0, dir);
+        cmpSessionAdvanced.delete(`${task.data.question}:::${dir}`);
     }
   }
 
@@ -402,10 +434,8 @@ function clickCmpScrambleTile(idx) {
       if (!task.hadMistake) {
         const isMultiWord = task.data.question.trim().includes(' ') || task.data.question.trim().includes('-');
         const step = isMultiWord ? 2 : 1;
-        const mIn = getSavedMastery(task.data.question, 'DIR_IN'); 
-        const mOut = getSavedMastery(task.data.question, 'DIR_OUT');
-        if (mIn < 2) saveWordMasteryToGoogle(task.data.question, Math.min(2, mIn + step), 'DIR_IN');
-        if (mOut < 2) saveWordMasteryToGoogle(task.data.question, Math.min(2, mOut + step), 'DIR_OUT');
+        advanceCmpMastery(task.data.question, 'DIR_IN', step);
+        advanceCmpMastery(task.data.question, 'DIR_OUT', step);
       }
     } else {
       const nextExpected = task.tokens[task.placed.length];
