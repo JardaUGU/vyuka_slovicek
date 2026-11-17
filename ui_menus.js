@@ -324,7 +324,7 @@ function _renderCampaignHub(main, bSubj, bGroup) {
   let lessons = [...new Set(vItems.map(it => it.lesson))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
 
   let userMinLvl = 1;
-  const subjNorm = selectedSubject.toLowerCase().replace(/[^a-z]/g, ""); 
+  const subjNorm = selectedSubject.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z]/g, "");
   if (currentUser && currentUser.startLevels) {
     for (let k in currentUser.startLevels) { if (subjNorm.includes(k) || k.includes(subjNorm)) { userMinLvl = Number(currentUser.startLevels[k]) || 1; break; } }
   }
