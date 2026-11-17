@@ -7,6 +7,10 @@ let cmpHearts = 5;
 let cmpState = 'PLAYING';
 let cmpChosenOpt = null;
 
+
+let cmpMistakes = [];        // Seznam slov, ve kterých žák během tréninku chyboval
+let cmpSummaryShown = false; // Zda už jsme ukázali závěrečný přehled chyb
+
 let cmpCapOneLevelPerSession = false;
 let cmpSessionAdvanced = new Set();
 
@@ -22,9 +26,6 @@ function advanceCmpMastery(question, dir, step = 1) {
     saveWordMasteryToGoogle(question, Math.min(2, cur + step), dir);
   }
 }
-
-let cmpMistakes = [];        // Seznam slov, ve kterých žák během tréninku chyboval
-let cmpSummaryShown = false; // Zda už jsme ukázali závěrečný přehled chyb
 
 let isCampaignMinigame = false;
 let campaignMinigameCoins = 0;
@@ -250,6 +251,9 @@ function startCampaign() {
   if (typeof stopSnakeLoop === "function") stopSnakeLoop();
   if (typeof stopTargetTimer === "function") stopTargetTimer();
 
+  cmpCapOneLevelPerSession = true;
+  cmpSessionAdvanced = new Set();
+
   let q = [];
   let allVItems = getVocabItems();
   let allQItems = getQuizItems();
@@ -271,15 +275,7 @@ function startCampaign() {
   let unmasteredVItems = currentVItems.filter(it => 
     getSavedMastery(it.question, 'DIR_IN') < 2 || getSavedMastery(it.question, 'DIR_OUT') < 2
   );
-  
-  cmpCapOneLevelPerSession = true;
-  cmpSessionAdvanced = new Set();
 
-  let unmasteredVItems = currentVItems.filter(it => 
-    getSavedMastery(it.question, 'DIR_IN') < 2 || getSavedMastery(it.question, 'DIR_OUT') < 2
-  );
-
-  // Přednost mají slova s 0 ★ před těmi, co už mají 1 ★
   unmasteredVItems.sort((a, b) => {
     const scoreA = getSavedMastery(a.question, 'DIR_IN') + getSavedMastery(a.question, 'DIR_OUT');
     const scoreB = getSavedMastery(b.question, 'DIR_IN') + getSavedMastery(b.question, 'DIR_OUT');
@@ -343,13 +339,11 @@ function startCampaign() {
        task.correctAns = correctAns;
        task.prompt = isOut ? cleanCzechTranslation(task.data.answer) : task.data.question;
 
-       // Poslechová výzva 🎧 pro 35 % pasivních otázek v cizích jazycích
        if (task.type === 'QUIZ_IN' && selectedSubject !== "Matematika" && typeof isAutoTTS !== "undefined" && isAutoTTS && getTargetLang(selectedSubject) !== 'cs-CZ') {
          if (Math.random() < 0.35) task.isAudioOnly = true;
        }
 
     } else if (task.type === 'SCRAMBLE') {
-       // OPRAVA: Odstranění závorek před rozpadem na kostičky i v Kampani
        const raw = task.data.question.replace(/\s*\([^)]*\)/g, '').trim();
        const isWordMode = (raw.split(/\s+/).length >= 3 || raw.length > 15);
        const tokens = isWordMode ? (raw.includes('-') ? raw.split('-').map(s=>s.trim()) : raw.split(/\s+/)) : getGraphemes(raw);
