@@ -214,6 +214,7 @@ function _renderShop(main, bSubj, bGroup) {
             </div>
          </div>
       </div>
+      ${typeof renderStreakHistoryBox === 'function' ? renderStreakHistoryBox(currentUser.name) : ''}
 
       <div style="background:var(--col-card);border:1px solid var(--col-card-border);border-radius:12px;padding:14px;margin-bottom:15px;display:flex;justify-content:space-between;align-items:center;">
          <div><b style="font-size:16px;">🔐 Ochrana profilu</b><p style="font-size:12px;color:var(--col-text-muted);margin-top:2px;">Zamez ostatním ve vstupu do tvého účtu.</p></div>
