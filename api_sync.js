@@ -19,7 +19,34 @@ function syncAllUsersTimeFromCloud(usersArr) {
     if (typeof updateStudyTimerUI === "function") updateStudyTimerUI();
   }
 }
+function syncAllUsersStreakFromCloud(usersArr) {
+  if (!Array.isArray(usersArr)) return;
+  usersArr.forEach(u => {
+    if (!u || !u.name) return;
+    const uKey = u.name.toLowerCase().trim();
+    const cloudLast = typeof parseDateOnlyStr === "function" ? parseDateOnlyStr(u.streakLastDate) : String(u.streakLastDate || '').slice(0, 10);
+    const localLast = typeof parseDateOnlyStr === "function" ? parseDateOnlyStr(localStorage.getItem(`streak_last_date_${uKey}`) || "") : "";
 
+    if (cloudLast && (!localLast || cloudLast >= localLast)) {
+      localStorage.setItem(`streak_${uKey}`, String(Number(u.streak || 0)));
+      localStorage.setItem(`streak_last_date_${uKey}`, cloudLast);
+      if (u.inventory && u.inventory["Zmrazeni"] !== undefined) {
+        localStorage.setItem(`item_Zmrazeni_${uKey}`, String(Number(u.inventory["Zmrazeni"])));
+      }
+      if (Array.isArray(u.streakFreezeDates)) {
+        localStorage.setItem(`freeze_dates_${uKey}`, JSON.stringify(u.streakFreezeDates));
+      }
+    } else if (localLast > cloudLast) {
+      // Lokální zařízení už dnes cíl splnilo, cloud se ještě synchronizuje -> ochrana proti přepsání
+      u.streak = Number(localStorage.getItem(`streak_${uKey}`) || u.streak || 0);
+      u.streakLastDate = localLast;
+      const localFreeze = localStorage.getItem(`item_Zmrazeni_${uKey}`);
+      if (localFreeze !== null && u.inventory) {
+        u.inventory["Zmrazeni"] = Number(localFreeze);
+      }
+    }
+  });
+}
 async function loadData() {
   checkDateRollover();
   if (currentUser) {
@@ -51,6 +78,7 @@ async function syncDataQuietly() {
       
       // DŮLEŽITÉ (BUGFIX): Aktualizace času z cloudu pro VŠECHNY profily
       syncAllUsersTimeFromCloud(appData.users);
+      syncAllUsersStreakFromCloud(appData.users);
 
       if (currentUser && appData.users) {
         const foundU = appData.users.find(u => u.name.toLowerCase().trim() === currentUser.name.toLowerCase().trim());
@@ -89,6 +117,7 @@ async function syncData() {
 
       // DŮLEŽITÉ (BUGFIX): Aktualizace času z cloudu pro VŠECHNY profily i při ruční aktualizaci 🔄
       syncAllUsersTimeFromCloud(appData.users);
+      syncAllUsersStreakFromCloud(appData.users);
 
       if (currentUser && appData.users) {
         const foundU = appData.users.find(u => u.name.toLowerCase().trim() === currentUser.name.toLowerCase().trim());
@@ -119,6 +148,7 @@ function sendTimeHeartbeatToGoogle() {
     fd.append("section", "Časomíra");
     fd.append("stars", 0); 
     fd.append("minutes", (todaySecondsStudied / 60).toFixed(2)); 
+    fd.append("clientDate", getTodayDateStr());
     fetch(API_URL, { method: "POST", mode: "no-cors", body: fd });
   } catch(e) {}
 }
