@@ -7,7 +7,7 @@ PRAVIDLA PRO ÚPRAVU KÓDU A CHOVÁNÍ APLIKACE
    - Před spuštěním nového čtení musí speakWord() vždy vyčistit předchozí speakTimeoutId (clearTimeout), aby opožděný timeout předchozího slova nezrušil čtení nového slova (např. při rychlé střelbě na terč).
    - TTS NESMÍ číst české kontrolní otázky v příbězích (mají options, ale chybí v nich "___") a nikdy nečte v předmětu Matematika.
    - TTS NESMÍ číst obsah kulatých závorek (např. v němčině "Sie (ona)").
-   - Zvuková funkce sndOk(showStar = true) zobrazuje plovoucí hvězdu (+1 ★) pouze tehdy, když showStar není false (při klikání na jednotlivá písmena ve Skládání se volá sndOk(false), hvězda vyskočí až po složení celého slova).
+   
 
 2. HERNÍ LOGIKA (game_*.js):
    - "Řada na čas" (SEQ) NESMÍ používat FIFO! Tlačítka se míchají jen jednou na začátku (s mezerami v pořadí), po kliknutí se doplní nové slovo přímo do uvolněného slotu a na konci sloty mizí.
