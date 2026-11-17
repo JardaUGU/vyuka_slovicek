@@ -85,7 +85,10 @@ function _renderSelectUser(main, bSubj, bGroup) {
         const uSec = Math.max(localSec, cloudSec);
         
         const uMin = Math.floor(uSec / 60); const targetM = u.targetMinutes || 15; const isDone = uMin >= targetM;
-        const streakDays = (u.streak !== undefined) ? u.streak : (typeof getUserStreak === 'function' ? getUserStreak(u.name) : 0);
+        const st = (typeof getUserStreakStatus === 'function') ? getUserStreakStatus(u.name) : { effectiveStreak: (u.streak || 0), state: 'NONE', rawStreak: (u.streak || 0) };
+        let streakLabel = `🔥 Série: ${st.effectiveStreak} dní`;
+        if (st.state === 'FREEZABLE') streakLabel = `🧊 Série: ${st.effectiveStreak} dní (zachraň!)`;
+        else if (st.state === 'BROKEN') streakLabel = `💔 Série: 0 (bylo ${st.rawStreak})`;
         const coins = Number(u.coins || 0); const freezes = typeof getUserItemCount === 'function' ? getUserItemCount(u.name, "Zmrazeni") : 0;
         const hasPin = !!(u.pin || localStorage.getItem(`user_pin_${u.name.toLowerCase().trim()}`));
         let themesArr = typeof getUserUnlockedThemes === 'function' ? getUserUnlockedThemes(u.name) : [];
@@ -95,7 +98,7 @@ function _renderSelectUser(main, bSubj, bGroup) {
           <div class="tile" style="${isDone ? 'border-color:var(--col-yellow);' : ''} position:relative;" onclick="if(typeof selectUser === 'function') selectUser('${u.name.replace(/'/g, "\\'")}', ${g}, ${targetM})">
             ${hasPin ? `<div style="position:absolute; top:8px; right:8px; font-size:16px;">🔒</div>` : ''}
             <h2>${u.name}</h2><p>${g >= 10 && g < 90 ? `${g-9}. ročník SŠ` : (g<=9 ? `${g}. tř.` : 'Dospělý')}</p>
-            <p style="color:var(--col-orange);margin-top:4px;">🔥 Série: ${streakDays} dní</p>
+            <p style="color:var(--col-orange);margin-top:4px;cursor:pointer;text-decoration:underline dotted;" onclick="openStreakModal('${u.name.replace(/'/g, "\\'")}', event)">${streakLabel} 📅</p>
             <p style="color:${isDone ? 'var(--col-yellow)' : 'var(--col-text-muted)'};margin-top:2px;font-weight:bold;">⏱️ Dnes: ${uMin}/${targetM} min ${isDone?'★':''}</p>
             <p style="color:var(--col-text-muted);margin-top:4px;font-size:12px;background:rgba(0,0,0,0.2);padding:2px 6px;border-radius:6px;min-height:22px;">
               💰 ${coins} | 🧊 ${freezes}x | 🐍 ${u.maxSnake || 0}
@@ -557,3 +560,62 @@ function _renderSelectPexesoSize(main, bSubj, bGroup) {
     </div>
   `;
 }
+
+function renderStreakHistoryBox(userName) {
+  if (typeof getUserStreakStatus !== "function") return "";
+  const st = getUserStreakStatus(userName);
+
+  const daysHtml = st.days.map(d => {
+    let cls = "empty";
+    let icon = "·";
+    if (d.state === "DONE") { cls = "done"; icon = "🔥"; }
+    else if (d.state === "FREEZE") { cls = "freeze"; icon = "🧊"; }
+    else if (d.state === "PENDING_FREEZE") { cls = "freeze pending"; icon = "🧊"; }
+    else if (d.state === "MISSED") { cls = "missed"; icon = "💔"; }
+    else if (d.state === "TODAY_PENDING") { cls = "today"; icon = "⏳"; }
+
+    return `
+      <div class="streak-day ${cls}" title="${d.dateStr}: ${d.minutes}/${d.targetMin} min">
+        <div class="streak-day-name">${d.label}</div>
+        <div class="streak-day-icon">${icon}</div>
+        <div class="streak-day-min">${d.minutes}m</div>
+      </div>
+    `;
+  }).join('');
+
+  return `
+    <div style="background:var(--col-card); border:1px solid var(--col-card-border); border-radius:12px; padding:12px; margin-bottom:15px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+        <b style="font-size:15px; color:var(--col-orange);">🔥 Posledních 7 dní série</b>
+        <span style="font-size:12px; color:var(--col-active-tab);">🧊 Zmrazení: ${st.freezes}×</span>
+      </div>
+      <div class="streak-strip">${daysHtml}</div>
+      <div style="font-size:12px; color:var(--col-text-muted); text-align:center; margin-top:8px; line-height:1.35;">
+        ${st.message}
+      </div>
+      <div style="display:flex; justify-content:center; gap:10px; font-size:10px; color:var(--col-text-muted); margin-top:6px; opacity:0.85;">
+        <span>🔥 Splněno</span><span>🧊 Zmrazeno</span><span>💔 Vynecháno</span><span>⏳ Dnes</span>
+      </div>
+    </div>
+  `;
+}
+
+window.openStreakModal = function(userName, e) {
+  if (e) e.stopPropagation();
+  const existing = document.getElementById("streak-modal-overlay");
+  if (existing) existing.remove();
+
+  const overlay = document.createElement("div");
+  overlay.id = "streak-modal-overlay";
+  overlay.className = "streak-modal-backdrop";
+  overlay.onclick = () => overlay.remove();
+
+  overlay.innerHTML = `
+    <div class="streak-modal-card" onclick="event.stopPropagation()">
+      <h3 style="text-align:center; color:var(--col-yellow); margin-bottom:10px;">Přehled série: ${userName}</h3>
+      ${renderStreakHistoryBox(userName)}
+      <div class="action-btn" style="margin-top:4px; padding:10px;" onclick="document.getElementById('streak-modal-overlay').remove()">Zavřít</div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+};
