@@ -845,7 +845,7 @@ function _renderGameTarget(main) {
       return;
     }
 
-    const totalEligibleInLesson = getVocabItems().filter(it => it.question.replace(/\s*\([^)]*\)/g, '').trim().length <= 18).length;
+    const totalEligibleInLesson = getVocabItems().filter(it => it.question.replace(/\s*\([^)]*\)/g, '').trim().length <= 20).length;
     const diffFromPrev = (targetPrevBestTime && targetLastFinalTime) ? (targetPrevBestTime - targetLastFinalTime) : 0;
 
     main.innerHTML = `
