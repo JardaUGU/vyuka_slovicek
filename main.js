@@ -58,7 +58,7 @@ function applyAppSkin(skinId) {
   document.body.setAttribute('data-theme', s);
   localStorage.setItem('active_skin', s);
 }
-applyAppSkin(localStorage.getItem('active_skin') || 'default');
+applyAppSkin(localStorage.getItem('default');
 
 function previewSkin(skinId) { previewingSkin = skinId; document.body.setAttribute('data-theme', skinId); if(typeof renderScreen==='function') renderScreen(); }
 function cancelPreview() { previewingSkin = null; applyAppSkin(currentUser ? currentUser.activeTheme : 'default'); if(typeof renderScreen==='function') renderScreen(); }
@@ -142,6 +142,7 @@ function setUserPIN() {
   if (!currentUser) return;
   const newPin = prompt("Zadej nový číselný PIN (např. 1234). Pokud chceš PIN zrušit, nevyplňuj nic a dej OK:");
   if (newPin !== null) {
+     hideSystemKeyboard();
      const pinStr = newPin.trim(); const uKey = currentUser.name.toLowerCase().trim();
      const u = (appData.users || []).find(x => x.name.toLowerCase().trim() === uKey);
      if (u) u.pin = pinStr;
@@ -546,7 +547,10 @@ function updateStudyTimerUI() {
 
 function setScreen(scr) { 
   if (currentScreen === "SHOP" && scr !== "SHOP") cancelPreview();
-  currentScreen = scr; registerUserAction(); if(typeof renderScreen==='function') renderScreen(); 
+  currentScreen = scr; registerUserAction(); 
+  hideSystemKeyboard();
+  setTimeout(hideSystemKeyboard, 80);
+  if(typeof renderScreen==='function') renderScreen(); 
 }
 
 function selectUser(name, grade, targetMinutes) {
@@ -554,6 +558,8 @@ function selectUser(name, grade, targetMinutes) {
   const foundU = (appData.users || []).find(u => u.name.toLowerCase().trim() === uKey);
   const savedPin = (foundU && foundU.pin) ? foundU.pin : localStorage.getItem(`user_pin_${uKey}`);
   if (savedPin && savedPin !== "") {
+     hideSystemKeyboard();
+     setTimeout(hideSystemKeyboard, 80);
      const inputPin = prompt(`Profil ${name} je chráněn PINem. Zadejte heslo:`);
      if (inputPin === null) return; 
      if (inputPin !== savedPin) { alert("Nesprávné heslo!"); return; }
@@ -688,4 +694,15 @@ function triggerConfetti() {
         else ctx.clearRect(0, 0, canvas.width, canvas.height);
     }
     animate();
+}
+
+function hideSystemKeyboard() {
+  try {
+    if (document.activeElement && typeof document.activeElement.blur === "function") {
+      document.activeElement.blur();
+    }
+    if (navigator.virtualKeyboard && typeof navigator.virtualKeyboard.hide === "function") {
+      navigator.virtualKeyboard.hide();
+    }
+  } catch (e) {}
 }
