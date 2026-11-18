@@ -794,7 +794,7 @@ function _renderGameCampaign(main) {
              </div>`;
     
     html += `<div class="grid-2">`;
-    (task.opts||[]).forEach(opt => {
+    (task.opts||[]).forEach((opt, optIdx) => {
       let btnCls = "";
       if (isEval) {
         if (opt === task.correctAns) btnCls = "correct";
@@ -802,7 +802,7 @@ function _renderGameCampaign(main) {
       }
       if (/[\u0590-\u05FF]/.test(opt)) btnCls += " hebrew-text";
       let displayOpt = typeof formatPromptText === 'function' ? formatPromptText(String(opt)) : opt;
-      html += `<div class="opt-btn ${btnCls.trim()}" onclick="if(typeof clickCmpQuizOpt==='function') clickCmpQuizOpt('${String(opt).replace(/'/g, "\\'")}')">${displayOpt}</div>`;
+      html += `<div class="opt-btn ${btnCls.trim()}" onclick="if(typeof clickCmpQuizOpt==='function') clickCmpQuizOpt(${optIdx})">${displayOpt}</div>`;
     });
     html += `</div>`;
 
@@ -845,7 +845,7 @@ function _renderGameTarget(main) {
       return;
     }
 
-    const totalEligibleInLesson = getVocabItems().filter(it => it.question.replace(/\s*\([^)]*\)/g, '').trim().length <= 18).length;
+    const totalEligibleInLesson = getVocabItems().filter(it => it.question.replace(/\s*\([^)]*\)/g, '').trim().length <= 20).length;
     const diffFromPrev = (targetPrevBestTime && targetLastFinalTime) ? (targetPrevBestTime - targetLastFinalTime) : 0;
 
     main.innerHTML = `

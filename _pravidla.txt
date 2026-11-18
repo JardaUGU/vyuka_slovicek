@@ -7,7 +7,7 @@ PRAVIDLA PRO ÚPRAVU KÓDU A CHOVÁNÍ APLIKACE
    - Před spuštěním nového čtení musí speakWord() vždy vyčistit předchozí speakTimeoutId (clearTimeout), aby opožděný timeout předchozího slova nezrušil čtení nového slova (např. při rychlé střelbě na terč).
    - TTS NESMÍ číst české kontrolní otázky v příbězích (mají options, ale chybí v nich "___") a nikdy nečte v předmětu Matematika.
    - TTS NESMÍ číst obsah kulatých závorek (např. v němčině "Sie (ona)").
-   - Zvuková funkce sndOk(showStar = true) zobrazuje plovoucí hvězdu (+1 ★) pouze tehdy, když showStar není false (při klikání na jednotlivá písmena ve Skládání se volá sndOk(false), hvězda vyskočí až po složení celého slova).
+   
 
 2. HERNÍ LOGIKA (game_*.js):
    - "Řada na čas" (SEQ) NESMÍ používat FIFO! Tlačítka se míchají jen jednou na začátku (s mezerami v pořadí), po kliknutí se doplní nové slovo přímo do uvolněného slotu a na konci sloty mizí.
@@ -20,11 +20,11 @@ PRAVIDLA PRO ÚPRAVU KÓDU A CHOVÁNÍ APLIKACE
    - Zlomky se vykreslují přes CSS flexbox vertikálně (čitatel, čára, jmenovatel). Mínusy a plusy ve výrazu se MUSÍ nahrazovat mezerami PŘED vygenerováním HTML zlomku (jinak se rozbije CSS "inline-flex"). Formát [a/b] v textu úloh převádí funkce formatPromptText() na vertikální zlomek.
    - Při stisku klávesnice v matematice se aktualizuje pouze div "#math-keyboard-input" (nesmí se volat celé renderActiveGame, jinak skáče obrazovka).
    - Tlačítko mazání na klávesnici funguje jako Backspace (⌫ - maže poslední znak, má pevnou hnědou barvu #b45309 čitelnou i v Matrix skinu).
-   - V krokových zlomcích se mezivýsledky (i nekrácené nebo chybné) vždy zapisují do historie s komentářem (nepoužívat blokující alert).
+   - V krokových zlomcích se chybné nebo nekrácené matematické mezivýsledky vždy zapisují do historie s komentářem (nepoužívat blokující alert; alert se používá jen u syntakticky neplatného zápisu)
 
 4. OBCHOD, SÉRIE A NAVIGACE (main.js, game_core.js):
    - Zmrazení série (Streak Freeze) se reálně odečítá z inventáře uživatele za každý vynechaný den (jak na frontendu v main.js, tak na backendu v kod.gs ve funkci updateUserStreakInSheet).
-   - Kontrola denní série (Streak) vždy porovnává dnešek s nejnovějším datem splnění z obou zdrojů (Cloud `streakLastDate` vs. localStorage), aby při přechodu mezi zařízeními (např. iPhone -> Win11) nedocházelo k falešnému přerušení série. Výpočet rozdílu dnů používá fixní čas `T12:00:00Z` kvůli odolnosti vůči posunu času.
+   - Kontrola denní série (Streak) vždy porovnává dnešek s novějším z platných dat YYYY-MM-DD (Cloud streakLastDate vs. localStorage), přičemž data z Google Sheets se vždy normalizují přes Utilities.formatDate / parseDateOnlyStr (ochrana proti Date objektům a UTC posunu). Pokud má uživatel již přerušenou sérii bez zmrazení, zobrazuje se mu stav BROKEN / FREEZABLE ještě před splněním dnešního cíle.
    - Tlačítko Zpět (goBack) musí vždy zastavit běžící časovače her (stopArcadeLoop, stopSnakeLoop, stopPexesoTimeout, stopTargetTimer) a rozlišovat kontext: z příběhu, kampaně a minihry vrací na CAMPAIGN_HUB (pokud jde o kampaňový předmět) nebo SELECT_GAME (u běžného předmětu), z matematiky na SELECT_MATH_OP, z běžné hry na SELECT_GAME.
    - Při odchodu z obchodu jakýmkoliv způsobem se musí zrušit neuložený náhled skinu (cancelPreview).
    - Ve světlém skinu (Arctic) nesmí být u textů úloh natvrdo "color: #fff", používá se "color: inherit".
@@ -36,7 +36,7 @@ PRAVIDLA PRO ÚPRAVU KÓDU A CHOVÁNÍ APLIKACE
 
 5.2. Výběr uživatele (SELECT_USER)
    - Dvousloupcová mřížka uživatelů.
-   - Dlaždice uživatele: Jméno, vpravo nahoře ikona 🔒 (pokud má nastaven PIN), ročník/třída, "🔥 Série: X dní", "⏱️ Dnes: X/15 min" (bere maximum z localStorage a cloudu, při splnění žlutě s ★), dole přehled "💰 zlaťáky | 🧊 zmrazení | 🐍 rekord hada" a ikony odemčených skinů.
+   - Dlaždice uživatele a Průkaz studenta (SHOP) zobrazují stav série a po kliknutí (resp. přímo v Průkazu) vykreslují 7denní historii série (🔥 splněno, 🧊 zachráněno zmrazením, 💔 vynecháno, ⏳ dnešek rozpracován) včetně informace o počtu dostupných zmrazení.
    - Kliknutí na zamčeného uživatele vyžádá PIN.
 
 5.3. Výběr předmětu (SELECT_SUBJECT)
@@ -48,7 +48,7 @@ PRAVIDLA PRO ÚPRAVU KÓDU A CHOVÁNÍ APLIKACE
    - Sekce Průkaz studenta: statistiky (počet zlatých úloh na 2 ★, počet přečtených příběhů, rekord Hada).
    - Sekce Ochrana profilu: nastavení nebo zrušení číselného PINu (ukládá se do sloupce PIN v Google Sheets s apostrofem proti umazání nul).
    - Sekce Zmrazení série: zobrazení počtu kusů a tlačítko nákupu (20 💰).
-   - Sekce Vzhledy: seznam skinů, tlačítka "👁️ Náhled", "Koupit (X 💰)", "Nasadit" nebo štítek "✅ Aktivní".
+   - Sekce Vzhledy: seznam skinů, tlačítko "👁️ Náhled" (po jeho otevření "Zrušit náhled" a "Koupit (X 💰)"), dále "Nasadit" nebo štítek "✅ Aktivní".
 
 5.5. Kampaň / Cesta (CAMPAIGN_HUB)
    - U jazykových kampaní zobrazuje nahoře ukazatel úrovně CEFR (A1, A2, B1, B2) s bargrafem celkového postupu kurzem.
@@ -111,6 +111,7 @@ PRAVIDLA PRO ÚPRAVU KÓDU A CHOVÁNÍ APLIKACE
    - Pohyb a rychlost: na startu had stojí a čeká na první tah (pokud hráč stiskne směr dozadu, had se na startu otočí a vyjede). Výchozí rychlost 220 ms/krok. Každá 3 složená slova zvýší level a zrychlí pohyb o 15 ms (maximálně na 110 ms/krok).
    - Životy a smrt: start se 3 ❤️. Náraz do vlastního těla nebo snězení špatného písmene ubere 1 ❤️, zastaví hada na místě nehody a čeká na změnu směru. Při ztrátě posledního ❤️ se smyčka zastaví a zobrazí se GAME OVER.
    - Štít (🛡️): chrání hada po dobu 20 sebraných písmen před nárazem do vlastního ocasu i před snězením špatného písmene (při nárazu do špatného písmene hada pouze zastaví a vypíše varování). Štít lze koupit za 1 ❤️ (pokud má hráč > 1 ❤️) nebo při posledním ❤️ za 15 💰. Jakmile štít vyprší na 0, hra se pozastaví a zobrazí překryvný dialog s možností koupit další štít nebo pokračovat bez štítu.
+   - Nejdelší dosažený had (maxSnake) se ukládá pouze při čisté hře bez použití štítu a dokoupených životů. Štít na 20 písmen lze koupit před startem či během hry za 1 💰 (případně za 1 ❤️ při > 1 ❤️); před startem lze koupit +1 ❤️ za 1 💰 a po vypršení životů oživení (+1 ❤️ za 1 💰 nebo +5 ❤️ za 3 💰).
 
 7.6. Padající slova (ARCADE - game_arcade.js)
    - Akční hra: shora padá kartička se slovem (v prostředních 40 % šířky obrazovky), dole jsou velká tlačítka rychlé volby. Hráč má 3 ❤️.
@@ -135,7 +136,7 @@ PRAVIDLA PRO ÚPRAVU KÓDU A CHOVÁNÍ APLIKACE
    - Spouští se z mapy (CAMPAIGN_HUB) pro předměty obsahující v názvu "cesta", "postupn" nebo "inteligentn".
    - Automatický výběr lekce: najde první lekci (počínaje nastaveným Start_Předmět uživatele), ve které je celkové zvládnutí (SLOVO i KVIZ) < 85 %.
    - Sestavení tréninkové fronty (max 40 úloh) v pevném pedagogickém pořadí:
-     1) Opakování (qRevision): max 5 náhodných slov ze starších lekcí.
+     1) Opakování (qRevision): přednostně až 8 nedokončených položek (SLOVO i KVIZ s < 2 ★) od nejstarší nehotové lekce (od Start_Předmět výše) tak, aby se starší lekce postupně dočistily na 100 %; pokud jsou všechny na 100 %, zařadí 3 náhodná starší slova. Aktuální lekce bere max 8 slov (0 ★ před 1 ★) a max 6 kvízů, celková fronta je do 40 úloh a každá položka může v jednom spuštění kampaně postoupit max o +1 ★ za směr.
      2) Nová slovíčka pasivně (qNewPassive): jednoslovné z aktuální lekce (Cizí ➔ CZ; u cizích jazyků se zapnutým TTS je 35 % z nich formou poslechové výzvy 🎧 bez psaného textu).
      3) Nová slovíčka aktivně (qNewActive): jednoslovné z aktuální lekce (CZ ➔ Cizí).
      4) Gramatika (qGrammar): všechny úlohy typu "KVIZ" z aktuální lekce.
@@ -171,6 +172,7 @@ PRAVIDLA PRO ÚPRAVU KÓDU A CHOVÁNÍ APLIKACE
 
 8. STRUKTURA DAT V GOOGLE SHEETS (kod.gs):
    - List "Uzivatele": Jmeno | Trida | DenniCilMinut | Streak | StreakLastDate | Zlataky | Item_Zmrazeni | Start_Angli... | Skiny | AktivniSkin | PIN | MaxSnake (sloupce od 7. dál se hledají a vytvářejí dynamicky podle názvu hlavičky přes ensureColumn).
+   - List "Uzivatele": přidat popis dynamického sloupce StreakFreezeDates (čárkou oddělená data YYYY-MM-DD za posledních 30 dní, kdy bylo spotřebováno zmrazení) a v doGet předávání dailyHistory (mapa minut za posledních 10 dní z listu Aktivita).
    - List "Pokrok": Uzivatel | Predmet | Lekce | Tema | Polozka | Uroven (0-2) | Datum | Smer (DIR_OUT, DIR_IN, STORY).
    - List "Aktivita": Datum | Uzivatel | Predmet | Sekce | Minuty (celkový denní čas zařízení) | Hvezdy. Backend z tohoto listu bere vždy MAXIMUM dosažených denních minut uživatele (nikoliv součet!) a při překročení DenniCilMinut aktualizuje Streak v listu Uzivatele (při vynechání dne reálně odečte Item_Zmrazeni v tabulce).
    - Noční údržba (cleanupOldActivity v kod.gs): Časový spouštěč (Trigger) každou noc automaticky maže z listu Aktivita záznamy starší než 10 dní.

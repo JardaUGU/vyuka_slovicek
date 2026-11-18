@@ -85,7 +85,10 @@ function _renderSelectUser(main, bSubj, bGroup) {
         const uSec = Math.max(localSec, cloudSec);
         
         const uMin = Math.floor(uSec / 60); const targetM = u.targetMinutes || 15; const isDone = uMin >= targetM;
-        const streakDays = (u.streak !== undefined) ? u.streak : (typeof getUserStreak === 'function' ? getUserStreak(u.name) : 0);
+        const st = (typeof getUserStreakStatus === 'function') ? getUserStreakStatus(u.name) : { effectiveStreak: (u.streak || 0), state: 'NONE', rawStreak: (u.streak || 0) };
+        let streakLabel = `🔥 Série: ${st.effectiveStreak} dní`;
+        if (st.state === 'FREEZABLE') streakLabel = `🧊 Série: ${st.effectiveStreak} dní (zachraň!)`;
+        else if (st.state === 'BROKEN') streakLabel = `💔 Série: 0 (bylo ${st.rawStreak})`;
         const coins = Number(u.coins || 0); const freezes = typeof getUserItemCount === 'function' ? getUserItemCount(u.name, "Zmrazeni") : 0;
         const hasPin = !!(u.pin || localStorage.getItem(`user_pin_${u.name.toLowerCase().trim()}`));
         let themesArr = typeof getUserUnlockedThemes === 'function' ? getUserUnlockedThemes(u.name) : [];
@@ -95,7 +98,7 @@ function _renderSelectUser(main, bSubj, bGroup) {
           <div class="tile" style="${isDone ? 'border-color:var(--col-yellow);' : ''} position:relative;" onclick="if(typeof selectUser === 'function') selectUser('${u.name.replace(/'/g, "\\'")}', ${g}, ${targetM})">
             ${hasPin ? `<div style="position:absolute; top:8px; right:8px; font-size:16px;">🔒</div>` : ''}
             <h2>${u.name}</h2><p>${g >= 10 && g < 90 ? `${g-9}. ročník SŠ` : (g<=9 ? `${g}. tř.` : 'Dospělý')}</p>
-            <p style="color:var(--col-orange);margin-top:4px;">🔥 Série: ${streakDays} dní</p>
+            <p style="color:var(--col-orange);margin-top:4px;cursor:pointer;text-decoration:underline dotted;" onclick="openStreakModal('${u.name.replace(/'/g, "\\'")}', event)">${streakLabel} 📅</p>
             <p style="color:${isDone ? 'var(--col-yellow)' : 'var(--col-text-muted)'};margin-top:2px;font-weight:bold;">⏱️ Dnes: ${uMin}/${targetM} min ${isDone?'★':''}</p>
             <p style="color:var(--col-text-muted);margin-top:4px;font-size:12px;background:rgba(0,0,0,0.2);padding:2px 6px;border-radius:6px;min-height:22px;">
               💰 ${coins} | 🧊 ${freezes}x | 🐍 ${u.maxSnake || 0}
@@ -122,12 +125,11 @@ function _renderSelectSubject(main, bSubj, bGroup) {
   const skinCount = unlocked.length;
 
   let html = `
-    <div class="filter-bar">
-      <span>Filtr: ${typeof filterExactGradeOnly !== 'undefined' && filterExactGradeOnly ? 'Jen ' + userG + '. třída' : 'Všechny ročníky'}</span>
-      <button class="toggle-btn ${typeof filterExactGradeOnly !== 'undefined' && filterExactGradeOnly ? 'on' : ''}" onclick="if(typeof filterExactGradeOnly !== 'undefined') { filterExactGradeOnly=!filterExactGradeOnly; renderScreen(); }">
-        ${typeof filterExactGradeOnly !== 'undefined' && filterExactGradeOnly ? 'Jen má třída' : 'Všechny ročníky'}
-      </button>
-    </div>
+    ${userG >= 90 ? `
+      <div class="filter-bar">
+        <span>👑 Režim Dospělý: Vidíš úlohy ze všech ročníků</span>
+      </div>
+    ` : ''}
 
     <div class="tile" style="border-color:var(--col-yellow);margin-bottom:10px;padding:12px 14px;cursor:pointer;" onclick="if(typeof setScreen==='function') setScreen('SHOP')">
       <div style="display:flex;align-items:center;justify-content:space-between;width:100%;">
@@ -212,6 +214,7 @@ function _renderShop(main, bSubj, bGroup) {
             </div>
          </div>
       </div>
+      ${typeof renderStreakHistoryBox === 'function' ? renderStreakHistoryBox(currentUser.name) : ''}
 
       <div style="background:var(--col-card);border:1px solid var(--col-card-border);border-radius:12px;padding:14px;margin-bottom:15px;display:flex;justify-content:space-between;align-items:center;">
          <div><b style="font-size:16px;">🔐 Ochrana profilu</b><p style="font-size:12px;color:var(--col-text-muted);margin-top:2px;">Zamez ostatním ve vstupu do tvého účtu.</p></div>
@@ -321,7 +324,7 @@ function _renderCampaignHub(main, bSubj, bGroup) {
   let lessons = [...new Set(vItems.map(it => it.lesson))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
 
   let userMinLvl = 1;
-  const subjNorm = selectedSubject.toLowerCase().replace(/[^a-z]/g, ""); 
+  const subjNorm = selectedSubject.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z]/g, ""); 
   if (currentUser && currentUser.startLevels) {
     for (let k in currentUser.startLevels) { if (subjNorm.includes(k) || k.includes(subjNorm)) { userMinLvl = Number(currentUser.startLevels[k]) || 1; break; } }
   }
@@ -332,14 +335,21 @@ function _renderCampaignHub(main, bSubj, bGroup) {
     if (num <= userMinLvl) currentLessonIndex = i;
   }
 
+  const itemsByLesson = {};
+  activeItems.forEach(it => {
+    if (!it.lesson) return;
+    if (!itemsByLesson[it.lesson]) itemsByLesson[it.lesson] = [];
+    itemsByLesson[it.lesson].push(it);
+  });
+
+  const lessonPcts = lessons.map(l =>
+    (typeof getGroupMasteryPercent === "function") ? getGroupMasteryPercent(itemsByLesson[l] || [], selectedSubject) : 0
+  );
+
   for (let i = currentLessonIndex; i < lessons.length; i++) {
-    let lItems = activeItems.filter(it => it.lesson === lessons[i]);
-    let pct = (typeof getGroupMasteryPercent === "function") ? getGroupMasteryPercent(lItems, selectedSubject) : 0;
-    
-    // Lekce je považována za dokončenou až při zvládnutí na 85 %!
-    if (pct < 85) {
-        currentLessonIndex = i;
-        break;
+    if (lessonPcts[i] < 85) {
+      currentLessonIndex = i;
+      break;
     }
     currentLessonIndex = i;
   }
@@ -348,7 +358,7 @@ function _renderCampaignHub(main, bSubj, bGroup) {
   if (/angli|nemc|spanel|franc|ital/i.test(subjNorm)) {
      const cefrPct = Math.min(100, Math.max(0, Math.round((currentLessonIndex / Math.max(1, lessons.length - 1)) * 100)));
      cefrHtml = `
-       <div style="width: 100%; max-width: 320px; margin: 5px auto 25px auto;">
+       <div style="width: 100%; max-width: 320px; margin: 5px auto 14px auto;">
          <div style="display:flex; justify-content:space-between; font-size:11px; margin-bottom:5px; font-weight:bold;">
             <span style="color:${cefrPct<25?'var(--col-text)':'var(--col-text-muted)'};">A1</span>
             <span style="color:${cefrPct>=25&&cefrPct<50?'var(--col-text)':'var(--col-text-muted)'};">A2</span>
@@ -361,6 +371,21 @@ function _renderCampaignHub(main, bSubj, bGroup) {
        </div>
      `;
   }
+
+  const activeLessonName = lessons[currentLessonIndex] || "";
+  const activeLessonPct = lessonPcts[currentLessonIndex] || 0;
+  const activeProgressHtml = activeLessonName ? `
+    <div style="width:100%; max-width:320px; margin: 0 auto 18px auto; background:var(--col-card); border:1px solid var(--col-card-border); border-radius:10px; padding:8px 12px; text-align:left;">
+      <div style="display:flex; justify-content:space-between; font-size:12px; font-weight:bold; margin-bottom:5px;">
+        <span style="color:var(--col-yellow);">📍 ${activeLessonName}</span>
+        <span style="color:var(--col-active-tab);">${activeLessonPct} % <span style="color:var(--col-text-muted);font-weight:normal;">(cíl 85 %)</span></span>
+      </div>
+      <div class="bargraph-track" style="height:8px; position:relative;">
+        <div class="bargraph-fill" style="width:${activeLessonPct}%;"></div>
+        <div style="position:absolute; left:85%; top:0; bottom:0; width:2px; background:var(--col-yellow); opacity:0.9;" title="Hranice odemčení dalšího levelu: 85 %"></div>
+      </div>
+    </div>
+  ` : '';
 
   let storiesByLesson = {};
   const userG = parseInt(currentUser.grade) || 2;
@@ -392,6 +417,7 @@ function _renderCampaignHub(main, bSubj, bGroup) {
     let isCompleted = i < currentLessonIndex;
     let isActive = i === currentLessonIndex;
     let isLocked = i > currentLessonIndex;
+    let pct = lessonPcts[i] || 0;
     
     let cx = CENTER_X + offsetsX[i % offsetsX.length]; let cy = nodeYPositions[i];
     let cmd = i === 0 ? "M" : "L";
@@ -400,6 +426,21 @@ function _renderCampaignHub(main, bSubj, bGroup) {
     
     let nodeClass = isActive ? "active" : (isCompleted ? "completed" : "locked");
     let icon = isActive ? "▶️" : (isCompleted ? "⭐" : "🔒");
+    let labelText = (isActive || isCompleted) ? `${l} · ${pct} %` : l;
+
+    let activeRingHtml = "";
+    if (isActive) {
+      const r = 50;
+      const circ = 2 * Math.PI * r;
+      const offset = circ * (1 - Math.min(100, Math.max(0, pct)) / 100);
+      activeRingHtml = `
+        <svg width="110" height="110" viewBox="0 0 110 110" style="position:absolute; left:50%; top:50%; transform:translate(-50%, -50%) rotate(-90deg); pointer-events:none; z-index:1;">
+          <circle cx="55" cy="55" r="${r}" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="5" />
+          <circle cx="55" cy="55" r="${r}" fill="none" stroke="var(--col-yellow)" stroke-width="5" stroke-linecap="round"
+                  stroke-dasharray="${circ.toFixed(1)}" stroke-dashoffset="${offset.toFixed(1)}" />
+        </svg>
+      `;
+    }
     
     let storyHtml = "";
     if (storiesByLesson[l]) {
@@ -407,7 +448,6 @@ function _renderCampaignHub(main, bSubj, bGroup) {
            let isDone = (typeof isStoryCompleted === "function") && isStoryCompleted(story.title, story.items);
            let storyClass = isDone ? "done" : ""; let storyIcon = isDone ? "📖" : "🎁";
            let storySide = cx <= CENTER_X ? `left: 100%; margin-left: 14px;` : `right: 100%; margin-right: 14px;`;
-           // OPRAVA (Bod 4): event.stopPropagation() zabrání spuštění lekce pod příběhem!
            let clickAction = isLocked 
              ? `event.stopPropagation(); alert('Tento příběh se odemkne, až se dostaneš do této lekce.');` 
              : `event.stopPropagation(); if(typeof startStory==='function') startStory('${story.title.replace(/'/g, "\\'")}');`;
@@ -420,12 +460,12 @@ function _renderCampaignHub(main, bSubj, bGroup) {
 
     mapNodesHtml += `
       <div class="map-node ${nodeClass}" ${isActive ? 'id="active-lesson-node"' : ''} style="position: absolute; left: ${cx}px; top: ${cy}px; transform: translate(-50%, -50%); z-index: 2;" onclick="${clickAction}">
-         <div class="map-label ${isActive ? 'active' : ''}">${l}</div>${icon}${storyHtml}
+         ${activeRingHtml}<div class="map-label ${isActive ? 'active' : ''}">${labelText}</div>${icon}${storyHtml}
       </div>`;
   });
 
   main.innerHTML = `
-    <div style="text-align:center; padding:15px 10px 0 10px;"><h2 style="color:var(--col-active-tab);font-size:26px;margin-bottom:8px;">Cesta k mistrovství</h2>${cefrHtml}</div>
+    <div style="text-align:center; padding:15px 10px 0 10px;"><h2 style="color:var(--col-active-tab);font-size:26px;margin-bottom:8px;">Cesta k mistrovství</h2>${cefrHtml}${activeProgressHtml}</div>
     <div style="position: relative; width: ${MAP_WIDTH}px; height: ${svgHeight}px; margin: 0 auto; overflow: visible;">
        <svg width="${MAP_WIDTH}" height="${svgHeight}" style="position:absolute; top:0; left:0; z-index:1; pointer-events:none;">
           <path d="${pathStringAll}" stroke="var(--col-card-border)" stroke-width="24" fill="none" stroke-linejoin="round" stroke-linecap="round" />
@@ -558,3 +598,62 @@ function _renderSelectPexesoSize(main, bSubj, bGroup) {
     </div>
   `;
 }
+
+function renderStreakHistoryBox(userName) {
+  if (typeof getUserStreakStatus !== "function") return "";
+  const st = getUserStreakStatus(userName);
+
+  const daysHtml = st.days.map(d => {
+    let cls = "empty";
+    let icon = "·";
+    if (d.state === "DONE") { cls = "done"; icon = "🔥"; }
+    else if (d.state === "FREEZE") { cls = "freeze"; icon = "🧊"; }
+    else if (d.state === "PENDING_FREEZE") { cls = "freeze pending"; icon = "🧊"; }
+    else if (d.state === "MISSED") { cls = "missed"; icon = "💔"; }
+    else if (d.state === "TODAY_PENDING") { cls = "today"; icon = "⏳"; }
+
+    return `
+      <div class="streak-day ${cls}" title="${d.dateStr}: ${d.minutes}/${d.targetMin} min">
+        <div class="streak-day-name">${d.label}</div>
+        <div class="streak-day-icon">${icon}</div>
+        <div class="streak-day-min">${d.minuteLabel || (d.minutes + 'm')}</div>
+      </div>
+    `;
+  }).join('');
+
+  return `
+    <div style="background:var(--col-card); border:1px solid var(--col-card-border); border-radius:12px; padding:12px; margin-bottom:15px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+        <b style="font-size:15px; color:var(--col-orange);">🔥 Posledních 7 dní série</b>
+        <span style="font-size:12px; color:var(--col-active-tab);">🧊 Zmrazení: ${st.freezes}×</span>
+      </div>
+      <div class="streak-strip">${daysHtml}</div>
+      <div style="font-size:12px; color:var(--col-text-muted); text-align:center; margin-top:8px; line-height:1.35;">
+        ${st.message}
+      </div>
+      <div style="display:flex; justify-content:center; gap:10px; font-size:10px; color:var(--col-text-muted); margin-top:6px; opacity:0.85;">
+        <span>🔥 Splněno</span><span>🧊 Zmrazeno</span><span>💔 Vynecháno</span><span>⏳ Dnes</span>
+      </div>
+    </div>
+  `;
+}
+
+window.openStreakModal = function(userName, e) {
+  if (e) e.stopPropagation();
+  const existing = document.getElementById("streak-modal-overlay");
+  if (existing) existing.remove();
+
+  const overlay = document.createElement("div");
+  overlay.id = "streak-modal-overlay";
+  overlay.className = "streak-modal-backdrop";
+  overlay.onclick = () => overlay.remove();
+
+  overlay.innerHTML = `
+    <div class="streak-modal-card" onclick="event.stopPropagation()">
+      <h3 style="text-align:center; color:var(--col-yellow); margin-bottom:10px;">Přehled série: ${userName}</h3>
+      ${renderStreakHistoryBox(userName)}
+      <div class="action-btn" style="margin-top:4px; padding:10px;" onclick="document.getElementById('streak-modal-overlay').remove()">Zavřít</div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+};

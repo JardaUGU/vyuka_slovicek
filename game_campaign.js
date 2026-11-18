@@ -14,6 +14,22 @@ let isCampaignMinigame = false;
 let campaignMinigameCoins = 0;
 let campaignMinigamePool = [];
 
+let cmpCapOneLevelPerSession = false;
+let cmpSessionAdvanced = new Set();
+
+function advanceCmpMastery(question, dir, step = 1) {
+  const advKey = `${question}:::${dir}`;
+  if (cmpCapOneLevelPerSession) {
+    if (cmpSessionAdvanced.has(advKey)) return;
+    cmpSessionAdvanced.add(advKey);
+    step = 1;
+  }
+  const cur = getSavedMastery(question, dir);
+  if (cur < 2) {
+    saveWordMasteryToGoogle(question, Math.min(2, cur + step), dir);
+  }
+}
+
 // Inteligentní generátor falešných odpovědí pro Matematiku (zachovává jednotky i formát zlomků)
 function generateMathDistractors(correctStr, fallbackPool) {
   const s = String(correctStr).trim();
@@ -76,6 +92,9 @@ function startSmartMix() {
   if (typeof stopArcadeLoop === "function") stopArcadeLoop();
   if (typeof stopSnakeLoop === "function") stopSnakeLoop();
   if (typeof stopTargetTimer === "function") stopTargetTimer();
+
+  cmpCapOneLevelPerSession = false;
+  cmpSessionAdvanced = new Set();
 
   const allItems = activeItems.filter(it => 
     (typeof viewMode !== 'undefined' && viewMode === "LESSONS" ? it.lesson : it.topic) === selectedGroupKey
@@ -222,45 +241,118 @@ function startSmartMix() {
     speakWord(cmpQueue[0].data.question, selectedSubject);
   }
 }
-
-// ==========================================
-// SPIRÁLOVÁ KAMPAŇ (CESTA)
-// ==========================================
 function startCampaign() {
   if (typeof stopArcadeLoop === "function") stopArcadeLoop();
   if (typeof stopSnakeLoop === "function") stopSnakeLoop();
   if (typeof stopTargetTimer === "function") stopTargetTimer();
 
+  cmpCapOneLevelPerSession = true;
+  cmpSessionAdvanced = new Set();
+
   let q = [];
   let allVItems = getVocabItems();
   let allQItems = getQuizItems();
 
+  // Zjistíme startovní lekci uživatele (Start_...) a seřadíme lekce od nejstarší
+  const subjNorm = selectedSubject.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z]/g, "");
+  let userMinLvl = 1;
+  if (currentUser && currentUser.startLevels) {
+    for (let k in currentUser.startLevels) {
+      if (subjNorm.includes(k) || k.includes(subjNorm)) {
+        userMinLvl = Number(currentUser.startLevels[k]) || 1;
+        break;
+      }
+    }
+  }
+
+  const allLessonsSorted = [...new Set(allVItems.map(it => it.lesson))].sort((a, b) =>
+    a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })
+  );
+  let startLessonIdx = 0;
+  for (let i = 0; i < allLessonsSorted.length; i++) {
+    let num = parseInt(allLessonsSorted[i].replace(/\D/g, '')) || 1;
+    if (num <= userMinLvl) startLessonIdx = i;
+  }
+  const curLessonIdx = allLessonsSorted.indexOf(selectedGroupKey);
+  const olderLessonNames = (curLessonIdx > startLessonIdx)
+    ? allLessonsSorted.slice(startLessonIdx, curLessonIdx)
+    : [];
+
   let currentVItems = allVItems.filter(it => it.lesson === selectedGroupKey);
-  let olderVItems = allVItems.filter(it => it.lesson !== selectedGroupKey && (parseInt(it.lesson.replace(/\D/g, ''))||1) < (parseInt(selectedGroupKey.replace(/\D/g, ''))||1));
+  let olderVItems = allVItems.filter(it => olderLessonNames.includes(it.lesson));
   let currentQItems = allQItems.filter(it => it.lesson === selectedGroupKey);
+  let olderQItems = allQItems.filter(it => olderLessonNames.includes(it.lesson));
 
   let qRevision = []; let qNewPassive = []; let qNewActive = []; let qGrammar = []; let qSentences = [];
 
-  if (olderVItems.length > 0) {
-      let shuffledOlder = olderVItems.sort(() => Math.random() - 0.5).slice(0, 5);
-      shuffledOlder.forEach(it => {
-          if (it.question.trim().includes(' ')) qRevision.push({ type: 'SCRAMBLE', data: it, wave: 1 });
-          else qRevision.push({ type: 'QUIZ_IN', data: it, wave: 1 });
-      });
+  // 1. DOČIŠŤOVÁNÍ STARŠÍCH LEKCÍ OD NEJSTARŠÍ (< 100 %)
+  let unmasteredOlderTasks = [];
+  for (let lName of olderLessonNames) {
+    if (unmasteredOlderTasks.length >= 8) break;
+
+    const lWords = olderVItems.filter(it => it.lesson === lName);
+    const lQuizzes = olderQItems.filter(it => it.lesson === lName);
+
+    for (let it of lWords) {
+      if (unmasteredOlderTasks.length >= 8) break;
+      const mIn = getSavedMastery(it.question, 'DIR_IN');
+      const mOut = getSavedMastery(it.question, 'DIR_OUT');
+      if (mIn < 2 || mOut < 2) {
+        const isMulti = it.question.trim().includes(' ') || it.question.trim().includes('-');
+        let taskType = 'QUIZ_IN';
+        if (isMulti) {
+          taskType = 'SCRAMBLE';
+        } else if (mOut < 2 && mIn >= 2) {
+          taskType = Math.random() < 0.5 ? 'QUIZ_OUT' : 'SCRAMBLE';
+        } else if (mIn < 2 && mOut >= 2) {
+          taskType = 'QUIZ_IN';
+        } else {
+          taskType = Math.random() < 0.5 ? 'QUIZ_IN' : 'QUIZ_OUT';
+        }
+        unmasteredOlderTasks.push({ type: taskType, data: it, wave: 1 });
+      }
+    }
+
+    for (let qIt of lQuizzes) {
+      if (unmasteredOlderTasks.length >= 8) break;
+      if (getSavedMastery(qIt.question, 'DIR_OUT') < 2) {
+        unmasteredOlderTasks.push({ type: 'KVIZ', data: qIt, wave: 1 });
+      }
+    }
   }
 
+  if (unmasteredOlderTasks.length > 0) {
+    qRevision = unmasteredOlderTasks;
+  } else if (olderVItems.length > 0) {
+    // Všechny starší lekce jsou na 100 % -> jen lehké udržovací opakování
+    let shuffledOlder = [...olderVItems].sort(() => Math.random() - 0.5).slice(0, 3);
+    shuffledOlder.forEach(it => {
+      if (it.question.trim().includes(' ') || it.question.trim().includes('-')) {
+        qRevision.push({ type: 'SCRAMBLE', data: it, wave: 1 });
+      } else {
+        qRevision.push({ type: 'QUIZ_IN', data: it, wave: 1 });
+      }
+    });
+  }
+
+  // 2. AKTUÁLNÍ LEKCE (max 8 slov, přednost mají 0 ★ před 1 ★)
   let unmasteredVItems = currentVItems.filter(it => 
     getSavedMastery(it.question, 'DIR_IN') < 2 || getSavedMastery(it.question, 'DIR_OUT') < 2
   );
-  
-  let targetVItems = [...unmasteredVItems].sort(() => Math.random() - 0.5);
 
-  if (targetVItems.length < 15) {
+  unmasteredVItems.sort((a, b) => {
+    const scoreA = getSavedMastery(a.question, 'DIR_IN') + getSavedMastery(a.question, 'DIR_OUT');
+    const scoreB = getSavedMastery(b.question, 'DIR_IN') + getSavedMastery(b.question, 'DIR_OUT');
+    if (scoreA !== scoreB) return scoreA - scoreB;
+    return Math.random() - 0.5;
+  });
+
+  let targetVItems = [...unmasteredVItems];
+  if (targetVItems.length < 8) {
     let masteredVItems = currentVItems.filter(it => !unmasteredVItems.includes(it)).sort(() => Math.random() - 0.5);
     targetVItems = [...targetVItems, ...masteredVItems];
   }
-  
-  targetVItems = targetVItems.slice(0, 15);
+  targetVItems = targetVItems.slice(0, 8);
 
   targetVItems.forEach(it => {
       let forceTest = (getSavedMastery(it.question, 'DIR_IN') === 2 && getSavedMastery(it.question, 'DIR_OUT') === 2);
@@ -274,7 +366,14 @@ function startCampaign() {
       }
   });
 
-  currentQItems.forEach(it => qGrammar.push({ type: 'KVIZ', data: it, wave: 2 }));
+  // U kvízů aktuální lekce mají přednost nedokončené (< 2 ★), max 6
+  const sortedQuizzes = [...currentQItems].sort((a, b) => {
+    const ma = getSavedMastery(a.question, 'DIR_OUT');
+    const mb = getSavedMastery(b.question, 'DIR_OUT');
+    if (ma !== mb) return ma - mb;
+    return Math.random() - 0.5;
+  }).slice(0, 6);
+  sortedQuizzes.forEach(it => qGrammar.push({ type: 'KVIZ', data: it, wave: 2 }));
 
   qRevision.sort(() => Math.random() - 0.5); qNewPassive.sort(() => Math.random() - 0.5); 
   qNewActive.sort(() => Math.random() - 0.5); qGrammar.sort(() => Math.random() - 0.5); qSentences.sort(() => Math.random() - 0.5);
@@ -311,13 +410,11 @@ function startCampaign() {
        task.correctAns = correctAns;
        task.prompt = isOut ? cleanCzechTranslation(task.data.answer) : task.data.question;
 
-       // Poslechová výzva 🎧 pro 35 % pasivních otázek v cizích jazycích
        if (task.type === 'QUIZ_IN' && selectedSubject !== "Matematika" && typeof isAutoTTS !== "undefined" && isAutoTTS && getTargetLang(selectedSubject) !== 'cs-CZ') {
          if (Math.random() < 0.35) task.isAudioOnly = true;
        }
 
     } else if (task.type === 'SCRAMBLE') {
-       // OPRAVA: Odstranění závorek před rozpadem na kostičky i v Kampani
        const raw = task.data.question.replace(/\s*\([^)]*\)/g, '').trim();
        const isWordMode = (raw.split(/\s+/).length >= 3 || raw.length > 15);
        const tokens = isWordMode ? (raw.includes('-') ? raw.split('-').map(s=>s.trim()) : raw.split(/\s+/)) : getGraphemes(raw);
@@ -336,17 +433,18 @@ function startCampaign() {
     speakWord(cmpQueue[0].data.question, selectedSubject);
   }
 }
-
-function clickCmpQuizOpt(opt) {
+function clickCmpQuizOpt(optOrIdx) {
   if (cmpState !== 'PLAYING') return;
-  const task = cmpQueue[cmpIdx]; cmpChosenOpt = opt; cmpState = 'EVAL';
+  const task = cmpQueue[cmpIdx];
+  if (!task) return;
+  const opt = (typeof optOrIdx === 'number' && Array.isArray(task.opts)) ? task.opts[optOrIdx] : optOrIdx;
+  cmpChosenOpt = opt; cmpState = 'EVAL';
 
   if (opt === task.correctAns) {
     sndOk(false);
     if (task.type === 'QUIZ_OUT' || task.type === 'QUIZ_IN' || task.type === 'KVIZ') {
-      const dir = task.type === 'QUIZ_OUT' ? 'DIR_OUT' : (task.type === 'KVIZ' ? 'DIR_OUT' : 'DIR_IN');
-      const mVal = getSavedMastery(task.data.question, dir);
-      if (mVal < 2) saveWordMasteryToGoogle(task.data.question, mVal + 1, dir);
+      const dir = (task.type === 'QUIZ_OUT' || task.type === 'KVIZ') ? 'DIR_OUT' : 'DIR_IN';
+      advanceCmpMastery(task.data.question, dir, 1);
     }
   } else {
     sndErr(); cmpHearts = Math.max(0, cmpHearts - 1);
@@ -354,13 +452,14 @@ function clickCmpQuizOpt(opt) {
       cmpMistakes.push(task.data);
     }
     let newTask = JSON.parse(JSON.stringify(task));
-    newTask.isAudioOnly = false; // Při opravě chyby už ukážeme i psaný text
+    newTask.isAudioOnly = false;
     if (newTask.opts) newTask.opts.sort(() => Math.random() - 0.5);
     requeueFailedTask(newTask);
     
     if (task.type === 'QUIZ_OUT' || task.type === 'QUIZ_IN' || task.type === 'KVIZ') {
-        const dir = task.type === 'QUIZ_OUT' ? 'DIR_OUT' : (task.type === 'KVIZ' ? 'DIR_OUT' : 'DIR_IN');
+        const dir = (task.type === 'QUIZ_OUT' || task.type === 'KVIZ') ? 'DIR_OUT' : 'DIR_IN';
         saveWordMasteryToGoogle(task.data.question, 0, dir);
+        cmpSessionAdvanced.delete(`${task.data.question}:::${dir}`);
     }
   }
 
@@ -370,7 +469,6 @@ function clickCmpQuizOpt(opt) {
   }
   renderActiveGame();
 }
-
 function requeueFailedTask(newTask) {
   if (!newTask.wave) {
     cmpQueue.push(newTask);
@@ -402,10 +500,8 @@ function clickCmpScrambleTile(idx) {
       if (!task.hadMistake) {
         const isMultiWord = task.data.question.trim().includes(' ') || task.data.question.trim().includes('-');
         const step = isMultiWord ? 2 : 1;
-        const mIn = getSavedMastery(task.data.question, 'DIR_IN'); 
-        const mOut = getSavedMastery(task.data.question, 'DIR_OUT');
-        if (mIn < 2) saveWordMasteryToGoogle(task.data.question, Math.min(2, mIn + step), 'DIR_IN');
-        if (mOut < 2) saveWordMasteryToGoogle(task.data.question, Math.min(2, mOut + step), 'DIR_OUT');
+        advanceCmpMastery(task.data.question, 'DIR_IN', step);
+        advanceCmpMastery(task.data.question, 'DIR_OUT', step);
       }
     } else {
       const nextExpected = task.tokens[task.placed.length];

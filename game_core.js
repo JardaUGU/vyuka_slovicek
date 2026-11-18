@@ -13,7 +13,7 @@ function addReward(count = 1, section = "Lekce") {
       const fd = new URLSearchParams();
       fd.append("action", "log_activity"); fd.append("user", currentUser.name);
       fd.append("subject", selectedSubject); fd.append("section", section);
-      fd.append("stars", count); fd.append("minutes", (todaySecondsStudied / 60).toFixed(1));
+      fd.append("stars", count); fd.append("minutes", (todaySecondsStudied / 60).toFixed(2));
       fetch(API_URL, { method: "POST", mode: "no-cors", body: fd });
     } catch(e) {}
   }
@@ -45,6 +45,8 @@ function getGroupMasteryPercent(groupItems, subjName) {
 
 // Opravené tlačítko ZPĚT, které plně respektuje, z jakého předmětu jsme přišli
 function goBack() {
+  if (typeof seqTimerInterval !== "undefined" && seqTimerInterval) { clearInterval(seqTimerInterval); seqTimerInterval = null; }
+  if (typeof seqInactivityTimer !== "undefined" && seqInactivityTimer) { clearTimeout(seqInactivityTimer); seqInactivityTimer = null; }
   if (typeof stopArcadeLoop === "function") stopArcadeLoop();
   if (typeof stopSnakeLoop === "function") stopSnakeLoop();
   if (typeof stopPexesoTimeout === "function") stopPexesoTimeout();
