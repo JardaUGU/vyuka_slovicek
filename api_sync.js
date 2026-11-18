@@ -149,7 +149,7 @@ function sendTimeHeartbeatToGoogle() {
     fd.append("stars", 0); 
     fd.append("minutes", (todaySecondsStudied / 60).toFixed(2)); 
     fd.append("clientDate", getTodayDateStr());
-    fetch(API_URL, { method: "POST", mode: "no-cors", body: fd });
+    fetch(API_URL, { method: "POST", mode: "no-cors", body: fd, keepalive: true });
   } catch(e) {}
 }
 
