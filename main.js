@@ -58,7 +58,7 @@ function applyAppSkin(skinId) {
   document.body.setAttribute('data-theme', s);
   localStorage.setItem('active_skin', s);
 }
-applyAppSkin(localStorage.getItem('default');
+applyAppSkin('default');
 
 function previewSkin(skinId) { previewingSkin = skinId; document.body.setAttribute('data-theme', skinId); if(typeof renderScreen==='function') renderScreen(); }
 function cancelPreview() { previewingSkin = null; applyAppSkin(currentUser ? currentUser.activeTheme : 'default'); if(typeof renderScreen==='function') renderScreen(); }
@@ -557,10 +557,10 @@ function selectUser(name, grade, targetMinutes) {
   const uKey = name.toLowerCase().trim();
   const foundU = (appData.users || []).find(u => u.name.toLowerCase().trim() === uKey);
   const savedPin = (foundU && foundU.pin) ? foundU.pin : localStorage.getItem(`user_pin_${uKey}`);
-  if (savedPin && savedPin !== "") {
+ if (savedPin && savedPin !== "") {
+     const inputPin = prompt(`Profil ${name} je chráněn PINem. Zadejte heslo:`);
      hideSystemKeyboard();
      setTimeout(hideSystemKeyboard, 80);
-     const inputPin = prompt(`Profil ${name} je chráněn PINem. Zadejte heslo:`);
      if (inputPin === null) return; 
      if (inputPin !== savedPin) { alert("Nesprávné heslo!"); return; }
   }
