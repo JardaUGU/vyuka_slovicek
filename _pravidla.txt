@@ -136,7 +136,7 @@ PRAVIDLA PRO ÚPRAVU KÓDU A CHOVÁNÍ APLIKACE
    - Spouští se z mapy (CAMPAIGN_HUB) pro předměty obsahující v názvu "cesta", "postupn" nebo "inteligentn".
    - Automatický výběr lekce: najde první lekci (počínaje nastaveným Start_Předmět uživatele), ve které je celkové zvládnutí (SLOVO i KVIZ) < 85 %.
    - Sestavení tréninkové fronty (max 40 úloh) v pevném pedagogickém pořadí:
-     1) Opakování (qRevision): max 5 náhodných slov ze starších lekcí.
+     1) Opakování (qRevision): přednostně až 8 nedokončených položek (SLOVO i KVIZ s < 2 ★) od nejstarší nehotové lekce (od Start_Předmět výše) tak, aby se starší lekce postupně dočistily na 100 %; pokud jsou všechny na 100 %, zařadí 3 náhodná starší slova. Aktuální lekce bere max 8 slov (0 ★ před 1 ★) a max 6 kvízů, celková fronta je do 40 úloh a každá položka může v jednom spuštění kampaně postoupit max o +1 ★ za směr.
      2) Nová slovíčka pasivně (qNewPassive): jednoslovné z aktuální lekce (Cizí ➔ CZ; u cizích jazyků se zapnutým TTS je 35 % z nich formou poslechové výzvy 🎧 bez psaného textu).
      3) Nová slovíčka aktivně (qNewActive): jednoslovné z aktuální lekce (CZ ➔ Cizí).
      4) Gramatika (qGrammar): všechny úlohy typu "KVIZ" z aktuální lekce.
