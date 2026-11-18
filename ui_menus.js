@@ -579,7 +579,7 @@ function renderStreakHistoryBox(userName) {
       <div class="streak-day ${cls}" title="${d.dateStr}: ${d.minutes}/${d.targetMin} min">
         <div class="streak-day-name">${d.label}</div>
         <div class="streak-day-icon">${icon}</div>
-        <div class="streak-day-min">${d.minutes}m</div>
+        <div class="streak-day-min">${d.minuteLabel || (d.minutes + 'm')}</div>
       </div>
     `;
   }).join('');
