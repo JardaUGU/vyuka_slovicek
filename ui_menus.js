@@ -26,6 +26,11 @@ function renderScreen() {
     // HLAVNÍ SMĚROVAČ (ROUTER) OBRAZOVEK
     // ==========================================
     if (currentScreen === "SELECT_USER" || !currentUser) {
+   document.body.setAttribute('data-theme', 'default');
+ } else if (!(currentScreen === "SHOP" && typeof previewingSkin !== 'undefined' && previewingSkin)) {
+   document.body.setAttribute('data-theme', currentUser.activeTheme || 'default');
+ }
+    if (currentScreen === "SELECT_USER" || !currentUser) {
       _renderSelectUser(main, bSubj, bGroup);
     }
     else if (currentScreen === "SELECT_SUBJECT") {
