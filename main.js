@@ -416,7 +416,8 @@ function getUserStreakStatus(userName) {
       dState = 'MISSED';
     }
 
-    days.push({ dateStr: dStr, label: label, minutes: Math.floor(mins), targetMin: targetMin, state: dState });
+    const minuteLabel = (mins > 0 && mins < 1) ? '<1m' : `${Math.floor(mins)}m`;
+    days.push({ dateStr: dStr, label: label, minutes: Math.floor(mins), minuteLabel: minuteLabel, targetMin: targetMin, state: dState });
   }
 
   return { rawStreak, effectiveStreak, state, missedDays, freezes, lastCompleted, isTodayDone, days, message };
