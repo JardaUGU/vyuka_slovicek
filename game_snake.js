@@ -23,100 +23,80 @@ let snakeShieldLetters = 0;
 let snakeTouchStartX = 0, snakeTouchStartY = 0;
 let isSnakeWaitingForInput = true;
 let snakeUsedBoosts = false; // Sleduje, zda hráč použil štít nebo dokoupil životy (pro férový rekord)
+let snakeLessonHearts = 0; // Nevyužitá ❤️ z lekce Kampaně
 
-window.buySnakeShieldInGame = function(e) {
-  if (e) { e.preventDefault(); e.stopPropagation(); }
-  if (snakeLives > 1 && snakeShieldLetters <= 0) {
-    snakeLives--;
-    snakeShieldLetters = 20;
-    snakeUsedBoosts = true; // Použil vylepšení -> nepočítá se do rekordu
-    if (typeof sndFanfare === "function") sndFanfare();
-    
-    isSnakeWaitingForInput = true;
-    snakeState = "WAITING";
-    snakeStatusMsg = "🛡️ Štít aktivován! Potáhni nebo stiskni šipku.";
-    
-    if (typeof renderActiveGame === "function") renderActiveGame();
-    setTimeout(resizeSnakeCanvas, 10);
-    runSnakeLoop();
-  } else if (snakeLives <= 1) {
-    alert("Nemůžeš obětovat své poslední srdíčko! ❤️ Koupit štít můžeš za 1 zlaťák.");
+window.cashOutSnakeLessonHearts = function() {
+  if (snakeLessonHearts > 0) {
+    if (typeof currentUser !== "undefined" && currentUser && typeof addCoins === "function") {
+      addCoins(currentUser.name, snakeLessonHearts);
+    }
+    snakeLessonHearts = 0;
   }
+};
+
+window.buySnakeLifeWithCoins = function(livesToAdd, cost, e) {
+  if (e) { e.preventDefault(); e.stopPropagation(); }
+  if (typeof currentUser === "undefined" || !currentUser) return;
+  const coins = getUserCoins(currentUser.name);
+  if (coins < cost) { alert(`Potřebuješ ${cost} 🪙!`); return; }
+  addCoins(currentUser.name, -cost);
+  snakeLives += livesToAdd;
+  snakeUsedBoosts = true;
+  if (snakeState === "GAMEOVER") snakeState = "EQUIP_PAUSE";
+  if (typeof sndFanfare === "function") sndFanfare();
+  if (typeof renderActiveGame === "function") renderActiveGame();
+};
+
+window.buySnakeLifeWithHearts = function(livesToAdd, cost, e) {
+  if (e) { e.preventDefault(); e.stopPropagation(); }
+  if (snakeLessonHearts < cost) { alert(`Potřebuješ ${cost} ❤️ z lekce!`); return; }
+  snakeLessonHearts -= cost;
+  snakeLives += livesToAdd;
+  snakeUsedBoosts = true;
+  if (snakeState === "GAMEOVER") snakeState = "EQUIP_PAUSE";
+  if (typeof sndFanfare === "function") sndFanfare();
+  if (typeof renderActiveGame === "function") renderActiveGame();
 };
 
 window.buySnakeShieldWithCoins = function(e) {
   if (e) { e.preventDefault(); e.stopPropagation(); }
   if (typeof currentUser === "undefined" || !currentUser) return;
   const coins = getUserCoins(currentUser.name);
-  if (coins >= 1 && snakeShieldLetters <= 0) {
-    addCoins(currentUser.name, -1);
-    snakeShieldLetters = 20;
-    snakeUsedBoosts = true; // Použil vylepšení -> nepočítá se do rekordu
-    if (typeof sndFanfare === "function") sndFanfare();
-    
-    isSnakeWaitingForInput = true;
-    snakeState = "WAITING";
-    snakeStatusMsg = "🛡️ Štít na 20 písmen koupen! Potáhni nebo stiskni šipku.";
-    
-    if (typeof renderActiveGame === "function") renderActiveGame();
-    setTimeout(resizeSnakeCanvas, 10);
-    runSnakeLoop();
-  } else {
-    alert("Potřebuješ alespoň 1 zlaťák! 💰");
-  }
+  if (coins < 1) { alert("Potřebuješ alespoň 1 🪙!"); return; }
+  if (snakeShieldLetters > 0) return;
+  addCoins(currentUser.name, -1);
+  snakeShieldLetters = 20;
+  snakeUsedBoosts = true;
+  if (typeof sndFanfare === "function") sndFanfare();
+  if (typeof renderActiveGame === "function") renderActiveGame();
 };
 
-// Nákup +1 života před startem (nebo v pauze) za 1 zlaťák
-window.buySnakeExtraLife = function(e) {
+window.buySnakeShieldWithHearts = function(e) {
   if (e) { e.preventDefault(); e.stopPropagation(); }
-  if (typeof currentUser === "undefined" || !currentUser) return;
-  const coins = getUserCoins(currentUser.name);
-  if (coins >= 1) {
-    addCoins(currentUser.name, -1);
-    snakeLives++;
-    snakeUsedBoosts = true; // Použil vylepšení -> nepočítá se do rekordu
-    if (typeof sndFanfare === "function") sndFanfare();
-
-    isSnakeWaitingForInput = true;
-    snakeState = "WAITING";
-    snakeStatusMsg = "❤️ Život přikoupen! Potáhni nebo stiskni šipku pro START.";
-
-    if (typeof renderActiveGame === "function") renderActiveGame();
-    setTimeout(resizeSnakeCanvas, 10);
-    runSnakeLoop();
-  } else {
-    alert("Potřebuješ alespoň 1 zlaťák! 💰");
-  }
+  if (snakeLessonHearts < 1) { alert("Nemáš žádné ❤️ z lekce!"); return; }
+  if (snakeShieldLetters > 0) return;
+  snakeLessonHearts -= 1;
+  snakeShieldLetters = 20;
+  snakeUsedBoosts = true;
+  if (typeof sndFanfare === "function") sndFanfare();
+  if (typeof renderActiveGame === "function") renderActiveGame();
 };
 
-window.resumeSnakeWithoutShield = function(e) {
+window.openSnakeEquipPause = function(e) {
   if (e) { e.preventDefault(); e.stopPropagation(); }
+  if (snakeState === "GAMEOVER") return;
+  isSnakeWaitingForInput = true;
+  snakeState = "EQUIP_PAUSE";
+  stopSnakeLoop();
+  if (typeof renderActiveGame === "function") renderActiveGame();
+};
+
+window.resumeSnakeFromEquip = function(e) {
+  if (e) { e.preventDefault(); e.stopPropagation(); }
+  if (snakeLives <= 0) return;
   isSnakeWaitingForInput = true;
   snakeState = "WAITING";
   snakeStatusMsg = "Potáhni prstem nebo stiskni šipku pro START!";
-  if (typeof renderActiveGame === "function") renderActiveGame();
-  setTimeout(resizeSnakeCanvas, 10);
-  runSnakeLoop();
-};
-
-// Nákup životů na konci hry (1 život za 1 💰, nebo 5 životů za 3 💰)
-window.buySnakeRevive = function(livesToAdd, cost, e) {
-  if (e) { e.preventDefault(); e.stopPropagation(); }
-  if (typeof currentUser === "undefined" || !currentUser) return;
-  const coins = getUserCoins(currentUser.name);
-  if (coins < cost) {
-    alert(`Nemáš dostatek zlaťáků! Potřebuješ ${cost} 💰.`);
-    return;
-  }
-  addCoins(currentUser.name, -cost);
-  snakeLives += livesToAdd;
-  snakeUsedBoosts = true; // Použil vylepšení -> nepočítá se do rekordu
-  if (typeof sndFanfare === "function") sndFanfare();
-
-  isSnakeWaitingForInput = true;
-  snakeState = "WAITING";
-  snakeStatusMsg = `❤️ Přidáno +${livesToAdd} životů! Potáhni do volného směru!`;
-
   if (typeof renderActiveGame === "function") renderActiveGame();
   setTimeout(resizeSnakeCanvas, 10);
   runSnakeLoop();
@@ -155,6 +135,7 @@ function startSnakeGame() {
   }
 
   snakeLives = 3;
+  snakeLessonHearts = 0;
   snakeScore = 0;
   snakeUsedBoosts = false;
   snakeLevel = 1;
@@ -184,7 +165,7 @@ function startSnakeGame() {
   }, 50);
 }
 
-function startCampaignSnake() {
+function startCampaignSnake(heartsFromLesson = 0) {
   if (typeof stopArcadeLoop === "function") stopArcadeLoop();
   stopSnakeLoop();
   isCampaignMinigame = true;
@@ -195,9 +176,14 @@ function startCampaignSnake() {
   }).sort(() => Math.random() - 0.5);
 
   if (snakeDeck.length === 0) {
+    if (heartsFromLesson > 0 && typeof currentUser !== "undefined" && currentUser && typeof addCoins === "function") {
+      addCoins(currentUser.name, heartsFromLesson);
+    }
     if (typeof startCampaignPexeso === "function") startCampaignPexeso();
     return;
   }
+
+  snakeLessonHearts = Number(heartsFromLesson) || 0;
 
   snakeLives = 3;
   snakeScore = 0;
@@ -406,7 +392,7 @@ function runSnakeLoop() {
 }
 
 function setSnakeDirection(dx, dy) {
-  if (snakeState === "PRE_START" || snakeState === "SHIELD_EXPIRED_PAUSE" || snakeState === "GAMEOVER") return;
+  if (snakeState === "PRE_START" || snakeState === "EQUIP_PAUSE" || snakeState === "SHIELD_EXPIRED_PAUSE" || snakeState === "GAMEOVER") return;
   if (typeof registerUserAction === "function") registerUserAction();
   
   if ((snakeDir.x !== 0 && snakeDir.x === -dx) || (snakeDir.y !== 0 && snakeDir.y === -dy)) {
@@ -674,8 +660,7 @@ function attachSnakeTouchHandlers() {
   const container = document.querySelector(".snake-container");
   if (!container) return;
 
-  const isButtonTarget = (el) => el && (el.tagName === "BUTTON" || el.classList.contains("action-btn") || el.classList.contains("snake-shield-btn"));
-
+ const isButtonTarget = (el) => el && !!(el.closest && el.closest("button, .action-btn, .snake-shield-btn"));
   container.addEventListener("touchstart", (e) => {
     if (isButtonTarget(e.target)) return;
     if (e.cancelable) e.preventDefault();
