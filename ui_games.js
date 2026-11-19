@@ -165,7 +165,7 @@ function _renderGameArcade(main) {
         main.innerHTML = `
           <div style="text-align:center;padding:35px;">
             <h2 style="color:var(--col-green);font-size:28px;">TRÉNINK DOKONČEN! 🎉</h2>
-            <p style="font-size:20px;color:inherit;margin:10px 0;">Sestřeleno: <b>${arcadeScore} slov</b> (Bonus: +${bonusCoins} 💰)</p>
+            <p style="font-size:20px;color:inherit;margin:10px 0;">Sestřeleno: <b>${arcadeScore} slov</b> (Bonus: +${bonusCoins} 🪙)</p>
             <div class="action-btn green" onclick="if(typeof finishCampaign==='function') finishCampaign(${campaignMinigameCoins + bonusCoins})">DOKONČIT A ZPĚT</div>
           </div>
         `;
@@ -322,11 +322,11 @@ function _renderGameStory(main) {
         <h2 style="color:var(--col-green);font-size:28px;margin-bottom:10px;">PŘÍBĚH DOKONČEN! 🎉</h2>
         <p style="font-size:18px;color:inherit;margin-bottom:20px;">Skvělá práce při čtení příběhu <b>${selectedGroupKey}</b>.</p>
         ${!alreadyDone ? `
-          <p style="font-size:24px;color:var(--col-yellow);font-weight:bold;margin-bottom:25px;">Získáváš odměnu: +${rewardCoins} 💰</p>
+          <p style="font-size:24px;color:var(--col-yellow);font-weight:bold;margin-bottom:25px;">Získáváš odměnu: +${rewardCoins} 🪙</p>
         ` : `
           <p style="font-size:16px;color:var(--col-text-muted);margin-bottom:25px;">Tento příběh už máš splněný (odměna již byla vyplacena).</p>
         `}
-        <div class="action-btn green" onclick="if(typeof finishStory==='function') finishStory()">${!alreadyDone ? 'VYINKASOVAT ' + rewardCoins + ' 💰 A ZPĚT' : 'ZPĚT NA CESTU'}</div>
+        <div class="action-btn green" onclick="if(typeof finishStory==='function') finishStory()">${!alreadyDone ? 'VYINKASOVAT ' + rewardCoins + ' 🪙 A ZPĚT' : 'ZPĚT NA CESTU'}</div>
       </div>
     `;
     return;
@@ -571,7 +571,7 @@ function _renderGameSeq(main) {
       </div>
     ` : `
       <div style="text-align:center;padding:15px;">
-        <h2 style="color:var(--col-green);margin-bottom:6px;">${seqIsNewRecord ? '🏆 NOVÝ REKORD! (+1 💰)' : 'DOKONČENO! 🎉'}</h2>
+        <h2 style="color:var(--col-green);margin-bottom:6px;">${seqIsNewRecord ? '🏆 NOVÝ REKORD! (+1 🪙)' : 'DOKONČENO! 🎉'}</h2>
         <p style="font-size:18px;margin-bottom:6px;">Tvůj čas: <b style="color:var(--col-yellow);">${seqLastFinalTime} s</b> &nbsp;|&nbsp; Rekord: <b>${seqBestTime} s</b></p>
         ${seqPrevBestTime ? `
           <p style="font-size:15px;font-weight:bold;color:${diffFromPrev >= 0 ? 'var(--col-green)' : 'var(--col-red)'};margin-bottom:14px;">
@@ -846,7 +846,7 @@ function _renderGameTarget(main) {
       main.innerHTML = `
         <div style="text-align:center;padding:30px;">
           <h2 style="color:var(--col-green);font-size:28px;margin-bottom:10px;">TRÉNINK DOKONČEN! 🎯</h2>
-          <p style="font-size:20px;color:inherit;margin-bottom:15px;">Sestřeleno v čase: <b style="color:var(--col-yellow);">${targetLastFinalTime} s</b> (Bonus: +${bonusCoins} 💰)</p>
+          <p style="font-size:20px;color:inherit;margin-bottom:15px;">Sestřeleno v čase: <b style="color:var(--col-yellow);">${targetLastFinalTime} s</b> (Bonus: +${bonusCoins} 🪙)</p>
           <div class="action-btn green" onclick="if(typeof finishCampaign==='function') finishCampaign(${campaignMinigameCoins + bonusCoins})">DOKONČIT A ZPĚT</div>
         </div>
       `;
@@ -858,7 +858,7 @@ function _renderGameTarget(main) {
 
     main.innerHTML = `
       <div style="text-align:center;padding:25px;">
-        <h2 style="color:var(--col-green);font-size:28px;margin-bottom:10px;">${targetIsNewRecord ? '🏆 NOVÝ REKORD SADY! (+1 💰)' : 'VŠE SESTŘELENO! 🎯'}</h2>
+        <h2 style="color:var(--col-green);font-size:28px;margin-bottom:10px;">${targetIsNewRecord ? '🏆 NOVÝ REKORD SADY! (+1 🪙)' : 'VŠE SESTŘELENO! 🎯'}</h2>
         <p style="font-size:20px;color:inherit;margin-bottom:6px;">Tvůj výsledný čas: <b style="color:var(--col-yellow);">${targetLastFinalTime} s</b></p>
         <p style="font-size:16px;color:var(--col-active-tab);margin-bottom:8px;">🏆 Rekord této sady slov: <b>${targetBestTime} s</b></p>
         ${targetPrevBestTime ? `
