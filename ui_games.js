@@ -593,116 +593,118 @@ function _renderGameSnake(main) {
 
   const isGameOver = (snakeState === "GAMEOVER");
   const isPreStart = (snakeState === "PRE_START");
+  const isEquipPause = (snakeState === "EQUIP_PAUSE");
   const isShieldPause = (snakeState === "SHIELD_EXPIRED_PAUSE");
-  
-  const canBuyShieldHeart = !isGameOver && (typeof snakeLives!=='undefined'?snakeLives:0) > 1 && (typeof snakeShieldLetters!=='undefined'?snakeShieldLetters:0) <= 0;
+  const showOverlay = isPreStart || isEquipPause || isShieldPause || isGameOver;
+
   const coins = typeof getUserCoins === 'function' && typeof currentUser !== 'undefined' && currentUser ? getUserCoins(currentUser.name) : 0;
-  const canBuyWithOneCoin = !isGameOver && coins >= 1;
-  const canBuyShieldCoins = canBuyWithOneCoin && (typeof snakeShieldLetters!=='undefined'?snakeShieldLetters:0) <= 0;
-  const bonusCoins = Math.floor((typeof snakeScore!=='undefined'?snakeScore:0) / 2);
+  const lessonHearts = typeof snakeLessonHearts !== 'undefined' ? snakeLessonHearts : 0;
+  const livesCount = typeof snakeLives !== 'undefined' ? snakeLives : 0;
+  const shieldCount = typeof snakeShieldLetters !== 'undefined' ? snakeShieldLetters : 0;
+  const bonusCoins = Math.floor((typeof snakeScore !== 'undefined' ? snakeScore : 0) / 2);
   const isPureRun = !(typeof snakeUsedBoosts !== 'undefined' && snakeUsedBoosts);
+
+  const livesDisplay = livesCount <= 0
+    ? '💥 0 🐍'
+    : (livesCount <= 5 ? '🐍'.repeat(livesCount) : `🐍×${livesCount}`);
+
+  let overlayTitle = '🐍 VÝBAVA PŘED STARTEM';
+  let overlayTitleCol = 'var(--col-yellow)';
+  if (isEquipPause) { overlayTitle = '⚙️ VÝBAVA A PAUZA'; }
+  else if (isShieldPause) { overlayTitle = '🛡️ ŠTÍT VYPRŠEL!'; overlayTitleCol = 'var(--col-orange)'; }
+  else if (isGameOver) { overlayTitle = '💥 DOŠLI HADI!'; overlayTitleCol = 'var(--col-red)'; }
 
   main.innerHTML = `
     <div class="snake-container">
       <div class="snake-header-box">
         <div class="snake-stats">
-          <span>${isGameOver ? '💔 GAME OVER' : "❤️".repeat(Math.min(10, typeof snakeLives!=='undefined'?snakeLives:0)) + (snakeLives > 10 ? ` (${snakeLives})` : '')}</span>
-          ${(typeof snakeShieldLetters!=='undefined'?snakeShieldLetters:0) > 0 ? `
-            <span id="snake-shield-indicator" class="snake-shield-btn active">🛡️ Štít: ${snakeShieldLetters} p.</span>
-          ` : ((canBuyShieldCoins || canBuyShieldHeart) ? `
-            <span style="display:inline-flex;gap:4px;">
-              ${canBuyShieldHeart ? `
-              <button class="action-btn" style="background:#1e1b4b;border-color:#818cf8;color:#c7d2fe;width:100%;max-width:270px;margin:0 0 10px 0;padding:10px;font-size:14px;" 
-                      ontouchstart="if(typeof buySnakeShieldInGame === 'function') buySnakeShieldInGame(event)" onclick="if(typeof buySnakeShieldInGame === 'function') buySnakeShieldInGame(event)">
-                🛡️ Koupit štít na 20 písmen (-1 ❤️)
+          <span title="Zbývající životy hada">${livesDisplay}</span>
+          <span style="display:inline-flex;gap:4px;align-items:center;">
+            ${shieldCount > 0 ? `<span id="snake-shield-indicator" class="snake-shield-btn active">🛡️ ${shieldCount} p.</span>` : ''}
+            ${!isGameOver ? `
+              <button class="snake-shield-btn" onclick="if(typeof openSnakeEquipPause === 'function') openSnakeEquipPause(event)">
+                ⚙️ Výbava ${lessonHearts > 0 ? `(❤️${lessonHearts})` : ''}
               </button>
             ` : ''}
-              ${canBuyShieldCoins ? `
-                <button class="snake-shield-btn" style="border-color:var(--col-yellow);color:var(--col-yellow);" ontouchstart="if(typeof buySnakeShieldWithCoins === 'function') buySnakeShieldWithCoins(event)" onclick="if(typeof buySnakeShieldWithCoins === 'function') buySnakeShieldWithCoins(event)">
-                  🛡️ (1 💰)
-                </button>
-              ` : ''}
-            </span>
-          ` : `
-            <span class="snake-shield-btn" style="opacity:0.4;">🛡️ Štít</span>
-          `)}
-          <span style="color:var(--col-active-tab);" title="${isPureRun ? 'Čistá hra – počítá se do rekordu!' : 'Hra s vylepšením – nepočítá se do rekordu'}">
-            Slova: ${typeof snakeScore!=='undefined'?snakeScore:0} | Délka: <span id="snake-length-ui">${typeof snakeBody!=='undefined'?snakeBody.length:3}</span> ${isPureRun ? '🏆' : '⚡'}
+          </span>
+          <span style="color:var(--col-active-tab);" title="${isPureRun ? 'Čistá hra – počítá se do rekordu!' : 'Hra s výbavou – nepočítá se do rekordu'}">
+            Slova: ${typeof snakeScore !== 'undefined' ? snakeScore : 0} | Délka: <span id="snake-length-ui">${typeof snakeBody !== 'undefined' ? snakeBody.length : 3}</span> ${isPureRun ? '🏆' : '⚡'}
           </span>
         </div>
 
-        ${typeof snakeCurrentWord!=='undefined' && snakeCurrentWord ? `
+        ${typeof snakeCurrentWord !== 'undefined' && snakeCurrentWord ? `
           <div class="snake-prompt-cz">${snakeCurrentWord.czech}</div>
           <div id="snake-slots-wrap" class="snake-slots-row">
-            ${(typeof snakeTargetLetters!=='undefined'?snakeTargetLetters:[]).map((ch, idx) => `
-              <div class="snake-slot ${idx < (typeof snakeCurrentIdx!=='undefined'?snakeCurrentIdx:0) ? 'done' : (idx === (typeof snakeCurrentIdx!=='undefined'?snakeCurrentIdx:0) ? 'active' : '')}">
-                ${idx < (typeof snakeCurrentIdx!=='undefined'?snakeCurrentIdx:0) ? ch : (idx === (typeof snakeCurrentIdx!=='undefined'?snakeCurrentIdx:0) ? ch : '_')}
+            ${(typeof snakeTargetLetters !== 'undefined' ? snakeTargetLetters : []).map((ch, idx) => `
+              <div class="snake-slot ${idx < (typeof snakeCurrentIdx !== 'undefined' ? snakeCurrentIdx : 0) ? 'done' : (idx === (typeof snakeCurrentIdx !== 'undefined' ? snakeCurrentIdx : 0) ? 'active' : '')}">
+                ${idx < (typeof snakeCurrentIdx !== 'undefined' ? snakeCurrentIdx : 0) ? ch : (idx === (typeof snakeCurrentIdx !== 'undefined' ? snakeCurrentIdx : 0) ? ch : '_')}
               </div>
             `).join('')}
           </div>
         ` : ''}
-        <div class="snake-status-bar" style="color:${(typeof snakeState!=='undefined' && (snakeState==='PAUSED_SHIELD' || snakeState==='WAITING'))?'var(--col-yellow)':'var(--col-red)'};">
-          ${typeof snakeStatusMsg!=='undefined'?snakeStatusMsg:''}
+        <div class="snake-status-bar" style="color:${(snakeState === 'PAUSED_SHIELD' || snakeState === 'WAITING') ? 'var(--col-yellow)' : 'var(--col-red)'};">
+          ${typeof snakeStatusMsg !== 'undefined' ? snakeStatusMsg : ''}
         </div>
       </div>
 
       <div class="snake-canvas-wrap">
         <canvas id="snake-canvas" width="400" height="400"></canvas>
 
-        ${(isPreStart || isShieldPause) ? `
+        ${showOverlay ? `
           <div class="snake-overlay">
-            <h3 style="color:var(--col-yellow);font-size:21px;margin-bottom:4px;">
-              ${isPreStart ? '🐍 PŘIPRAVEN KE STARTU?' : '🛡️ ŠTÍT VYPRŠEL!'}
-            </h3>
-            <p style="font-size:12px;color:var(--col-text-muted);margin-bottom:12px;">
-              ${isPreStart ? 'Máš <b>' + coins + ' 💰</b>. Rekord délky 🏆 platí jen pro hru bez nákupů.' : 'Dál už tě tvůj ocas ani špatná písmena neochrání.'}
-            </p>
+            <h3 style="color:${overlayTitleCol};font-size:19px;margin-bottom:6px;">${overlayTitle}</h3>
 
-            <button class="action-btn" style="background:#be123c;border-color:#fda4af;width:100%;max-width:270px;margin:0 0 8px 0;padding:10px;font-size:14px;${!canBuyWithOneCoin ? 'opacity:0.4;' : ''}" 
-                    ontouchstart="if(typeof buySnakeExtraLife === 'function') buySnakeExtraLife(event)" onclick="if(typeof buySnakeExtraLife === 'function') buySnakeExtraLife(event)">
-              ❤️ Koupit +1 život (1 💰)
-            </button>
-
-            <button class="action-btn" style="background:#2d2605;border-color:var(--col-yellow);color:var(--col-yellow);width:100%;max-width:270px;margin:0 0 10px 0;padding:10px;font-size:14px;${!canBuyShieldCoins ? 'opacity:0.4;' : ''}" 
-                    ontouchstart="if(typeof buySnakeShieldWithCoins === 'function') buySnakeShieldWithCoins(event)" onclick="if(typeof buySnakeShieldWithCoins === 'function') buySnakeShieldWithCoins(event)">
-              🛡️ Koupit štít na 20 písmen (1 💰)
-            </button>
-
-            <button class="action-btn green" style="width:100%;max-width:270px;margin:0;padding:10px;font-size:15px;" 
-                    ontouchstart="if(typeof resumeSnakeWithoutShield === 'function') resumeSnakeWithoutShield(event)" onclick="if(typeof resumeSnakeWithoutShield === 'function') resumeSnakeWithoutShield(event)">
-              ${isPreStart ? 'Hrát bez pomoci (pro rekord 🏆) ▶️' : 'Pokračovat bez štítu ▶️'}
-            </button>
-          </div>
-        ` : ''}
-
-        ${isGameOver ? `
-          <div class="snake-overlay">
-            <h3 style="color:var(--col-red);font-size:24px;margin-bottom:4px;">💔 DOŠLY ŽIVOTY!</h3>
-            <p style="font-size:14px;color:#fff;margin-bottom:12px;">Délka hada: <b>${snakeBody.length}</b> | Složeno: <b>${snakeScore} slov</b></p>
-            
-            <div style="background:rgba(255,255,255,0.06);border:1px solid var(--col-card-border);border-radius:10px;padding:10px;width:100%;max-width:270px;margin-bottom:10px;">
-              <div style="font-size:12px;color:var(--col-yellow);margin-bottom:8px;font-weight:bold;">Pokračovat v jízdě? (Máš ${coins} 💰)</div>
-              <button class="action-btn" style="background:#be123c;border-color:#fda4af;width:100%;margin:0 0 6px 0;padding:8px;font-size:14px;${coins < 1 ? 'opacity:0.4;' : ''}"
-                      onclick="if(typeof buySnakeRevive === 'function') buySnakeRevive(1, 1, event)">
-                ❤️ Koupit +1 život (1 💰)
-              </button>
-              <button class="action-btn" style="background:#9333ea;border-color:#e9d5ff;width:100%;margin:0;padding:8px;font-size:14px;${coins < 3 ? 'opacity:0.4;' : ''}"
-                      onclick="if(typeof buySnakeRevive === 'function') buySnakeRevive(5, 3, event)">
-                ❤️❤️❤️❤️❤️ Koupit +5 životů (3 💰)
-              </button>
+            <div class="snake-equip-stats">
+              <div class="snake-stat-pill" title="Tvé mince na účtu">🪙 <b>${coins}</b></div>
+              <div class="snake-stat-pill" title="Zbylá srdíčka z lekce (nevyužitá se na konci promění na 🪙)">❤️ <b>${lessonHearts}</b></div>
+              <div class="snake-stat-pill" title="Aktuální životy hada">🐍 <b>${livesCount}</b></div>
+              <div class="snake-stat-pill" title="Ochrana štítem">🛡️ <b>${shieldCount} p.</b></div>
             </div>
+
+            <div class="snake-equip-card">
+              <div class="snake-equip-title">🐍 Přidat život hada</div>
+              <div class="snake-equip-grid">
+                <button class="snake-equip-btn coin" ${coins < 1 ? 'disabled' : ''} onclick="buySnakeLifeWithCoins(1, 1, event)">1 🪙 ➔ +1 🐍</button>
+                <button class="snake-equip-btn coin" ${coins < 3 ? 'disabled' : ''} onclick="buySnakeLifeWithCoins(5, 3, event)">3 🪙 ➔ +5 🐍</button>
+                <button class="snake-equip-btn heart" ${lessonHearts < 1 ? 'disabled' : ''} onclick="buySnakeLifeWithHearts(1, 1, event)">1 ❤️ ➔ +1 🐍</button>
+                <button class="snake-equip-btn heart" ${lessonHearts < 3 ? 'disabled' : ''} onclick="buySnakeLifeWithHearts(5, 3, event)">3 ❤️ ➔ +5 🐍</button>
+              </div>
+            </div>
+
+            <div class="snake-equip-card">
+              <div class="snake-equip-title">🛡️ Štít na 20 písmen</div>
+              ${shieldCount > 0 ? `
+                <div style="font-size:13px;color:var(--col-green);font-weight:bold;padding:4px 0;">✅ Štít je aktivní (zbývá ${shieldCount} p.)</div>
+              ` : `
+                <div class="snake-equip-grid">
+                  <button class="snake-equip-btn coin" ${coins < 1 ? 'disabled' : ''} onclick="buySnakeShieldWithCoins(event)">1 🪙 ➔ 🛡️ 20</button>
+                  <button class="snake-equip-btn heart" ${lessonHearts < 1 ? 'disabled' : ''} onclick="buySnakeShieldWithHearts(event)">1 ❤️ ➔ 🛡️ 20</button>
+                </div>
+              `}
+            </div>
+
+            ${livesCount > 0 ? `
+              <button class="action-btn green" style="width:100%;max-width:290px;margin:4px 0 0 0;padding:10px;font-size:15px;" onclick="resumeSnakeFromEquip(event)">
+                ${isPreStart ? (isPureRun ? '▶️ HRÁT ČISTĚ (pro rekord 🏆)' : '▶️ ROZJET HADA') : '▶️ POKRAČOVAT V JÍZDĚ'}
+              </button>
+            ` : `
+              <div style="font-size:12px;color:var(--col-text-muted);margin-top:4px;">
+                Délka: <b>${snakeBody.length}</b> | Slova: <b>${snakeScore}</b> (+${bonusCoins} 🪙)${lessonHearts > 0 ? ` | Zbylá ❤️: +${lessonHearts} 🪙` : ''}
+              </div>
+            `}
           </div>
         ` : ''}
       </div>
 
-      ${isGameOver ? `
+      ${(isGameOver && livesCount <= 0) ? `
         <div style="width:100%; text-align:center; padding:8px 0;">
           ${typeof isCampaignMinigame !== 'undefined' && isCampaignMinigame ? `
-            <p style="font-size:16px;color:var(--col-yellow);font-weight:bold;margin-bottom:6px;">Složeno: ${snakeScore} slov (Bonus: +${bonusCoins} 💰)</p>
-            <div class="action-btn green" onclick="if(typeof finishCampaign === 'function') finishCampaign(${(typeof campaignMinigameCoins!=='undefined'?campaignMinigameCoins:0) + bonusCoins})">UKONČIT A VZÍT ODMĚNU ➔</div>
+            <div class="action-btn green" onclick="if(typeof finishCampaign === 'function') finishCampaign(${(typeof campaignMinigameCoins !== 'undefined' ? campaignMinigameCoins : 0) + bonusCoins})">
+              UKONČIT A VZÍT +${bonusCoins + lessonHearts} 🪙 ➔
+            </div>
           ` : `
             <div class="grid-2" style="width:100%;">
-              <div class="action-btn green" style="margin-top:0;" onclick="if(typeof startSnakeGame === 'function') startSnakeGame()">OD ZAČÁTKU (NA REKORD 🏆)</div>
+              <div class="action-btn green" style="margin-top:0;" onclick="if(typeof startSnakeGame === 'function') startSnakeGame()">🔄 OD ZAČÁTKU (🏆)</div>
               <div class="action-btn" style="margin-top:0;" onclick="if(typeof setScreen === 'function') setScreen('SELECT_GAME')">ZPĚT DO MENU</div>
             </div>
           `}
