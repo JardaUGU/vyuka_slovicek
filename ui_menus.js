@@ -146,7 +146,7 @@ function _renderSelectSubject(main, bSubj, bGroup) {
           </div>
         </div>
         <div style="text-align:right;">
-          <div style="color:var(--col-yellow);font-size:18px;font-weight:bold;">${coins} 💰</div>
+          <div style="color:var(--col-yellow);font-size:18px;font-weight:bold;">${coins} 🪙</div>
           <div style="color:var(--col-active-tab);font-size:12px;margin-top:2px;">🧊 ${freezes}x | 🎨 ${skinCount}</div>
         </div>
       </div>
@@ -231,7 +231,7 @@ function _renderShop(main, bSubj, bGroup) {
           <div><b style="font-size:16px;">🧊 Zmrazení série</b><p style="font-size:12px;color:var(--col-text-muted);margin-top:2px;">Ochrání tvou sérii, když vynecháš den.</p></div>
           <span style="font-size:15px;color:var(--col-active-tab);font-weight:bold;margin-left:8px;">Máš: ${freezes}x</span>
         </div>
-        <button class="action-btn" style="padding:10px;font-size:15px;width:100%;margin-top:6px;" onclick="if(typeof buyFreeze==='function') buyFreeze()">Koupit zmrazení (Cena: 20 💰)</button>
+        <button class="action-btn" style="padding:10px;font-size:15px;width:100%;margin-top:6px;" onclick="if(typeof buyFreeze==='function') buyFreeze()">Koupit zmrazení (Cena: 20 🪙)</button>
       </div>
 
       <div style="background:var(--col-card);border:1px solid var(--col-card-border);border-radius:12px;padding:14px;margin-bottom:15px;">
@@ -246,7 +246,7 @@ function _renderShop(main, bSubj, bGroup) {
                     ${isActive ? `<span style="color:var(--col-green);font-size:12px;font-weight:bold;padding:6px 10px;background:rgba(34,197,94,0.1);border-radius:6px;border:1px solid var(--col-green);">✅ Aktivní</span>` 
                       : isUnlocked ? `<button class="toggle-btn on" style="font-size:13px;padding:6px 14px;" onclick="if(typeof equipSkin==='function') equipSkin('${skin.id}')">Nasadit</button>` 
                       : (isPreview ? `<button class="toggle-btn" style="font-size:12px;padding:4px 8px;" onclick="if(typeof cancelPreview==='function') cancelPreview()">Zrušit náhled</button>
-                                      <button class="toggle-btn on" style="font-size:13px;padding:6px 10px;" onclick="if(typeof buySkin==='function') buySkin('${skin.id}', ${skin.cost})">Koupit (${skin.cost} 💰)</button>` 
+                                      <button class="toggle-btn on" style="font-size:13px;padding:6px 10px;" onclick="if(typeof buySkin==='function') buySkin('${skin.id}', ${skin.cost})">Koupit (${skin.cost} 🪙)</button>` 
                       : `<button class="toggle-btn" style="font-size:12px;padding:6px 10px;border-color:var(--col-active-tab);" onclick="if(typeof previewSkin==='function') previewSkin('${skin.id}')">👁️ Náhled</button>`)}
                   </div>
                 </div>

@@ -469,3 +469,68 @@ footer { height: 32px; background-color: var(--col-card); border-top: 1px solid 
   padding: 14px;
   box-shadow: 0 12px 30px rgba(0,0,0,0.6);
 }
+/* =========================================================
+   PŘEHLEDNÁ VÝBAVA HADA (MINCE / SRDÍČKA / HADI / ŠTÍT)
+   ========================================================= */
+.snake-equip-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 5px;
+  width: 100%;
+  max-width: 290px;
+  margin-bottom: 8px;
+}
+.snake-stat-pill {
+  background: var(--col-card);
+  border: 1px solid var(--col-card-border);
+  border-radius: 8px;
+  padding: 4px 2px;
+  font-size: 12px;
+  color: var(--col-text);
+  text-align: center;
+}
+.snake-equip-card {
+  width: 100%;
+  max-width: 290px;
+  background: rgba(24, 38, 62, 0.9);
+  border: 1px solid var(--col-card-border);
+  border-radius: 10px;
+  padding: 7px 8px;
+  margin-bottom: 7px;
+}
+.snake-equip-title {
+  font-size: 12px;
+  font-weight: bold;
+  color: var(--col-text-muted);
+  margin-bottom: 5px;
+}
+.snake-equip-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.snake-equip-btn {
+  padding: 7px 4px;
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: bold;
+  cursor: pointer;
+  border: 1px solid var(--col-active-tab);
+  background: var(--col-card-alt);
+  color: var(--col-text);
+}
+.snake-equip-btn.coin {
+  border-color: var(--col-yellow);
+  color: var(--col-yellow);
+}
+.snake-equip-btn.heart {
+  border-color: #fb7185;
+  color: #fda4af;
+}
+.snake-equip-btn:disabled {
+  opacity: 0.32;
+  cursor: not-allowed;
+}
+.snake-equip-btn:active:not(:disabled) {
+  transform: scale(0.95);
+}

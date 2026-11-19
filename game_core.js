@@ -49,6 +49,7 @@ function goBack() {
   if (typeof seqInactivityTimer !== "undefined" && seqInactivityTimer) { clearTimeout(seqInactivityTimer); seqInactivityTimer = null; }
   if (typeof stopArcadeLoop === "function") stopArcadeLoop();
   if (typeof stopSnakeLoop === "function") stopSnakeLoop();
+  if (typeof cashOutSnakeLessonHearts === "function") cashOutSnakeLessonHearts();
   if (typeof stopPexesoTimeout === "function") stopPexesoTimeout();
   if (typeof sendTimeHeartbeatToGoogle === "function") sendTimeHeartbeatToGoogle();
   if (typeof stopTargetTimer === "function") stopTargetTimer();

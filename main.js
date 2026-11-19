@@ -118,7 +118,7 @@ function buySkin(skinId, cost) {
       fetch(API_URL, { method: "POST", mode: "no-cors", body: fd });
     } catch(e) {}
     alert("Nový vzhled byl odemčen a nasazen! 🎨"); if(typeof renderScreen==='function') renderScreen();
-  } else { alert("Nemáš dostatek zlaťáků! 💰"); }
+  } else { alert("Nemáš dostatek zlaťáků! 🪙"); }
 }
 
 function equipSkin(skinId) {
@@ -242,7 +242,7 @@ function buyShopItem(itemKey, cost) {
       fetch(API_URL, { method: "POST", mode: "no-cors", body: fd });
     } catch(e) {}
     alert(`Úspěšně zakoupeno! 🛒\nPoložka ${itemKey} byla přidána.`); if(typeof renderScreen==='function') renderScreen();
-  } else { alert("Nemáš dostatek zlaťáků! 💰"); }
+  } else { alert("Nemáš dostatek zlaťáků! 🪙"); }
 }
 
 function saveSnakeRecord(length) {

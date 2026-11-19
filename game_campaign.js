@@ -546,9 +546,7 @@ function launchCampaignMinigame() {
     }).sort(() => Math.random() - 0.5);
 
     campaignMinigamePool = [...currentSingle, ...olderSingle].slice(0, 30);
-    if (cmpHearts > 0) {
-      addCoins(currentUser.name, cmpHearts);
-    }
+    const heartsFromLesson = cmpHearts;
     addReward(1, "Trénink: " + selectedGroupKey);
     isCampaignMinigame = true; 
     campaignMinigameCoins = 0;
@@ -557,6 +555,7 @@ function launchCampaignMinigame() {
         let tempPool = [...campaignMinigamePool];
         while (campaignMinigamePool.length < 20) campaignMinigamePool.push(tempPool[Math.floor(Math.random() * tempPool.length)]);
     } else if (campaignMinigamePool.length === 0) {
+        if (heartsFromLesson > 0) addCoins(currentUser.name, heartsFromLesson);
         finishCampaign(campaignMinigameCoins); return; 
     }
 
@@ -564,21 +563,24 @@ function launchCampaignMinigame() {
     let isGerman = getTargetLang(selectedSubject).startsWith('de');
     let articlesCount = campaignMinigamePool.filter(it => /^(der|die|das)\s/i.test(it.question)).length;
 
+    const cashOutNow = () => { if (heartsFromLesson > 0) addCoins(currentUser.name, heartsFromLesson); };
+
     if (isGerman && articlesCount >= 8) {
-        if (r < 0.20) startCampaignArcade("ARTICLES");
-        else if (r < 0.40) startCampaignArcade("TRANSLATE");
-        else if (r < 0.60) startCampaignPexeso();
-        else if (r < 0.80 && typeof startCampaignSnake === "function") startCampaignSnake();
-        else if (typeof startCampaignTarget === "function") startCampaignTarget();
+        if (r < 0.20) { cashOutNow(); startCampaignArcade("ARTICLES"); }
+        else if (r < 0.40) { cashOutNow(); startCampaignArcade("TRANSLATE"); }
+        else if (r < 0.60) { cashOutNow(); startCampaignPexeso(); }
+        else if (r < 0.80 && typeof startCampaignSnake === "function") startCampaignSnake(heartsFromLesson);
+        else if (typeof startCampaignTarget === "function") { cashOutNow(); startCampaignTarget(); }
     } else {
-        if (r < 0.25) startCampaignArcade("TRANSLATE");
-        else if (r < 0.50) startCampaignPexeso();
-        else if (r < 0.75 && typeof startCampaignSnake === "function") startCampaignSnake();
-        else if (typeof startCampaignTarget === "function") startCampaignTarget();
+        if (r < 0.25) { cashOutNow(); startCampaignArcade("TRANSLATE"); }
+        else if (r < 0.50) { cashOutNow(); startCampaignPexeso(); }
+        else if (r < 0.75 && typeof startCampaignSnake === "function") startCampaignSnake(heartsFromLesson);
+        else if (typeof startCampaignTarget === "function") { cashOutNow(); startCampaignTarget(); }
     }
 }
 
 function finishCampaign(bonusCoins) {
+  if (typeof cashOutSnakeLessonHearts === "function") cashOutSnakeLessonHearts();
   if (bonusCoins > 0) {
     addCoins(currentUser.name, bonusCoins);
   }
