@@ -230,7 +230,7 @@ function buyShopItem(itemKey, cost) {
   if (currentCoins >= cost) {
     // Odečteme pouze lokálně (v Google Sheets odečítá přímo akce "buy_item"!)
     const u = (appData.users || []).find(x => x.name.toLowerCase().trim() === uKey);
-    if (u) { 
+   if (u) { 
       u.coins = Math.max(0, Number(u.coins || 0) - cost); 
       if (!u.inventory) u.inventory = {}; 
       const prevInv = Number(u.inventory[itemKey] ?? u.inventory[itemKey.toLowerCase()]) || 0;
@@ -458,7 +458,7 @@ function updateUserStreak(userName, targetMinutes) {
       if (freezes >= missedDays) {
         let newFreezeCount = freezes - missedDays;
         localStorage.setItem(`item_Zmrazeni_${uKey}`, newFreezeCount);
-        if (u && u.inventory) {
+       if (u && u.inventory) {
           u.inventory["Zmrazeni"] = newFreezeCount;
           u.inventory["zmrazeni"] = newFreezeCount;
         }

@@ -30,19 +30,22 @@ function syncAllUsersStreakFromCloud(usersArr) {
     if (cloudLast && (!localLast || cloudLast >= localLast)) {
       localStorage.setItem(`streak_${uKey}`, String(Number(u.streak || 0)));
       localStorage.setItem(`streak_last_date_${uKey}`, cloudLast);
-      if (u.inventory && u.inventory["Zmrazeni"] !== undefined) {
-        localStorage.setItem(`item_Zmrazeni_${uKey}`, String(Number(u.inventory["Zmrazeni"])));
+      const cloudFreeze = (u.inventory && u.inventory["Zmrazeni"] !== undefined)
+        ? u.inventory["Zmrazeni"]
+        : (u.inventory && u.inventory["zmrazeni"] !== undefined ? u.inventory["zmrazeni"] : undefined);
+      if (cloudFreeze !== undefined) {
+        localStorage.setItem(`item_Zmrazeni_${uKey}`, String(Number(cloudFreeze)));
       }
       if (Array.isArray(u.streakFreezeDates)) {
         localStorage.setItem(`freeze_dates_${uKey}`, JSON.stringify(u.streakFreezeDates));
       }
     } else if (localLast > cloudLast) {
-      // Lokální zařízení už dnes cíl splnilo, cloud se ještě synchronizuje -> ochrana proti přepsání
       u.streak = Number(localStorage.getItem(`streak_${uKey}`) || u.streak || 0);
       u.streakLastDate = localLast;
       const localFreeze = localStorage.getItem(`item_Zmrazeni_${uKey}`);
       if (localFreeze !== null && u.inventory) {
         u.inventory["Zmrazeni"] = Number(localFreeze);
+        u.inventory["zmrazeni"] = Number(localFreeze);
       }
     }
   });
