@@ -98,13 +98,17 @@ function _renderSelectUser(main, bSubj, bGroup) {
         const hasPin = !!(u.pin || localStorage.getItem(`user_pin_${u.name.toLowerCase().trim()}`));
         let themesArr = typeof getUserUnlockedThemes === 'function' ? getUserUnlockedThemes(u.name) : [];
         const unlockedSkins = themesArr.filter(t => t !== 'default').map(t => { const s = typeof APP_SKINS !== 'undefined' ? APP_SKINS.find(x => x.id === t) : null; return s ? s.name.split(' ')[0] : t; }).join(' ');
-
+        
+        const uLvl = (typeof getLevelInfo === 'function' && typeof getUserXp === 'function') ? getLevelInfo(getUserXp(u.name)) : { level: 1, totalXp: 0 };
+        const uWeekXp = (typeof getUserWeeklyXp === 'function') ? getUserWeeklyXp(u.name) : 0;
+        
         return `
           <div class="tile" style="${isDone ? 'border-color:var(--col-yellow);' : ''} position:relative;" onclick="if(typeof selectUser === 'function') selectUser('${u.name.replace(/'/g, "\\'")}', ${g}, ${targetM})">
             ${hasPin ? `<div style="position:absolute; top:8px; right:8px; font-size:16px;">🔒</div>` : ''}
             <h2>${u.name}</h2><p>${g >= 10 && g < 90 ? `${g-9}. ročník SŠ` : (g<=9 ? `${g}. tř.` : 'Dospělý')}</p>
             <p style="color:var(--col-orange);margin-top:4px;cursor:pointer;text-decoration:underline dotted;" onclick="openStreakModal('${u.name.replace(/'/g, "\\'")}', event)">${streakLabel} 📅</p>
             <p style="color:${isDone ? 'var(--col-yellow)' : 'var(--col-text-muted)'};margin-top:2px;font-weight:bold;">⏱️ Dnes: ${uMin}/${targetM} min ${isDone?'★':''}</p>
+            <p style="color:var(--col-active-tab);margin-top:2px;font-size:12px;font-weight:bold;">⚡ Lv.${uLvl.level} · 🏆 ${uWeekXp} XP</p>
             <p style="color:var(--col-text-muted);margin-top:4px;font-size:12px;background:rgba(0,0,0,0.2);padding:2px 6px;border-radius:6px;min-height:22px;">
               💰 ${coins} | 🧊 ${freezes}x | 🐍 ${u.maxSnake || 0}
               ${unlockedSkins ? `<br>🎨 ${unlockedSkins}` : ''}
@@ -220,6 +224,8 @@ function _renderShop(main, bSubj, bGroup) {
          </div>
       </div>
       ${typeof renderStreakHistoryBox === 'function' ? renderStreakHistoryBox(currentUser.name) : ''}
+      ${typeof renderXpLevelCard === 'function' ? renderXpLevelCard(currentUser.name) : ''}
+      ${typeof renderWeeklyLeaderboardBox === 'function' ? renderWeeklyLeaderboardBox() : ''}
 
       <div style="background:var(--col-card);border:1px solid var(--col-card-border);border-radius:12px;padding:14px;margin-bottom:15px;display:flex;justify-content:space-between;align-items:center;">
          <div><b style="font-size:16px;">🔐 Ochrana profilu</b><p style="font-size:12px;color:var(--col-text-muted);margin-top:2px;">Zamez ostatním ve vstupu do tvého účtu.</p></div>
@@ -662,3 +668,71 @@ window.openStreakModal = function(userName, e) {
   `;
   document.body.appendChild(overlay);
 };
+function renderXpLevelCard(userName) {
+  if (typeof getUserXp !== "function" || typeof getLevelInfo !== "function") return "";
+  const info = getLevelInfo(getUserXp(userName));
+  const wXp = getUserWeeklyXp(userName);
+  const stXp = getStreakXpInfo(userName);
+
+  const bonusText = stXp.bonusPct > 0
+    ? `🔥 Bonus série (${stXp.streak} d.): <b style="color:var(--col-green);">+${stXp.bonusPct} % XP</b>`
+    : `🔥 Tip: Udrž sérii 3 dny v kuse a získej <b>+15 % XP</b> navíc!`;
+
+  return `
+    <div style="background:var(--col-card); border:1px solid var(--col-card-border); border-radius:12px; padding:12px; margin-bottom:15px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+        <b style="font-size:16px; color:var(--col-active-tab);">⚡ Úroveň ${info.level}</b>
+        <span style="font-size:12px; color:var(--col-yellow); font-weight:bold;">Celkem: ${info.totalXp} XP | Týden: ${wXp} XP</span>
+      </div>
+      <div class="bargraph-track" style="height:10px;">
+        <div class="bargraph-fill" style="width:${info.pct}%; background:linear-gradient(90deg, #3b82f6, #a855f7);"></div>
+      </div>
+      <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--col-text-muted); margin-top:5px;">
+        <span>Do další úrovně: ${info.currentLevelXp} / ${info.nextLevelXp} XP</span>
+        <span>${info.pct} %</span>
+      </div>
+      <div style="font-size:11px; color:var(--col-text-muted); margin-top:6px; text-align:center;">${bonusText}</div>
+    </div>
+  `;
+}
+
+function renderWeeklyLeaderboardBox() {
+  const uList = (typeof appData !== 'undefined' && Array.isArray(appData.users)) ? appData.users : [];
+  if (uList.length === 0 || typeof getUserWeeklyXp !== "function") return "";
+
+  const ranked = uList.map(u => {
+    const totalXp = getUserXp(u.name);
+    const lvl = getLevelInfo(totalXp).level;
+    const wXp = getUserWeeklyXp(u.name);
+    return { name: u.name, level: lvl, weeklyXp: wXp };
+  }).sort((a, b) => b.weeklyXp - a.weeklyXp);
+
+  const maxW = Math.max(1, ranked[0].weeklyXp);
+  const medals = ['🥇', '🥈', '🥉'];
+
+  return `
+    <div style="background:var(--col-card); border:1px solid var(--col-card-border); border-radius:12px; padding:12px; margin-top:14px; margin-bottom:15px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+        <b style="font-size:15px; color:var(--col-yellow);">🏆 Týdenní rodinná liga</b>
+        <span style="font-size:11px; color:var(--col-text-muted);">Po – Ne</span>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:6px;">
+        ${ranked.map((r, idx) => {
+          const isMe = (typeof currentUser !== 'undefined' && currentUser && currentUser.name.toLowerCase().trim() === r.name.toLowerCase().trim());
+          const pct = Math.round((r.weeklyXp / maxW) * 100);
+          return `
+            <div style="background:var(--col-card-alt); border:1px solid ${isMe ? 'var(--col-active-tab)' : 'var(--col-card-border)'}; border-radius:8px; padding:6px 10px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; font-size:13px; margin-bottom:3px;">
+                <span><b>${medals[idx] || (idx + 1) + '.'} ${r.name}</b> <span style="font-size:11px; color:var(--col-active-tab);">Lv.${r.level}</span></span>
+                <b style="color:var(--col-yellow);">${r.weeklyXp} XP</b>
+              </div>
+              <div class="bargraph-track" style="height:5px;">
+                <div class="bargraph-fill" style="width:${pct}%; background:${idx === 0 ? 'linear-gradient(90deg, #facc15, #f97316)' : 'linear-gradient(90deg, var(--col-active-tab), var(--col-green))'};"></div>
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    </div>
+  `;
+}
