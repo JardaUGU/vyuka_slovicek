@@ -117,6 +117,7 @@ function _renderSelectUser(main, bSubj, bGroup) {
         `;
       }).join('')}
     </div>
+    ${typeof renderWeeklyLeaderboardBox === 'function' ? renderWeeklyLeaderboardBox() : ''}
   `;
 }
 
