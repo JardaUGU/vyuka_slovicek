@@ -196,9 +196,14 @@ function getUserCoins(userName) {
 
 function getUserItemCount(userName, itemKey) {
   if (!userName) return 0;
-  const u = (appData.users || []).find(x => x.name.toLowerCase().trim() === userName.toLowerCase().trim());
-  if (u && u.inventory && u.inventory[itemKey] !== undefined) return Number(u.inventory[itemKey]);
-  return Number(localStorage.getItem(`item_${itemKey}_${userName.toLowerCase().trim()}`) || 0);
+  const uKey = userName.toLowerCase().trim();
+  const u = (appData.users || []).find(x => x.name.toLowerCase().trim() === uKey);
+  const lowKey = String(itemKey || '').toLowerCase();
+  if (u && u.inventory) {
+    if (u.inventory[itemKey] !== undefined) return Number(u.inventory[itemKey]);
+    if (u.inventory[lowKey] !== undefined) return Number(u.inventory[lowKey]);
+  }
+  return Number(localStorage.getItem(`item_${itemKey}_${uKey}`) || 0);
 }
 
 function addCoins(userName, amount) {
@@ -225,10 +230,12 @@ function buyShopItem(itemKey, cost) {
   if (currentCoins >= cost) {
     // Odečteme pouze lokálně (v Google Sheets odečítá přímo akce "buy_item"!)
     const u = (appData.users || []).find(x => x.name.toLowerCase().trim() === uKey);
-    if (u) { 
+   if (u) { 
       u.coins = Math.max(0, Number(u.coins || 0) - cost); 
       if (!u.inventory) u.inventory = {}; 
-      u.inventory[itemKey] = (u.inventory[itemKey] || 0) + 1; 
+      const prevInv = Number(u.inventory[itemKey] ?? u.inventory[itemKey.toLowerCase()]) || 0;
+      u.inventory[itemKey] = prevInv + 1;
+      u.inventory[itemKey.toLowerCase()] = prevInv + 1;
     }
     currentUser.coins = u ? u.coins : Math.max(0, currentCoins - cost);
     localStorage.setItem(`coins_${uKey}`, String(currentUser.coins));
@@ -451,7 +458,10 @@ function updateUserStreak(userName, targetMinutes) {
       if (freezes >= missedDays) {
         let newFreezeCount = freezes - missedDays;
         localStorage.setItem(`item_Zmrazeni_${uKey}`, newFreezeCount);
-        if (u && u.inventory) u.inventory["Zmrazeni"] = newFreezeCount;
+       if (u && u.inventory) {
+          u.inventory["Zmrazeni"] = newFreezeCount;
+          u.inventory["zmrazeni"] = newFreezeCount;
+        }
 
         // Zápis zachráněných dnů i lokálně pro okamžité zobrazení v kalendáři
         let localFreezeDates = [];
