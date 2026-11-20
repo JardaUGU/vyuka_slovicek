@@ -47,6 +47,30 @@ function syncAllUsersStreakFromCloud(usersArr) {
     }
   });
 }
+
+function syncAllUsersXpFromCloud(usersArr) {
+  if (!Array.isArray(usersArr)) return;
+  const monStr = typeof getMondayDateStrClient === "function" ? getMondayDateStrClient() : "";
+  usersArr.forEach(u => {
+    if (!u || !u.name) return;
+    const uKey = u.name.toLowerCase().trim();
+
+    const cloudXp = Number(u.xp || 0);
+    const localXp = Number(localStorage.getItem(`xp_${uKey}`) || 0);
+    const bestXp = Math.max(cloudXp, localXp);
+    localStorage.setItem(`xp_${uKey}`, String(bestXp));
+    u.xp = bestXp;
+
+    const cloudW = Number(u.weeklyXp || 0);
+    const localStart = localStorage.getItem(`weekly_xp_start_${uKey}`) || "";
+    const localW = (localStart === monStr) ? Number(localStorage.getItem(`weekly_xp_${uKey}`) || 0) : 0;
+    const bestW = Math.max(cloudW, localW);
+    localStorage.setItem(`weekly_xp_${uKey}`, String(bestW));
+    if (monStr) localStorage.setItem(`weekly_xp_start_${uKey}`, monStr);
+    u.weeklyXp = bestW;
+  });
+}
+
 async function loadData() {
   checkDateRollover();
   if (currentUser) {
@@ -79,6 +103,7 @@ async function syncDataQuietly() {
       // DŮLEŽITÉ (BUGFIX): Aktualizace času z cloudu pro VŠECHNY profily
       syncAllUsersTimeFromCloud(appData.users);
       syncAllUsersStreakFromCloud(appData.users);
+      syncAllUsersXpFromCloud(appData.users);
 
       if (currentUser && appData.users) {
         const foundU = appData.users.find(u => u.name.toLowerCase().trim() === currentUser.name.toLowerCase().trim());
@@ -118,6 +143,7 @@ async function syncData() {
       // DŮLEŽITÉ (BUGFIX): Aktualizace času z cloudu pro VŠECHNY profily i při ruční aktualizaci 🔄
       syncAllUsersTimeFromCloud(appData.users);
       syncAllUsersStreakFromCloud(appData.users);
+      syncAllUsersXpFromCloud(appData.users);
 
       if (currentUser && appData.users) {
         const foundU = appData.users.find(u => u.name.toLowerCase().trim() === currentUser.name.toLowerCase().trim());
