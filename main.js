@@ -572,7 +572,8 @@ function selectUser(name, grade, targetMinutes) {
     startLevels: (foundU && foundU.startLevels) ? foundU.startLevels : {},
     inventory: (foundU && foundU.inventory) ? foundU.inventory : {},
     unlockedThemes: themesArr, activeTheme: activeTh, coins: foundU ? Number(foundU.coins || 0) : 0,
-    maxSnake: foundU ? Number(foundU.maxSnake || 0) : 0 // NOVÝ ŘÁDEK
+    maxSnake: foundU ? Number(foundU.maxSnake || 0) : 0, xp: foundU ? Number(foundU.xp || 0) : 0,
+    weeklyXp: foundU ? Number(foundU.weeklyXp || 0) : 0
   };
   localStorage.setItem("cur_user", JSON.stringify(currentUser)); 
   if(typeof applyAppSkin==='function') applyAppSkin(currentUser.activeTheme);
@@ -705,4 +706,91 @@ function hideSystemKeyboard() {
       navigator.virtualKeyboard.hide();
     }
   } catch (e) {}
+}
+
+function getMondayDateStrClient() {
+  const todayStr = getTodayDateStr();
+  const d = new Date(todayStr + "T12:00:00Z");
+  const day = d.getUTCDay();
+  const diffToMon = (day === 0) ? -6 : (1 - day);
+  return new Date(d.getTime() + diffToMon * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
+function getLevelInfo(totalXp) {
+  let xp = Math.max(0, Number(totalXp) || 0);
+  let level = 1;
+  let need = 50;
+  while (xp >= need) {
+    xp -= need;
+    level++;
+    need = 50 + (level - 1) * 30;
+  }
+  const pct = Math.min(100, Math.round((xp / need) * 100));
+  return { level, currentLevelXp: xp, nextLevelXp: need, pct, totalXp: Math.max(0, Number(totalXp) || 0) };
+}
+
+function getStreakXpInfo(userName) {
+  const st = (typeof getUserStreakStatus === "function") ? getUserStreakStatus(userName) : { effectiveStreak: 0 };
+  const s = st.effectiveStreak || 0;
+  if (s >= 14) return { multiplier: 1.5, bonusPct: 50, streak: s };
+  if (s >= 7)  return { multiplier: 1.3, bonusPct: 30, streak: s };
+  if (s >= 3)  return { multiplier: 1.15, bonusPct: 15, streak: s };
+  return { multiplier: 1.0, bonusPct: 0, streak: s };
+}
+
+function getUserXp(userName) {
+  if (!userName) return 0;
+  const uKey = userName.toLowerCase().trim();
+  const u = (appData.users || []).find(x => x.name.toLowerCase().trim() === uKey);
+  const cloudXp = u ? Number(u.xp || 0) : 0;
+  const localXp = Number(localStorage.getItem(`xp_${uKey}`) || 0);
+  return Math.max(cloudXp, localXp);
+}
+
+function getUserWeeklyXp(userName) {
+  if (!userName) return 0;
+  const uKey = userName.toLowerCase().trim();
+  const u = (appData.users || []).find(x => x.name.toLowerCase().trim() === uKey);
+  const cloudW = u ? Number(u.weeklyXp || 0) : 0;
+  const monStr = getMondayDateStrClient();
+  const localStart = localStorage.getItem(`weekly_xp_start_${uKey}`) || "";
+  const localW = (localStart === monStr) ? Number(localStorage.getItem(`weekly_xp_${uKey}`) || 0) : 0;
+  return Math.max(cloudW, localW);
+}
+
+function showLevelUpToast(newLevel) {
+  if (typeof triggerConfetti === "function") triggerConfetti();
+  const existing = document.getElementById("level-up-toast");
+  if (existing) existing.remove();
+  const el = document.createElement("div");
+  el.id = "level-up-toast";
+  el.className = "level-up-toast";
+  el.innerHTML = `🎉 <b>LEVEL UP!</b> Dosáhl(a) jsi <b>Úrovně ${newLevel}</b>! ⚡`;
+  document.body.appendChild(el);
+  setTimeout(() => { if (el.parentNode) el.remove(); }, 3400);
+}
+
+function addLocalXp(userName, xpGain) {
+  if (!userName || !xpGain || xpGain <= 0) return;
+  const uKey = userName.toLowerCase().trim();
+  const oldLvl = getLevelInfo(getUserXp(userName)).level;
+
+  const newTotal = getUserXp(userName) + xpGain;
+  const monStr = getMondayDateStrClient();
+  const newWeekly = getUserWeeklyXp(userName) + xpGain;
+
+  localStorage.setItem(`xp_${uKey}`, String(newTotal));
+  localStorage.setItem(`weekly_xp_${uKey}`, String(newWeekly));
+  localStorage.setItem(`weekly_xp_start_${uKey}`, monStr);
+
+  const u = (appData.users || []).find(x => x.name.toLowerCase().trim() === uKey);
+  if (u) { u.xp = newTotal; u.weeklyXp = newWeekly; }
+  if (currentUser && currentUser.name.toLowerCase().trim() === uKey) {
+    currentUser.xp = newTotal;
+    currentUser.weeklyXp = newWeekly;
+    localStorage.setItem("cur_user", JSON.stringify(currentUser));
+  }
+
+  const newLvl = getLevelInfo(newTotal).level;
+  if (newLvl > oldLvl) showLevelUpToast(newLvl);
 }
