@@ -557,6 +557,7 @@ function updateStudyTimerUI() {
 
 function setScreen(scr) { 
   if (currentScreen === "SHOP" && scr !== "SHOP") cancelPreview();
+  if (currentScreen === "AVATAR_SHOP" && scr !== "AVATAR_SHOP" && typeof cancelAvatarPreview === "function") cancelAvatarPreview();
   currentScreen = scr; registerUserAction(); 
   hideSystemKeyboard();
   setTimeout(hideSystemKeyboard, 80);
@@ -803,4 +804,168 @@ function addLocalXp(userName, xpGain) {
 
   const newLvl = getLevelInfo(newTotal).level;
   if (newLvl > oldLvl) showLevelUpToast(newLvl);
+}
+const AVATAR_CATEGORIES = [
+  { id: 'base', label: '🧑 Postava' },
+  { id: 'hat', label: '👑 Čepice' },
+  { id: 'glasses', label: '😎 Brýle' },
+  { id: 'outfit', label: '🦸 Oblek' },
+  { id: 'pet', label: '🐉 Doplněk' },
+  { id: 'bg', label: '🌌 Pozadí' }
+];
+
+const AVATAR_ITEMS = [
+  // Postavy
+  { id: 'base_boy', slot: 'base', name: 'Kluk', cost: 0 },
+  { id: 'base_girl', slot: 'base', name: 'Holka', cost: 0 },
+  { id: 'base_cat', slot: 'base', name: 'Kočka 🐱', cost: 30 },
+  { id: 'base_robot', slot: 'base', name: 'Robot 🤖', cost: 45 },
+  { id: 'base_alien', slot: 'base', name: 'Mimozemšťan 👾', cost: 55 },
+  // Čepice
+  { id: 'hat_cap', slot: 'hat', name: 'Kšiltovka 🧢', cost: 20 },
+  { id: 'hat_headphones', slot: 'hat', name: 'Sluchátka 🎧', cost: 30 },
+  { id: 'hat_viking', slot: 'hat', name: 'Vikingská helma', cost: 45 },
+  { id: 'hat_wizard', slot: 'hat', name: 'Čaroděj 🧙', cost: 55 },
+  { id: 'hat_crown', slot: 'hat', name: 'Zlatá koruna 👑', cost: 80 },
+  // Brýle
+  { id: 'gl_nerd', slot: 'glasses', name: 'Chytré brýle 🤓', cost: 15 },
+  { id: 'gl_sun', slot: 'glasses', name: 'Sluneční 😎', cost: 25 },
+  { id: 'gl_pirate', slot: 'glasses', name: 'Pirátská páska 🏴‍☠️', cost: 30 },
+  { id: 'gl_visor', slot: 'glasses', name: 'Kyber-vizor', cost: 50 },
+  // Oblečení
+  { id: 'outfit_tee', slot: 'outfit', name: 'Modré triko', cost: 0 },
+  { id: 'outfit_bolt', slot: 'outfit', name: 'Triko Blesk ⚡', cost: 20 },
+  { id: 'outfit_hoodie', slot: 'outfit', name: 'Zelená mikina', cost: 25 },
+  { id: 'outfit_armor', slot: 'outfit', name: 'Rytířské brnění', cost: 50 },
+  { id: 'outfit_cape', slot: 'outfit', name: 'Superhrdina 🦸', cost: 60 },
+  // Doplňky / Mazlíčci
+  { id: 'pet_ball', slot: 'pet', name: 'Fotbalový míč ⚽', cost: 20 },
+  { id: 'pet_sword', slot: 'pet', name: 'Rytířský meč ⚔️', cost: 35 },
+  { id: 'pet_wand', slot: 'pet', name: 'Kouzelná hůlka ✨', cost: 40 },
+  { id: 'pet_rocket', slot: 'pet', name: 'Mini-raketa 🚀', cost: 50 },
+  { id: 'pet_dragon', slot: 'pet', name: 'Mini-drak 🐉', cost: 75 },
+  // Pozadí
+  { id: 'bg_space', slot: 'bg', name: 'Noční vesmír', cost: 0 },
+  { id: 'bg_forest', slot: 'bg', name: 'Zelený les', cost: 15 },
+  { id: 'bg_lava', slot: 'bg', name: 'Sopečná láva', cost: 30 },
+  { id: 'bg_gold', slot: 'bg', name: 'Zlatá záře', cost: 60 }
+];
+
+let avatarShopTab = 'hat';
+let avatarPreviewEquip = null;
+
+function parseAvatarEquipStr(str) {
+  const res = { base: 'base_boy', bg: 'bg_space', outfit: 'outfit_tee', hat: '', glasses: '', pet: '' };
+  if (!str) return res;
+  String(str).split(';').forEach(pair => {
+    const idx = pair.indexOf('=');
+    if (idx > 0) {
+      const k = pair.slice(0, idx).trim();
+      const v = pair.slice(idx + 1).trim();
+      if (k in res) res[k] = v;
+    }
+  });
+  return res;
+}
+
+function serializeAvatarEquip(obj) {
+  return ['base', 'bg', 'outfit', 'hat', 'glasses', 'pet']
+    .map(k => `${k}=${(obj && obj[k]) ? obj[k] : ''}`)
+    .join(';');
+}
+
+function getUserAvatarItems(userName) {
+  const defaults = ['base_boy', 'base_girl', 'bg_space', 'outfit_tee'];
+  if (!userName) return defaults;
+  const uKey = userName.toLowerCase().trim();
+  const u = (appData.users || []).find(x => x.name.toLowerCase().trim() === uKey);
+  const cloud = (u && Array.isArray(u.avatarItems)) ? u.avatarItems : [];
+  let local = [];
+  try { local = JSON.parse(localStorage.getItem(`av_items_${uKey}`) || '[]'); } catch(e) {}
+  return [...new Set([...defaults, ...cloud, ...local])];
+}
+
+function getUserAvatarEquip(userName) {
+  if (!userName) return parseAvatarEquipStr('');
+  const uKey = userName.toLowerCase().trim();
+  const u = (appData.users || []).find(x => x.name.toLowerCase().trim() === uKey);
+  const localStr = localStorage.getItem(`av_equip_${uKey}`);
+  const cloudStr = u ? (u.avatarEquipStr || '') : '';
+  return parseAvatarEquipStr(localStr !== null ? localStr : cloudStr);
+}
+
+function previewAvatarItem(slot, itemId) {
+  if (!currentUser) return;
+  const baseEq = avatarPreviewEquip ? { ...avatarPreviewEquip } : getUserAvatarEquip(currentUser.name);
+  baseEq[slot] = itemId;
+  avatarPreviewEquip = baseEq;
+  if (typeof renderScreen === "function") renderScreen();
+}
+
+function cancelAvatarPreview() {
+  avatarPreviewEquip = null;
+}
+
+function equipAvatarItem(slot, itemId) {
+  if (!currentUser) return;
+  avatarPreviewEquip = null;
+  const uKey = currentUser.name.toLowerCase().trim();
+  const eq = getUserAvatarEquip(currentUser.name);
+  eq[slot] = itemId;
+  const eqStr = serializeAvatarEquip(eq);
+
+  localStorage.setItem(`av_equip_${uKey}`, eqStr);
+  localStorage.setItem(`av_ts_${uKey}`, String(Date.now()));
+  const u = (appData.users || []).find(x => x.name.toLowerCase().trim() === uKey);
+  if (u) u.avatarEquipStr = eqStr;
+
+  try {
+    const fd = new URLSearchParams();
+    fd.append("action", "equip_avatar");
+    fd.append("user", currentUser.name);
+    fd.append("equipStr", eqStr);
+    fetch(API_URL, { method: "POST", mode: "no-cors", body: fd });
+  } catch(e) {}
+  if (typeof renderScreen === "function") renderScreen();
+}
+
+function buyAvatarItem(itemId) {
+  if (!currentUser) return;
+  const item = AVATAR_ITEMS.find(x => x.id === itemId);
+  if (!item) return;
+
+  const coins = getUserCoins(currentUser.name);
+  if (coins < item.cost) { alert("Nemáš dostatek mincí! 🪙"); return; }
+
+  const uKey = currentUser.name.toLowerCase().trim();
+  const u = (appData.users || []).find(x => x.name.toLowerCase().trim() === uKey);
+  if (u) u.coins = Math.max(0, Number(u.coins || 0) - item.cost);
+  currentUser.coins = u ? u.coins : Math.max(0, coins - item.cost);
+  localStorage.setItem(`coins_${uKey}`, String(currentUser.coins));
+
+  const owned = getUserAvatarItems(currentUser.name);
+  if (!owned.includes(item.id)) owned.push(item.id);
+  localStorage.setItem(`av_items_${uKey}`, JSON.stringify(owned));
+  if (u) u.avatarItems = owned;
+
+  avatarPreviewEquip = null;
+  const eq = getUserAvatarEquip(currentUser.name);
+  eq[item.slot] = item.id;
+  const eqStr = serializeAvatarEquip(eq);
+  localStorage.setItem(`av_equip_${uKey}`, eqStr);
+  localStorage.setItem(`av_ts_${uKey}`, String(Date.now()));
+  if (u) u.avatarEquipStr = eqStr;
+  localStorage.setItem("cur_user", JSON.stringify(currentUser));
+
+  if (typeof sndFanfare === "function") sndFanfare();
+  try {
+    const fd = new URLSearchParams();
+    fd.append("action", "buy_avatar_item");
+    fd.append("user", currentUser.name);
+    fd.append("itemId", item.id);
+    fd.append("cost", item.cost);
+    fd.append("equipStr", eqStr);
+    fetch(API_URL, { method: "POST", mode: "no-cors", body: fd });
+  } catch(e) {}
+  if (typeof renderScreen === "function") renderScreen();
 }

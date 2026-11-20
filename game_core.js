@@ -85,6 +85,10 @@ function goBack() {
     cancelPreview();
     setScreen("SELECT_SUBJECT");
   }
+  else if (currentScreen === "AVATAR_SHOP") {
+    if (typeof cancelAvatarPreview === "function") cancelAvatarPreview();
+    setScreen("SHOP");
+  }
   else if (currentScreen === "CAMPAIGN_HUB" || currentScreen === "SELECT_MATH_OP") {
     setScreen("SELECT_SUBJECT");
   }

@@ -73,7 +73,24 @@ function syncAllUsersXpFromCloud(usersArr) {
     u.weeklyXp = bestW;
   });
 }
-
+function syncAllUsersAvatarFromCloud(usersArr) {
+  if (!Array.isArray(usersArr)) return;
+  usersArr.forEach(u => {
+    if (!u || !u.name) return;
+    const uKey = u.name.toLowerCase().trim();
+    if (Array.isArray(u.avatarItems)) {
+      let local = [];
+      try { local = JSON.parse(localStorage.getItem(`av_items_${uKey}`) || '[]'); } catch(e) {}
+      const merged = [...new Set([...u.avatarItems, ...local])];
+      localStorage.setItem(`av_items_${uKey}`, JSON.stringify(merged));
+      u.avatarItems = merged;
+    }
+    const lastLocalTs = Number(localStorage.getItem(`av_ts_${uKey}`) || 0);
+    if (u.avatarEquipStr && (Date.now() - lastLocalTs > 10000)) {
+      localStorage.setItem(`av_equip_${uKey}`, u.avatarEquipStr);
+    }
+  });
+}
 async function loadData() {
   checkDateRollover();
   if (currentUser) {
@@ -107,6 +124,7 @@ async function syncDataQuietly() {
       syncAllUsersTimeFromCloud(appData.users);
       syncAllUsersStreakFromCloud(appData.users);
       syncAllUsersXpFromCloud(appData.users);
+      syncAllUsersAvatarFromCloud(appData.users);
 
       if (currentUser && appData.users) {
         const foundU = appData.users.find(u => u.name.toLowerCase().trim() === currentUser.name.toLowerCase().trim());
@@ -147,6 +165,7 @@ async function syncData() {
       syncAllUsersTimeFromCloud(appData.users);
       syncAllUsersStreakFromCloud(appData.users);
       syncAllUsersXpFromCloud(appData.users);
+      syncAllUsersAvatarFromCloud(appData.users);
 
       if (currentUser && appData.users) {
         const foundU = appData.users.find(u => u.name.toLowerCase().trim() === currentUser.name.toLowerCase().trim());
