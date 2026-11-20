@@ -5,6 +5,9 @@
 function addReward(count = 1, section = "Lekce") {
   if (!currentUser) return;
   currentUser.stars = (currentUser.stars || 0) + count;
+  const xpInfo = (typeof getStreakXpInfo === "function") ? getStreakXpInfo(currentUser.name) : { multiplier: 1 };
+  const xpGain = Math.max(1, Math.round(count * 10 * xpInfo.multiplier));
+  if (typeof addLocalXp === "function") addLocalXp(currentUser.name, xpGain);
   localStorage.setItem("cur_user", JSON.stringify(currentUser));
   if(typeof updateFooter === 'function') updateFooter();
   
@@ -13,7 +16,8 @@ function addReward(count = 1, section = "Lekce") {
       const fd = new URLSearchParams();
       fd.append("action", "log_activity"); fd.append("user", currentUser.name);
       fd.append("subject", selectedSubject); fd.append("section", section);
-      fd.append("stars", count); fd.append("minutes", (todaySecondsStudied / 60).toFixed(2));
+      fd.append("stars", count); fd.append("xp", xpGain);
+      fd.append("minutes", (todaySecondsStudied / 60).toFixed(2));
       fetch(API_URL, { method: "POST", mode: "no-cors", body: fd });
     } catch(e) {}
   }
