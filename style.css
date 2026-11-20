@@ -111,7 +111,7 @@ header { height: 48px; background-color: var(--col-card); border-bottom: 2px sol
 .badge { background: var(--col-card-alt); color: var(--col-text); border: 1px solid var(--col-card-border); padding: 0 8px; height: 32px; display: flex; align-items: center; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; max-width: 130px; }
 .badge.active { background: var(--col-active-tab); color: var(--col-on-active); border-color: var(--col-text); }
 .spacer { flex: 1; }
-.tts-toggle-btn { background: var(--col-card-alt); color: var(--col-text); border: 1px solid var(--col-card-border); border-radius: 6px; padding: 4px 6px; font-size: 12px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 3px; }
+.tts-toggle-btn { background: var(--col-card-alt); color: var(--col-text); border: 1px solid var(--col-card-border); border-radius: 6px; padding: 4px 6px; font-size: 12px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 3px; white-space: nowrap; flex-shrink: 0; }
 .tts-toggle-btn.active { background: var(--col-green); color: var(--col-on-green); border-color: var(--col-text); }
 .study-timer-box { background: var(--col-card-alt); color: var(--col-text); border: 1px solid var(--col-card-border); padding: 4px 7px; border-radius: 6px; font-size: 12px; font-weight: bold; display: flex; align-items: center; gap: 4px; white-space: nowrap; }
 .study-timer-box.bonus { border-color: var(--col-yellow); color: var(--col-yellow); }
@@ -133,7 +133,8 @@ footer { height: 32px; background-color: var(--col-card); border-top: 1px solid 
 
 .prompt-box { background: var(--col-card); border: 1px solid var(--col-card-border); border-radius: 10px; padding: 14px; text-align: center; font-size: 22px; font-weight: 500; color: var(--col-yellow); margin-bottom: 10px; position: relative; }
 .hebrew-text { font-family: 'Tinos', serif; direction: rtl; font-size: 32px !important; line-height: 1.4; }
-.audio-btn { position: absolute; right: 12px; top: 12px; font-size: 20px; cursor: pointer; opacity: 0.8; }
+.prompt-box:has(.audio-btn) {  padding-left: 46px;  padding-right: 46px;}
+.audio-btn {  position: absolute;  right: 10px;  top: 50%;  transform: translateY(-50%);  font-size: 20px;  cursor: pointer;  opacity: 0.9;  padding: 4px 6px;  border-radius: 8px;  background: rgba(128, 128, 128, 0.14);}
 
 .action-btn { background: var(--col-active-tab); border: 1px solid var(--col-card-border); color: var(--col-on-active); padding: 12px; border-radius: 8px; font-size: 17px; font-weight: bold; text-align: center; cursor: pointer; margin-top: 8px; }
 .action-btn.green { background: var(--col-green); color: var(--col-on-green); }
