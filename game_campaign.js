@@ -442,6 +442,7 @@ function clickCmpQuizOpt(optOrIdx) {
 
   if (opt === task.correctAns) {
     sndOk(false);
+    if (typeof addReward === "function") addReward(1, "Trénink: " + selectedGroupKey);
     if (task.type === 'QUIZ_OUT' || task.type === 'QUIZ_IN' || task.type === 'KVIZ') {
       const dir = (task.type === 'QUIZ_OUT' || task.type === 'KVIZ') ? 'DIR_OUT' : 'DIR_IN';
       advanceCmpMastery(task.data.question, dir, 1);
@@ -514,6 +515,7 @@ function clickCmpScrambleTile(idx) {
     tile.isWrong = true;
     
     if (!task.hadMistake) {
+      if (typeof addReward === "function") addReward(1, "Trénink: " + selectedGroupKey);
       cmpHearts = Math.max(0, cmpHearts - 1); 
       task.hadMistake = true;
       if (task.data && !cmpMistakes.some(m => m.question === task.data.question)) {
