@@ -140,20 +140,27 @@ function equipSkin(skinId) {
 
 function setUserPIN() {
   if (!currentUser) return;
-  const newPin = prompt("Zadej nový číselný PIN (např. 1234). Pokud chceš PIN zrušit, nevyplňuj nic a dej OK:");
-  if (newPin !== null) {
-     hideSystemKeyboard();
-     const pinStr = newPin.trim(); const uKey = currentUser.name.toLowerCase().trim();
-     const u = (appData.users || []).find(x => x.name.toLowerCase().trim() === uKey);
-     if (u) u.pin = pinStr;
-     localStorage.setItem(`user_pin_${uKey}`, pinStr);
-     try {
-       const fd = new URLSearchParams(); fd.append("action", "set_pin"); fd.append("user", currentUser.name); fd.append("pin", pinStr);
-       fetch(API_URL, { method: "POST", mode: "no-cors", body: fd });
-     } catch(e) {}
-     alert(pinStr ? `Skvělé! Tvé heslo bylo nastaveno na: ${pinStr}` : "Heslo bylo zrušeno. Přístup je volný.");
-     if(typeof renderScreen==='function') renderScreen();
-  }
+  openPinModal({
+    title: `🔐 Ochrana profilu: ${currentUser.name}`,
+    subtitle: "Zadej nové heslo (nech prázdné a potvrď pro zrušení):",
+    placeholder: "Nové heslo...",
+    maskInput: false,
+    onSubmit: (newPin) => {
+      const pinStr = newPin.trim();
+      const uKey = currentUser.name.toLowerCase().trim();
+      const u = (appData.users || []).find(x => x.name.toLowerCase().trim() === uKey);
+      if (u) u.pin = pinStr;
+      localStorage.setItem(`user_pin_${uKey}`, pinStr);
+      try {
+        const fd = new URLSearchParams();
+        fd.append("action", "set_pin"); fd.append("user", currentUser.name); fd.append("pin", pinStr);
+        fetch(API_URL, { method: "POST", mode: "no-cors", body: fd });
+      } catch(e) {}
+      alert(pinStr ? `Skvělé! Tvé heslo bylo nastaveno na: ${pinStr}` : "Heslo bylo zrušeno. Přístup je volný.");
+      if (typeof renderScreen === 'function') renderScreen();
+      return true;
+    }
+  });
 }
 
 function forceHardReload() { const newUrl = window.location.origin + window.location.pathname + '?v=' + Date.now(); window.location.replace(newUrl); }
@@ -568,13 +575,29 @@ function selectUser(name, grade, targetMinutes) {
   const uKey = name.toLowerCase().trim();
   const foundU = (appData.users || []).find(u => u.name.toLowerCase().trim() === uKey);
   const savedPin = (foundU && foundU.pin) ? foundU.pin : localStorage.getItem(`user_pin_${uKey}`);
- if (savedPin && savedPin !== "") {
-     const inputPin = prompt(`Profil ${name} je chráněn PINem. Zadejte heslo:`);
-     hideSystemKeyboard();
-     setTimeout(hideSystemKeyboard, 80);
-     if (inputPin === null) return; 
-     if (inputPin !== savedPin) { alert("Nesprávné heslo!"); return; }
+
+  if (savedPin && savedPin !== "") {
+    openPinModal({
+      title: `🔒 Profil: ${name}`,
+      subtitle: "Profil je chráněn. Zadej heslo:",
+      placeholder: "Heslo...",
+      maskInput: true,
+      onSubmit: (inputPin) => {
+        if (inputPin.trim() !== String(savedPin).trim()) {
+          return "Nesprávné heslo!";
+        }
+        completeSelectUser(name, grade, targetMinutes);
+        return true;
+      }
+    });
+    return;
   }
+  completeSelectUser(name, grade, targetMinutes);
+}
+
+function completeSelectUser(name, grade, targetMinutes) {
+  const uKey = name.toLowerCase().trim();
+  const foundU = (appData.users || []).find(u => u.name.toLowerCase().trim() === uKey);
   checkDateRollover();
   const themesArr = typeof getUserUnlockedThemes==='function'?getUserUnlockedThemes(name):[]; 
   const activeTh = typeof getUserActiveTheme==='function'?getUserActiveTheme(name):'default';
@@ -589,14 +612,12 @@ function selectUser(name, grade, targetMinutes) {
   localStorage.setItem("cur_user", JSON.stringify(currentUser)); 
   if(typeof applyAppSkin==='function') applyAppSkin(currentUser.activeTheme);
   
-  // DŮLEŽITÉ (BUGFIX): Načtení maximálního času z cloudu a z lokální paměti
   let localSec = typeof loadUserStudyTime==='function'?loadUserStudyTime(currentUser.name):0;
   let cloudSec = (foundU && appData.syncDate === getTodayDateStr()) ? Math.round(Number(foundU.todayMinutes || 0) * 60) : 0;
   todaySecondsStudied = Math.max(localSec, cloudSec);
   localStorage.setItem(getStudyTimeKey(currentUser.name), String(todaySecondsStudied));
   
   lastCloudSyncSec = todaySecondsStudied; 
-
   isTimerPaused = false; 
   if(typeof updateStudyTimerUI==='function') updateStudyTimerUI(); 
   if(typeof setScreen==='function') setScreen("SELECT_SUBJECT");
@@ -968,4 +989,71 @@ function buyAvatarItem(itemId) {
     fetch(API_URL, { method: "POST", mode: "no-cors", body: fd });
   } catch(e) {}
   if (typeof renderScreen === "function") renderScreen();
+}
+function openPinModal({ title, subtitle, placeholder, maskInput, onSubmit }) {
+  const prev = document.getElementById("pin-modal-overlay");
+  if (prev) prev.remove();
+
+  const overlay = document.createElement("div");
+  overlay.id = "pin-modal-overlay";
+  overlay.className = "streak-modal-backdrop";
+
+  overlay.innerHTML = `
+    <div class="streak-modal-card" onclick="event.stopPropagation()">
+      <h3 style="text-align:center;color:var(--col-yellow);margin-bottom:6px;">${title}</h3>
+      <p style="text-align:center;font-size:13px;color:var(--col-text-muted);margin-bottom:12px;">${subtitle}</p>
+      <div style="display:flex;gap:6px;align-items:center;margin-bottom:8px;">
+        <input id="pin-modal-input" type="${maskInput ? 'password' : 'text'}"
+               autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+               placeholder="${placeholder || ''}"
+               style="flex:1;min-width:0;padding:11px 12px;font-size:18px;border-radius:8px;border:2px solid var(--col-active-tab);background:var(--col-card);color:var(--col-text);user-select:text;-webkit-user-select:text;" />
+        <button id="pin-modal-eye" type="button" class="toggle-btn" style="padding:11px 12px;font-size:18px;" title="Zobrazit/skrýt">👁️</button>
+      </div>
+      <div id="pin-modal-error" style="color:var(--col-red);font-size:13px;font-weight:bold;text-align:center;min-height:18px;margin-bottom:8px;"></div>
+      <div class="grid-2">
+        <button id="pin-modal-cancel" type="button" class="action-btn" style="margin-top:0;background:var(--col-card-alt);">Zrušit</button>
+        <button id="pin-modal-ok" type="button" class="action-btn green" style="margin-top:0;">OK</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  const inp = document.getElementById("pin-modal-input");
+  const errEl = document.getElementById("pin-modal-error");
+  const eyeBtn = document.getElementById("pin-modal-eye");
+
+  const closeModal = () => {
+    if (inp) {
+      inp.readOnly = true;
+      inp.disabled = true;
+      inp.blur();
+    }
+    hideSystemKeyboard();
+    setTimeout(hideSystemKeyboard, 100);
+    if (overlay.parentNode) overlay.remove();
+  };
+
+  overlay.onclick = closeModal;
+  document.getElementById("pin-modal-cancel").onclick = closeModal;
+
+  eyeBtn.onclick = () => {
+    inp.type = (inp.type === "password") ? "text" : "password";
+  };
+
+  const handleConfirm = () => {
+    const res = onSubmit(inp.value);
+    if (res === true) {
+      closeModal();
+    } else {
+      errEl.innerText = res || "Neplatné heslo!";
+      inp.select();
+    }
+  };
+
+  document.getElementById("pin-modal-ok").onclick = handleConfirm;
+  inp.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); handleConfirm(); }
+  });
+
+  setTimeout(() => { try { inp.focus(); } catch(e) {} }, 60);
 }
