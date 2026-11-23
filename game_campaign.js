@@ -88,6 +88,18 @@ function generateMathDistractors(correctStr, fallbackPool) {
 // ==========================================
 // CHYTRÝ TRÉNINK PRO BĚŽNÉ LEKCE (MIX)
 // ==========================================
+function startSmartMix() {
+  if (typeof stopArcadeLoop === "function") stopArcadeLoop();
+  if (typeof stopSnakeLoop === "function") stopSnakeLoop();
+  if (typeof stopTargetTimer === "function") stopTargetTimer();
+
+  cmpCapOneLevelPerSession = false;
+  cmpSessionAdvanced = new Set();
+
+  const allItems = activeItems.filter(it => 
+    (typeof viewMode !== 'undefined' && viewMode === "LESSONS" ? it.lesson : it.topic) === selectedGroupKey
+  );
+  if (allItems.length === 0) return;
 // 1. Zjistit mastery pro všechny trénovatelné položky (Kvízy i Slova)
   const trainableItems = allItems.filter(it => it.type === "SLOVO" || it.type === "KVIZ");
   if (trainableItems.length === 0) return;
@@ -495,6 +507,7 @@ function clickCmpScrambleTile(idx) {
     if (task.placed.length === task.tokens.length) { 
       cmpState = 'EVAL'; if (isAutoTTS) speakWord(task.data.question, selectedSubject); 
       if (!task.hadMistake) {
+        if (typeof addReward === "function") addReward(1, "Trénink: " + selectedGroupKey);
         const isMultiWord = task.data.question.trim().includes(' ') || task.data.question.trim().includes('-');
         const step = isMultiWord ? 2 : 1;
         advanceCmpMastery(task.data.question, 'DIR_IN', step);
@@ -511,7 +524,6 @@ function clickCmpScrambleTile(idx) {
     tile.isWrong = true;
     
     if (!task.hadMistake) {
-      if (typeof addReward === "function") addReward(1, "Trénink: " + selectedGroupKey);
       cmpHearts = Math.max(0, cmpHearts - 1); 
       task.hadMistake = true;
       if (task.data && !cmpMistakes.some(m => m.question === task.data.question)) {
