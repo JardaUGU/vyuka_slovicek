@@ -22,6 +22,7 @@ function syncAllUsersTimeFromCloud(usersArr) {
 function syncAllUsersStreakFromCloud(usersArr) {
   if (!Array.isArray(usersArr)) return;
   usersArr.forEach(u => {
+    if (u.pin !== undefined) localStorage.setItem(`user_pin_${uKey}`, String(u.pin || ''));
     if (!u || !u.name) return;
     const uKey = u.name.toLowerCase().trim();
     const cloudLast = typeof parseDateOnlyStr === "function" ? parseDateOnlyStr(u.streakLastDate) : String(u.streakLastDate || '').slice(0, 10);
