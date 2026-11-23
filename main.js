@@ -141,7 +141,7 @@ function equipSkin(skinId) {
 function setUserPIN() {
   if (!currentUser) return;
   openPinModal({
-    title: `🔐 Ochrana profilu: ${currentUser.name}`,
+    title: "🔐 Ochrana profilu: " + currentUser.name,
     subtitle: "Zadej nové heslo (nech prázdné a potvrď pro zrušení):",
     placeholder: "Nové heslo...",
     maskInput: false,
@@ -578,7 +578,7 @@ function selectUser(name, grade, targetMinutes) {
 
   if (savedPin && savedPin !== "") {
     openPinModal({
-      title: `🔒 Profil: ${name}`,
+      title: "🔒 Profil: " + name,
       subtitle: "Profil je chráněn. Zadej heslo:",
       placeholder: "Heslo...",
       maskInput: true,
