@@ -574,7 +574,7 @@ function setScreen(scr) {
 function selectUser(name, grade, targetMinutes) {
   const uKey = name.toLowerCase().trim();
   const foundU = (appData.users || []).find(u => u.name.toLowerCase().trim() === uKey);
-  const savedPin = (foundU && foundU.pin) ? foundU.pin : localStorage.getItem(`user_pin_${uKey}`);
+  const savedPin = (foundU && foundU.pin !== undefined) ? foundU.pin : localStorage.getItem(`user_pin_${uKey}`);}`);
 
   if (savedPin && savedPin !== "") {
     openPinModal({
