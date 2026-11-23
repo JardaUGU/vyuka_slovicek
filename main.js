@@ -141,7 +141,7 @@ function equipSkin(skinId) {
 function setUserPIN() {
   if (!currentUser) return;
   openPinModal({
-    title: `🔐 Ochrana profilu: ${currentUser.name}`,
+    title: "🔐 Ochrana profilu: " + currentUser.name,
     subtitle: "Zadej nové heslo (nech prázdné a potvrď pro zrušení):",
     placeholder: "Nové heslo...",
     maskInput: false,
@@ -574,11 +574,11 @@ function setScreen(scr) {
 function selectUser(name, grade, targetMinutes) {
   const uKey = name.toLowerCase().trim();
   const foundU = (appData.users || []).find(u => u.name.toLowerCase().trim() === uKey);
-  const savedPin = (foundU && foundU.pin) ? foundU.pin : localStorage.getItem(`user_pin_${uKey}`);
+  const savedPin = (foundU && foundU.pin !== undefined) ? foundU.pin : localStorage.getItem("user_pin_" + uKey);
 
   if (savedPin && savedPin !== "") {
     openPinModal({
-      title: `🔒 Profil: ${name}`,
+      title: "🔒 Profil: " + name,
       subtitle: "Profil je chráněn. Zadej heslo:",
       placeholder: "Heslo...",
       maskInput: true,

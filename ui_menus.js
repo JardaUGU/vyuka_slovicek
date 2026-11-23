@@ -98,7 +98,7 @@ function _renderSelectUser(main, bSubj, bGroup) {
         if (st.state === 'FREEZABLE') streakLabel = `🧊 Série: ${st.effectiveStreak} dní (zachraň!)`;
         else if (st.state === 'BROKEN') streakLabel = `💔 Série: 0 (bylo ${st.rawStreak})`;
         const coins = Number(u.coins || 0); const freezes = typeof getUserItemCount === 'function' ? getUserItemCount(u.name, "Zmrazeni") : 0;
-        const hasPin = !!(u.pin || localStorage.getItem(`user_pin_${u.name.toLowerCase().trim()}`));
+        const hasPin = !!(u.pin !== undefined ? u.pin : localStorage.getItem(`user_pin_${u.name.toLowerCase().trim()}`));
         let themesArr = typeof getUserUnlockedThemes === 'function' ? getUserUnlockedThemes(u.name) : [];
         const unlockedSkins = themesArr.filter(t => t !== 'default').map(t => { const s = typeof APP_SKINS !== 'undefined' ? APP_SKINS.find(x => x.id === t) : null; return s ? s.name.split(' ')[0] : t; }).join(' ');
         

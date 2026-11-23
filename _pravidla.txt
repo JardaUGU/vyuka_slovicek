@@ -164,7 +164,7 @@ PRAVIDLA PRO ÚPRAVU KÓDU A CHOVÁNÍ APLIKACE
 
 7.12. Chytrý trénink pro běžné lekce (SMART_MIX - game_campaign.js)
    - Spouští se tlačítkem „🧠 SPUSTIT CHYTRÝ TRÉNINK“ na obrazovce výběru her (SELECT_GAME).
-   - Výběr položek a nekonečné opakování: vybere až 10–15 položek z lekce s mastery < 2 ★. Pokud mají všechny 2 ★, vybere 15 náhodných položek a resetuje jim mastery na 0 ★.
+   - Výběr položek a nekonečné opakování: vybere až 10 položek s předností < 2 ★ a v případě potřeby doplní do 10 náhodnými zvládnutými položkami z lekce
    - Třífázová pedagogická vlna (Spaced Repetition + Anti-clustering):
      1. Vlna 1 (Poznávání): Kvízy s gramatikou (KVIZ) a pasivní porozumění Cizí ➔ CZ (QUIZ_IN, z toho 35 % jako čistý audio poslech 🎧).
      2. Vlna 2 (Aktivní překlad): Výběr ze 4 možností CZ ➔ Cizí (QUIZ_OUT).

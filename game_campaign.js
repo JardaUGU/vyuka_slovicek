@@ -99,27 +99,34 @@ function startSmartMix() {
   const allItems = activeItems.filter(it => 
     (typeof viewMode !== 'undefined' && viewMode === "LESSONS" ? it.lesson : it.topic) === selectedGroupKey
   );
-  
   if (allItems.length === 0) return;
+// 1. Zjistit mastery pro všechny trénovatelné položky (Kvízy i Slova)
+  const trainableItems = allItems.filter(it => it.type === "SLOVO" || it.type === "KVIZ");
+  if (trainableItems.length === 0) return;
 
-  // 1. Zjistit mastery pro všechny položky (Kvízy i Slova)
-  let pool = [];
-  let unmastered = allItems.filter(it => {
-    let m = 2;
+  const getItemScore = (it) => {
     if (it.type === "SLOVO") {
-      m = Math.min(getSavedMastery(it.question, 'DIR_IN'), getSavedMastery(it.question, 'DIR_OUT'));
-    } else if (it.type === "KVIZ") {
-      m = getSavedMastery(it.question, 'DIR_OUT');
+      return getSavedMastery(it.question, 'DIR_IN') + getSavedMastery(it.question, 'DIR_OUT'); // max 4
     }
-    return m < 2;
-  });
+    return getSavedMastery(it.question, 'DIR_OUT') * 2; // max 4
+  };
 
-  // 2. Výběr 15 položek (buď těch, co neumí, nebo 15 náhodných s resetem na 0)
+  let unmastered = trainableItems.filter(it => getItemScore(it) < 4);
+  let mastered = trainableItems.filter(it => getItemScore(it) >= 4);
+
+  // 2. Výběr 10 položek: přednostně chybné/nedokončené, zbytek do 10 doplníme zvládnutými z lekce
+  let wavePool = [];
   if (unmastered.length > 0) {
-    pool = unmastered.sort(() => Math.random() - 0.5).slice(0, 15);
+    unmastered.sort((a, b) => {
+      const sa = getItemScore(a), sb = getItemScore(b);
+      if (sa !== sb) return sa - sb; // 0 ★ před 1 ★
+      return Math.random() - 0.5;
+    });
+    const fillers = [...mastered].sort(() => Math.random() - 0.5);
+    wavePool = [...unmastered, ...fillers].slice(0, 10);
   } else {
-    pool = [...allItems].sort(() => Math.random() - 0.5).slice(0, 15);
-    pool.forEach(it => {
+    wavePool = [...trainableItems].sort(() => Math.random() - 0.5).slice(0, 10);
+    wavePool.forEach(it => {
       saveWordMasteryToGoogle(it.question, 0, 'DIR_OUT');
       if (it.type === "SLOVO") saveWordMasteryToGoogle(it.question, 0, 'DIR_IN');
     });
@@ -130,8 +137,6 @@ function startSmartMix() {
   let wave2 = []; // CZ -> Cizí
   let wave3 = []; // Skládání (Scramble)
 
-  let wavePool = pool.slice(0, 10);
-
   wavePool.forEach(it => {
     if (it.type === "KVIZ") {
       wave1.push({ type: 'KVIZ', data: it, wave: 1 });
@@ -139,15 +144,18 @@ function startSmartMix() {
       if (selectedSubject === "Matematika") {
          wave1.push({ type: 'QUIZ_IN', data: it, wave: 1 });
       } else {
+         const mIn = getSavedMastery(it.question, 'DIR_IN');
+         const mOut = getSavedMastery(it.question, 'DIR_OUT');
+         const forcePractice = (mIn >= 2 && mOut >= 2); // Doplněná slova procvičíme ve všech vlnách
          const isMultiWord = it.question.trim().includes(' ') || it.question.trim().includes('-');
          if (isMultiWord) {
-            if (getSavedMastery(it.question, 'DIR_IN') < 2) {
+            if (mIn < 2 || forcePractice) {
                wave1.push({ type: 'QUIZ_IN', data: it, wave: 1 });
             }
             wave3.push({ type: 'SCRAMBLE', data: it, wave: 3 });
          } else {
-            if (getSavedMastery(it.question, 'DIR_IN') < 2) wave1.push({ type: 'QUIZ_IN', data: it, wave: 1 });
-            if (getSavedMastery(it.question, 'DIR_OUT') < 2) wave2.push({ type: 'QUIZ_OUT', data: it, wave: 2 });
+            if (mIn < 2 || forcePractice) wave1.push({ type: 'QUIZ_IN', data: it, wave: 1 });
+            if (mOut < 2 || forcePractice) wave2.push({ type: 'QUIZ_OUT', data: it, wave: 2 });
             wave3.push({ type: 'SCRAMBLE', data: it, wave: 3 });
          }
       }
@@ -499,6 +507,7 @@ function clickCmpScrambleTile(idx) {
     if (task.placed.length === task.tokens.length) { 
       cmpState = 'EVAL'; if (isAutoTTS) speakWord(task.data.question, selectedSubject); 
       if (!task.hadMistake) {
+        if (typeof addReward === "function") addReward(1, "Trénink: " + selectedGroupKey);
         const isMultiWord = task.data.question.trim().includes(' ') || task.data.question.trim().includes('-');
         const step = isMultiWord ? 2 : 1;
         advanceCmpMastery(task.data.question, 'DIR_IN', step);
@@ -515,7 +524,6 @@ function clickCmpScrambleTile(idx) {
     tile.isWrong = true;
     
     if (!task.hadMistake) {
-      if (typeof addReward === "function") addReward(1, "Trénink: " + selectedGroupKey);
       cmpHearts = Math.max(0, cmpHearts - 1); 
       task.hadMistake = true;
       if (task.data && !cmpMistakes.some(m => m.question === task.data.question)) {
