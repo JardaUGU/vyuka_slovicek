@@ -145,7 +145,7 @@ async function syncDataQuietly() {
       }
       if (typeof renderScreen === "function") renderScreen();
     } else { if (typeof renderScreen === "function") renderScreen(); }
-  } catch(e) { console.log("Offline mód aktivní"); if (typeof renderScreen === "function") renderScreen(); }
+  } catch(e) { console.warn("Offline mód aktivní:", e); if (typeof renderScreen === "function") renderScreen(); }
 }
 
 async function syncData() {
