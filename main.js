@@ -751,11 +751,11 @@ function getMondayDateStrClient() {
 function getLevelInfo(totalXp) {
   let xp = Math.max(0, Number(totalXp) || 0);
   let level = 1;
-  let need = 50;
+  let need = 250 * level;
   while (xp >= need) {
     xp -= need;
     level++;
-    need = 50 + (level - 1) * 30;
+    need = 250 * level;
   }
   const pct = Math.min(100, Math.round((xp / need) * 100));
   return { level, currentLevelXp: xp, nextLevelXp: need, pct, totalXp: Math.max(0, Number(totalXp) || 0) };
