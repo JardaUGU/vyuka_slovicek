@@ -104,7 +104,7 @@ function startCampaignTarget() {
   }
 
   targetSavedSet = uniqueItems.sort(() => Math.random() - 0.5).slice(0, 12);
-  initTargetSession(targetSavedSet, false);
+  initTargetSession(targetSavedSet, true);
 }
 
 // OPRAVA (Bod 5): Žádné opakování slov! Každé slovo ze sady vItems je použito přesně jednou.
@@ -117,10 +117,12 @@ function initTargetSession(vItems, resetBest = false) {
   targetIsNewRecord = false;
   targetLastSplitDiff = 0;
 
-  if (resetBest) {
+ if (resetBest || (typeof isCampaignMinigame !== 'undefined' && isCampaignMinigame)) {
     targetBestTime = null;
     targetPrevBestTime = null;
-    localStorage.removeItem(getTargetRecordKey());
+    if (resetBest && !(typeof isCampaignMinigame !== 'undefined' && isCampaignMinigame)) {
+      localStorage.removeItem(getTargetRecordKey());
+    }
   } else {
     const savedBest = localStorage.getItem(getTargetRecordKey());
     targetBestTime = savedBest ? parseFloat(savedBest) : null;
@@ -241,16 +243,18 @@ function checkTargetHit(slotIdx) {
       targetLastFinalTime = parseFloat((((Date.now() - targetStartTime) / 1000) + targetPenaltySec).toFixed(1));
       
       // Pokud překonal již existující rekord, dostane +1 zlaťák!
-      if (targetPrevBestTime && targetLastFinalTime < targetPrevBestTime) {
-        targetIsNewRecord = true;
-        targetBestTime = targetLastFinalTime;
-        localStorage.setItem(getTargetRecordKey(), String(targetBestTime));
-        if (typeof currentUser !== "undefined" && currentUser && typeof addCoins === "function") {
-          addCoins(currentUser.name, 1);
+      if (!(typeof isCampaignMinigame !== 'undefined' && isCampaignMinigame)) {
+        if (targetPrevBestTime && targetLastFinalTime < targetPrevBestTime) {
+          targetIsNewRecord = true;
+          targetBestTime = targetLastFinalTime;
+          localStorage.setItem(getTargetRecordKey(), String(targetBestTime));
+          if (typeof currentUser !== "undefined" && currentUser && typeof addCoins === "function") {
+            addCoins(currentUser.name, 1);
+          }
+        } else if (!targetPrevBestTime) {
+          targetBestTime = targetLastFinalTime;
+          localStorage.setItem(getTargetRecordKey(), String(targetBestTime));
         }
-      } else if (!targetPrevBestTime) {
-        targetBestTime = targetLastFinalTime;
-        localStorage.setItem(getTargetRecordKey(), String(targetBestTime));
       }
 
       sndFanfare();
