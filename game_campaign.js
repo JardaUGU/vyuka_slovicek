@@ -512,7 +512,7 @@ function startCampaign() {
     task.tokens = tokens;
     task.tiles = [...tokens, ...distractors].map((t, i) => ({ text: t, used: false, id: i })).sort(() => Math.random() - 0.5);
     task.placed = []; task.hardPlacedIds = []; task.isWordMode = isWordMode; task.hadMistake = false;
- }} else if (task.type === 'KVIZ') {
+   } else if (task.type === 'KVIZ') {
        task.opts = task.data.options; task.correctAns = task.data.answer; task.prompt = formatPromptText(task.data.question);
     }
   });
