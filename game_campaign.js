@@ -468,7 +468,7 @@ function startCampaign() {
 
   q = [...qRevision, ...qNewPassive, ...qNewActive, ...qGrammar, ...qSentences];
   if (q.length > 40) q = q.slice(0, 40);
-
+  assignHardScrambles(q, 2);
   q.forEach(task => {
     if (task.type === 'QUIZ_OUT' || task.type === 'QUIZ_IN') {
        const isOut = task.type === 'QUIZ_OUT';
@@ -503,13 +503,16 @@ function startCampaign() {
        }
 
     } else if (task.type === 'SCRAMBLE') {
-       const raw = task.data.question.replace(/\s*\([^)]*\)/g, '').trim();
-       const isWordMode = (raw.split(/\s+/).length >= 3 || raw.length > 15);
-       const tokens = isWordMode ? (raw.includes('-') ? raw.split('-').map(s=>s.trim()) : raw.split(/\s+/)) : getGraphemes(raw);
-       task.tokens = tokens;
-       task.tiles = tokens.map((t, i) => ({ text: t, used: false, id: i })).sort(() => Math.random() - 0.5);
-       task.placed = []; task.isWordMode = isWordMode; task.hadMistake = false;
-    } else if (task.type === 'KVIZ') {
+    const raw = task.data.question.replace(/\s*\([^)]*\)/g, '').trim();
+    const isWordMode = (raw.split(/\s+/).length >= 3 || raw.length > 15);
+    const tokens = isWordMode ? (raw.includes('-') ? raw.split('-').map(s=>s.trim()) : raw.split(/\s+/)) : getGraphemes(raw);
+    const distractors = (task.isHard && typeof buildScrambleDistractors === "function")
+      ? buildScrambleDistractors(tokens, isWordMode, task.data.question, allVItems, selectedSubject)
+      : [];
+    task.tokens = tokens;
+    task.tiles = [...tokens, ...distractors].map((t, i) => ({ text: t, used: false, id: i })).sort(() => Math.random() - 0.5);
+    task.placed = []; task.hardPlacedIds = []; task.isWordMode = isWordMode; task.hadMistake = false;
+ }} else if (task.type === 'KVIZ') {
        task.opts = task.data.options; task.correctAns = task.data.answer; task.prompt = formatPromptText(task.data.question);
     }
   });
@@ -578,7 +581,14 @@ function clickCmpScrambleTile(idx) {
   const task = cmpQueue[cmpIdx]; const tile = task.tiles[idx];
   
   if (tile.used || tile.isWrong) return; 
-
+  if (task.isHard) {
+    sndOk(false);
+    tile.used = true;
+    task.placed.push(tile.text);
+    task.hardPlacedIds.push(idx);
+    renderActiveGame();
+    return;
+  }
   if (tile.text === task.tokens[task.placed.length]) {
     sndOk(false); 
     tile.used = true; 
