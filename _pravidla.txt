@@ -21,7 +21,7 @@ PRAVIDLA PRO ÚPRAVU KÓDU A CHOVÁNÍ APLIKACE
    - Zlomky se vykreslují přes CSS flexbox vertikálně (čitatel, čára, jmenovatel). Mínusy a plusy ve výrazu se MUSÍ nahrazovat mezerami PŘED vygenerováním HTML zlomku (jinak se rozbije CSS "inline-flex"). Formát [a/b] v textu úloh převádí funkce formatPromptText() na vertikální zlomek.
    - Při stisku klávesnice v matematice se aktualizuje pouze div "#math-keyboard-input" (nesmí se volat celé renderActiveGame, jinak skáče obrazovka).
    - Tlačítko mazání na klávesnici funguje jako Backspace (⌫ - maže poslední znak, má pevnou hnědou barvu #b45309 čitelnou i v Matrix skinu).
-   - V krokových zlomcích se chybné nebo nekrácené matematické mezivýsledky vždy zapisují do historie s komentářem (nepoužívat blokující alert; alert se používá jen u syntakticky neplatného zápisu)
+   - V krokových zlomcích se chybné nebo nekrácené matematické mezivýsledky vždy zapisují do historie s komentářem ( nepoužívat blokující alert; alert se používá jen u syntakticky neplatného zápisu)
 
 4. OBCHOD, SÉRIE A NAVIGACE (main.js, game_core.js):
    - Zmrazení série (Streak Freeze) se reálně odečítá z inventáře uživatele za každý vynechaný den (jak na frontendu v main.js, tak na backendu v kod.gs ve funkci updateUserStreakInSheet).
