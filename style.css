@@ -558,3 +558,35 @@ footer { height: 32px; background-color: var(--col-card); border-top: 1px solid 
   from { opacity: 0; transform: translate(-50%, -18px); }
   to { opacity: 1; transform: translate(-50%, 0); }
 }
+
+/* =========================================================
+   TĚŽKÉ SKLÁDÁNÍ (VOLNÉ POLE BEZ NÁPOVĚDY DÉLKY)
+   ========================================================= */
+.hard-answer-box {
+  min-height: 68px;
+  background: var(--col-card-alt);
+  border: 2px dashed var(--col-active-tab);
+  border-radius: 10px;
+  padding: 8px 10px;
+  margin: 8px auto 12px auto;
+  max-width: 580px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 7px;
+}
+.hard-answer-box.ok {
+  border-style: solid;
+  border-color: var(--col-green);
+  background: var(--col-success-bg);
+}
+.hard-answer-box.err {
+  border-style: solid;
+  border-color: var(--col-red);
+  background: rgba(239, 68, 68, 0.14);
+}
+.hard-chip-placed {
+  border-color: var(--col-yellow);
+  background: var(--col-card);
+}
