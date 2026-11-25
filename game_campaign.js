@@ -88,6 +88,82 @@ function generateMathDistractors(correctStr, fallbackPool) {
 // ==========================================
 // CHYTRÝ TRÉNINK PRO BĚŽNÉ LEKCE (MIX)
 // ==========================================
+function assignHardScrambles(queue, maxCount = 2) {
+  const scrambleTasks = queue.filter(t => t.type === 'SCRAMBLE' && t.data && t.data.question);
+  const eligible = scrambleTasks.filter(t => {
+    const raw = t.data.question.replace(/\s*\([^)]*\)/g, '').trim();
+    const isWM = (raw.split(/\s+/).length >= 3 || raw.length > 15);
+    const toks = isWM ? (raw.includes('-') ? raw.split('-').map(s => s.trim()) : raw.split(/\s+/)) : getGraphemes(raw);
+    return toks.length >= 2;
+  });
+  if (eligible.length === 0) return;
+
+  const sorted = [...eligible].sort((a, b) => {
+    const sa = getSavedMastery(a.data.question, 'DIR_IN') + getSavedMastery(a.data.question, 'DIR_OUT');
+    const sb = getSavedMastery(b.data.question, 'DIR_IN') + getSavedMastery(b.data.question, 'DIR_OUT');
+    if ((sa > 0) !== (sb > 0)) return sb - sa; // Přednostně známější slova (>= 1 ★)
+    return Math.random() - 0.5;
+  });
+  sorted.slice(0, maxCount).forEach(t => { t.isHard = true; });
+}
+
+function removeCmpScramblePlaced(pIdx) {
+  if (cmpState !== 'PLAYING') return;
+  const task = cmpQueue[cmpIdx];
+  if (!task || !task.isHard) return;
+  const origIdx = task.hardPlacedIds[pIdx];
+  if (origIdx !== undefined && task.tiles[origIdx]) task.tiles[origIdx].used = false;
+  task.placed.splice(pIdx, 1);
+  task.hardPlacedIds.splice(pIdx, 1);
+  renderActiveGame();
+}
+
+function clearCmpScramblePlaced() {
+  if (cmpState !== 'PLAYING') return;
+  const task = cmpQueue[cmpIdx];
+  if (!task || !task.isHard) return;
+  task.placed = [];
+  task.hardPlacedIds = [];
+  task.tiles.forEach(t => { t.used = false; });
+  renderActiveGame();
+}
+
+function checkCmpHardScramble() {
+  if (cmpState !== 'PLAYING') return;
+  const task = cmpQueue[cmpIdx];
+  if (!task || !task.isHard || task.placed.length === 0) return;
+
+  const isCorrect = (task.placed.length === task.tokens.length) && task.placed.every((t, i) => t === task.tokens[i]);
+  cmpState = 'EVAL';
+
+  if (isCorrect) {
+    sndOk(false);
+    if (typeof addReward === "function") addReward(1, "Trénink: " + selectedGroupKey);
+    const isMultiWord = task.data.question.trim().includes(' ') || task.data.question.trim().includes('-');
+    const step = isMultiWord ? 2 : 1;
+    advanceCmpMastery(task.data.question, 'DIR_IN', step);
+    advanceCmpMastery(task.data.question, 'DIR_OUT', step);
+  } else {
+    sndErr();
+    task.hadMistake = true;
+    cmpHearts = Math.max(0, cmpHearts - 1);
+    if (task.data && !cmpMistakes.some(m => m.question === task.data.question)) {
+      cmpMistakes.push(task.data);
+    }
+    let newTask = {
+      type: 'SCRAMBLE', data: task.data, tokens: task.tokens, isWordMode: task.isWordMode,
+      hadMistake: false, wave: task.wave, isHard: false, hardPlacedIds: []
+    };
+    newTask.tiles = task.tokens.map((t, i) => ({ text: t, used: false, id: i })).sort(() => Math.random() - 0.5);
+    newTask.placed = [];
+    requeueFailedTask(newTask);
+  }
+
+  if (typeof isAutoTTS !== "undefined" && isAutoTTS) {
+    speakWord(task.data.question, selectedSubject);
+  }
+  renderActiveGame();
+}
 function startSmartMix() {
   if (typeof stopArcadeLoop === "function") stopArcadeLoop();
   if (typeof stopSnakeLoop === "function") stopSnakeLoop();
@@ -193,6 +269,7 @@ function startSmartMix() {
 
   // 4. Doplnit možnosti, grafémy a poslechové výzvy
   const vItemsOnly = allItems.filter(i => i.type === "SLOVO");
+  assignHardScrambles(q, 2);
   q.forEach(task => {
     if (task.type === 'QUIZ_OUT' || task.type === 'QUIZ_IN') {
        const isOut = task.type === 'QUIZ_OUT';
@@ -230,13 +307,16 @@ function startSmartMix() {
        }
 
     } else if (task.type === 'SCRAMBLE') {
-       const raw = task.data.question.replace(/\s*\([^)]*\)/g, '').trim();
-       const isWordMode = (raw.split(/\s+/).length >= 3 || raw.length > 15);
-       const tokens = isWordMode ? (raw.includes('-') ? raw.split('-').map(s=>s.trim()) : raw.split(/\s+/)) : getGraphemes(raw);
-       task.tokens = tokens;
-       task.tiles = tokens.map((t, i) => ({ text: t, used: false, id: i })).sort(() => Math.random() - 0.5);
-       task.placed = []; task.isWordMode = isWordMode; task.hadMistake = false;
-    } else if (task.type === 'KVIZ') {
+    const raw = task.data.question.replace(/\s*\([^)]*\)/g, '').trim();
+    const isWordMode = (raw.split(/\s+/).length >= 3 || raw.length > 15);
+    const tokens = isWordMode ? (raw.includes('-') ? raw.split('-').map(s=>s.trim()) : raw.split(/\s+/)) : getGraphemes(raw);
+    const distractors = (task.isHard && typeof buildScrambleDistractors === "function")
+      ? buildScrambleDistractors(tokens, isWordMode, task.data.question, vItemsOnly, selectedSubject)
+      : [];
+    task.tokens = tokens;
+    task.tiles = [...tokens, ...distractors].map((t, i) => ({ text: t, used: false, id: i })).sort(() => Math.random() - 0.5);
+    task.placed = []; task.hardPlacedIds = []; task.isWordMode = isWordMode; task.hadMistake = false;
+ } else if (task.type === 'KVIZ') {
        task.opts = task.data.options; task.correctAns = task.data.answer; task.prompt = formatPromptText(task.data.question);
     }
   });
