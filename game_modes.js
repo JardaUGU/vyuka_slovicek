@@ -8,6 +8,8 @@ let adaptiveBatchIndices = [];
 let isAdaptiveBatchMode = false;
 
 let scrambleDeck = [], scramblePlaced = [], scrambleTiles = [], scrambleIsWordMode = false, scrambleHadMistake = false, scrambleDone = false, scrambleSolvedCount = 0;
+let scrambleHardMode = false, scrambleIsHard = false, scrambleHardPlacedIds = [];
+
 let qCurStep = 0, qAnswered = false, qChosenOpt = null, qActiveList = [];
 
 let seqTargetIdx = 0, seqHighestDeployed = 0, seqSlots = [], seqStartTime = 0, seqTimerInterval = null, seqHintActive = false, seqInactivityTimer = null;
@@ -122,6 +124,100 @@ function startScrambleFromAdaptiveBatch() {
   selectedGame = "SCRAMBLE"; scrambleDeck = [...adaptiveBatchIndices].sort(() => Math.random() - 0.5); scrambleSolvedCount = 0;
   initScramble(); setScreen("PLAYING");
 }
+function toggleScrambleHardMode() {
+  scrambleHardMode = !scrambleHardMode;
+  scrambleDeck = [];
+  scrambleSolvedCount = 0;
+  initScramble();
+  if (typeof renderActiveGame === 'function') renderActiveGame();
+}
+
+function buildScrambleDistractors(tokens, isWordMode, targetQuestion, poolItems, subjectName) {
+  const extraCount = tokens.length >= 5 ? 3 : 2;
+  const targetClean = String(targetQuestion || '').replace(/\s*\([^)]*\)/g, '').trim();
+  const distractors = [];
+  const tokenSet = new Set(tokens);
+
+  if (isWordMode) {
+    const poolWords = [];
+    (poolItems || []).forEach(it => {
+      if (!it || !it.question) return;
+      const raw = it.question.replace(/\s*\([^)]*\)/g, '').trim();
+      if (raw === targetClean) return;
+      const parts = raw.includes('-') ? raw.split('-').map(s => s.trim()) : raw.split(/\s+/);
+      parts.forEach(w => { if (w && !tokenSet.has(w)) poolWords.push(w); });
+    });
+    const lang = typeof getTargetLang === 'function' ? getTargetLang(subjectName) : 'en-GB';
+    const fallbackWords = lang.startsWith('de')
+      ? ['der', 'die', 'das', 'den', 'ein', 'eine', 'ist', 'sind', 'mit', 'und', 'nicht']
+      : (lang.startsWith('he')
+        ? ['אֶת', 'לֹא', 'כִּי', 'עַל', 'אֶל']
+        : ['is', 'are', 'the', 'a', 'in', 'on', 'to', 'for', 'my', 'have', 'has', 'not']);
+
+    const uniqueCandidates = [...new Set([...poolWords, ...fallbackWords])].filter(w => !tokenSet.has(w));
+    uniqueCandidates.sort(() => Math.random() - 0.5);
+    return uniqueCandidates.slice(0, extraCount);
+  } else {
+    const poolChars = [];
+    (poolItems || []).forEach(it => {
+      if (!it || !it.question) return;
+      const raw = it.question.replace(/\s*\([^)]*\)/g, '').trim();
+      if (raw === targetClean) return;
+      getGraphemes(raw).forEach(ch => { if (ch && ch.trim() && !tokenSet.has(ch)) poolChars.push(ch); });
+    });
+    const lang = typeof getTargetLang === 'function' ? getTargetLang(subjectName) : 'en-GB';
+    const fallbackAlpha = lang.startsWith('he')
+      ? 'אבגדהוזחטיכלמנסעפצקרשת'.split('')
+      : 'eaositnrlduchmp'.split('');
+
+    const uniqueChars = [...new Set([...poolChars, ...fallbackAlpha])].filter(ch => ch && ch.trim() && !tokenSet.has(ch));
+    uniqueChars.sort(() => Math.random() - 0.5);
+    for (let i = 0; i < Math.min(extraCount, uniqueChars.length); i++) {
+      distractors.push(uniqueChars[i]);
+    }
+    return distractors;
+  }
+}
+
+function removeScramblePlaced(pIdx) {
+  if (!scrambleIsHard || scrambleDone) return;
+  const origIdx = scrambleHardPlacedIds[pIdx];
+  if (origIdx !== undefined && scrambleTiles[origIdx]) scrambleTiles[origIdx].used = false;
+  scramblePlaced.splice(pIdx, 1);
+  scrambleHardPlacedIds.splice(pIdx, 1);
+  if (typeof renderActiveGame === 'function') renderActiveGame();
+}
+
+function clearScramblePlaced() {
+  if (!scrambleIsHard || scrambleDone) return;
+  scramblePlaced = [];
+  scrambleHardPlacedIds = [];
+  scrambleTiles.forEach(t => { t.used = false; });
+  if (typeof renderActiveGame === 'function') renderActiveGame();
+}
+
+function checkHardScramble() {
+  if (scrambleDone || scramblePlaced.length === 0) return;
+  const w = getVocabItems()[vCurrentWord];
+  const cleanTarget = w.question.replace(/\s*\([^)]*\)/g, '').trim();
+  const target = scrambleIsWordMode
+    ? (cleanTarget.includes('-') ? cleanTarget.split('-').map(s => s.trim()) : cleanTarget.split(/\s+/))
+    : getGraphemes(cleanTarget);
+
+  const isCorrect = (scramblePlaced.length === target.length) && scramblePlaced.every((t, i) => t === target[i]);
+  scrambleDone = true;
+  scrambleSolvedCount++;
+  if (isCorrect) {
+    scrambleHadMistake = false;
+    addReward(1, typeof selectedGroupKey !== 'undefined' ? selectedGroupKey : "");
+    sndFanfare();
+  } else {
+    scrambleHadMistake = true;
+    sndErr();
+  }
+  if (typeof isAutoTTS !== "undefined" && isAutoTTS) speakWord(w.question, selectedSubject);
+  if (typeof renderActiveGame === 'function') renderActiveGame();
+}
 
 function initScramble() {
   const vItems = getVocabItems();
@@ -133,18 +229,22 @@ function initScramble() {
 
   vCurrentWord = scrambleDeck.pop();
   const w = vItems[vCurrentWord];
-  scramblePlaced = []; scrambleHadMistake = false; scrambleDone = false;
+  scramblePlaced = []; scrambleHardPlacedIds = []; scrambleHadMistake = false; scrambleDone = false;
   
-  // OPRAVA: Odřízne závorky z textu před rozpadem na kostičky
   const raw = w.question.replace(/\s*\([^)]*\)/g, '').trim();
   
   if (raw.split(/\s+/).length >= 3 || raw.length > 15) {
     scrambleIsWordMode = true;
     const tokens = raw.includes('-') ? raw.split('-').map(s => s.trim()) : raw.split(/\s+/);
-    scrambleTiles = tokens.map(chunk => ({ text: chunk, used: false })).sort(() => Math.random() - 0.5);
+    scrambleIsHard = !!(scrambleHardMode && tokens.length >= 2);
+    const distractors = scrambleIsHard ? buildScrambleDistractors(tokens, true, w.question, vItems, selectedSubject) : [];
+    scrambleTiles = [...tokens, ...distractors].map(chunk => ({ text: chunk, used: false })).sort(() => Math.random() - 0.5);
   } else {
     scrambleIsWordMode = false;
-    scrambleTiles = getGraphemes(raw).map(ch => ({ text: ch, used: false })).sort(() => Math.random() - 0.5);
+    const tokens = getGraphemes(raw);
+    scrambleIsHard = !!(scrambleHardMode && tokens.length >= 2);
+    const distractors = scrambleIsHard ? buildScrambleDistractors(tokens, false, w.question, vItems, selectedSubject) : [];
+    scrambleTiles = [...tokens, ...distractors].map(ch => ({ text: ch, used: false })).sort(() => Math.random() - 0.5);
   }
 }
 
@@ -157,6 +257,15 @@ function clickScrambleTile(idx) {
 
   const item = scrambleTiles[idx];
   if (item.used || item.isWrong) return; 
+
+  if (scrambleIsHard) {
+    sndOk(false);
+    item.used = true;
+    scramblePlaced.push(item.text);
+    scrambleHardPlacedIds.push(idx);
+    if (typeof renderActiveGame === 'function') renderActiveGame();
+    return;
+  }
   
   const w = getVocabItems()[vCurrentWord];
   const cleanTarget = w.question.replace(/\s*\([^)]*\)/g, '').trim();
@@ -172,7 +281,6 @@ function clickScrambleTile(idx) {
       if (!scrambleHadMistake) { addReward(1, typeof selectedGroupKey !== 'undefined' ? selectedGroupKey : ""); sndFanfare(); }
       if (typeof isAutoTTS !== "undefined" && isAutoTTS) speakWord(w.question, selectedSubject);
     } else {
-      // VYLEPŠENÍ: Zjistíme další hledaný znak a odblokujeme ho, pokud byl dříve vybrán chybně
       const nextExpected = target[scramblePlaced.length];
       scrambleTiles.forEach(t => { 
         if (t.text === nextExpected) t.isWrong = false; 
@@ -180,7 +288,7 @@ function clickScrambleTile(idx) {
     }
   } else { 
     sndErr(); 
-    item.isWrong = true; // Zablokuje toto písmeno
+    item.isWrong = true;
     scrambleHadMistake = true; 
   }
   if(typeof renderActiveGame === 'function') renderActiveGame();

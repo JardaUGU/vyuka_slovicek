@@ -113,6 +113,8 @@ function _renderGameScramble(main) {
   const w = vItems[typeof vCurrentWord!=='undefined'?vCurrentWord:0];
   const totalWords = (typeof isAdaptiveBatchMode!=='undefined' && isAdaptiveBatchMode && typeof adaptiveBatchIndices!=='undefined' && adaptiveBatchIndices.length > 0) ? adaptiveBatchIndices.length : vItems.length;
   const pct = Math.min(100, Math.round(((typeof scrambleSolvedCount!=='undefined'?scrambleSolvedCount:0) / totalWords) * 100));
+  const isHard = typeof scrambleIsHard !== 'undefined' && scrambleIsHard;
+  const isHardModeOn = typeof scrambleHardMode !== 'undefined' && scrambleHardMode;
 
   if ((typeof scrambleSolvedCount!=='undefined'?scrambleSolvedCount:0) >= totalWords && (typeof scrambleDone!=='undefined'&&scrambleDone)) {
       main.innerHTML = `
@@ -129,23 +131,50 @@ function _renderGameScramble(main) {
     <div class="bargraph-container">
       <div class="bargraph-header">
         <span>Složeno: ${(typeof scrambleSolvedCount!=='undefined'?scrambleSolvedCount:0)} z ${totalWords}</span>
-        <span style="color:var(--col-yellow);">${pct} %</span>
+        <span>
+          <button class="toggle-btn ${isHardModeOn ? 'on' : ''}" style="padding:2px 8px;font-size:11px;margin-right:6px;" onclick="if(typeof toggleScrambleHardMode==='function') toggleScrambleHardMode()">${isHardModeOn ? '🔥 Těžké' : 'Lehké'}</button>
+          <span style="color:var(--col-yellow);">${pct} %</span>
+        </span>
       </div>
       <div class="bargraph-track"><div class="bargraph-fill" style="width:${pct}%;"></div></div>
     </div>
     <div class="prompt-box" style="color:inherit;">Slož: <b>${w?(typeof cleanCzechTranslation==='function'?cleanCzechTranslation(w.answer):w.answer):''}</b></div>
-    <div class="slots-row ${isHebrew ? 'hebrew-text' : ''}">
-      ${(typeof scrambleTiles!=='undefined'?scrambleTiles:[]).map((t, i) => `<div class="letter-slot ${(typeof scrambleIsWordMode!=='undefined'&&scrambleIsWordMode)?'word-slot':''} ${i<(typeof scramblePlaced!=='undefined'?scramblePlaced.length:0)?'filled':''}">${i<(typeof scramblePlaced!=='undefined'?scramblePlaced.length:0)?scramblePlaced[i]:'_'}</div>`).join('')}
-    </div>
-    ${!(typeof scrambleDone!=='undefined'&&scrambleDone) ? `
-      <div class="letters-row">
-        ${(typeof scrambleTiles!=='undefined'?scrambleTiles:[]).map((t, idx) => `<div class="letter-tile ${(typeof scrambleIsWordMode!=='undefined'&&scrambleIsWordMode)?'word-tile':''} ${isHebrew ? 'hebrew' : ''} ${t.used?'used':''} ${t.isWrong?'wrong-temporary':''}" onpointerdown="event.preventDefault(); if(typeof clickScrambleTile==='function') clickScrambleTile(${idx})">${t.text}</div>`).join('')}
+
+    ${isHard ? `
+      <div class="hard-answer-box ${isHebrew ? 'hebrew-text' : ''} ${(typeof scrambleDone!=='undefined'&&scrambleDone) ? ((typeof scrambleHadMistake!=='undefined'&&scrambleHadMistake)?'err':'ok') : ''}">
+        ${(typeof scramblePlaced!=='undefined'&&scramblePlaced.length>0)
+          ? scramblePlaced.map((txt, pIdx) => `<div class="letter-tile ${(typeof scrambleIsWordMode!=='undefined'&&scrambleIsWordMode)?'word-tile':''} ${isHebrew ? 'hebrew' : ''} hard-chip-placed" onclick="if(typeof removeScramblePlaced==='function') removeScramblePlaced(${pIdx})">${txt}</div>`).join('')
+          : `<span style="color:var(--col-text-muted);font-size:13px;font-family:Roboto,sans-serif;direction:ltr;">Klikej na kostičky níže (délka je skrytá)...</span>`}
       </div>
+      ${!(typeof scrambleDone!=='undefined'&&scrambleDone) ? `
+        <div class="letters-row ${isHebrew ? 'hebrew-text' : ''}">
+          ${(typeof scrambleTiles!=='undefined'?scrambleTiles:[]).map((t, idx) => `<div class="letter-tile ${(typeof scrambleIsWordMode!=='undefined'&&scrambleIsWordMode)?'word-tile':''} ${isHebrew ? 'hebrew' : ''} ${t.used?'used':''}" onpointerdown="event.preventDefault(); if(typeof clickScrambleTile==='function') clickScrambleTile(${idx})">${t.text}</div>`).join('')}
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 2fr;gap:8px;margin-top:8px;">
+          <div class="action-btn" style="margin-top:0;background:var(--col-card-alt);" onclick="if(typeof clearScramblePlaced==='function') clearScramblePlaced()">🗑️ Smazat</div>
+          <div class="action-btn green" style="margin-top:0;${(!scramblePlaced || scramblePlaced.length===0)?'opacity:0.45;pointer-events:none;':''}" onclick="if(typeof checkHardScramble==='function') checkHardScramble()">ZKONTROLOVAT ✓</div>
+        </div>
+      ` : `
+        ${(typeof scrambleHadMistake!=='undefined'&&scrambleHadMistake && w) ? `<div style="text-align:center;color:var(--col-green);font-size:20px;font-weight:bold;margin:8px 0;" class="${isHebrew?'hebrew-text':''}">Správně: ${w.question.replace(/\s*\([^)]*\)/g, '').trim()}</div>` : ''}
+        ${w&&w.help ? `<div style="text-align:center;color:var(--col-active-tab);font-size:18px;margin-bottom:8px;font-weight:bold;">[ ${w.help} ]</div>` : ''}
+        <div class="action-btn ${(typeof scrambleHadMistake!=='undefined'&&scrambleHadMistake)?'red':'green'}" onclick="if(typeof initScramble==='function') { initScramble(); renderActiveGame(); }">
+          ${(typeof scrambleHadMistake!=='undefined'&&scrambleHadMistake) ? 'CHYBA ➔ DALŠÍ SLOVO' : 'SPRÁVNĚ! ➔ DALŠÍ SLOVO'}
+        </div>
+      `}
     ` : `
-      ${w&&w.help ? `<div style="text-align:center;color:var(--col-active-tab);font-size:18px;margin-bottom:8px;font-weight:bold;">[ ${w.help} ]</div>` : ''}
-      <div class="action-btn ${(typeof scrambleHadMistake!=='undefined'&&scrambleHadMistake)?'red':'green'}" onclick="if(typeof initScramble==='function') { initScramble(); renderActiveGame(); }">
-        ${(typeof scrambleHadMistake!=='undefined'&&scrambleHadMistake) ? 'DOKONČENO S CHYBOU ➔ DALŠÍ' : 'SPRÁVNĚ! ➔ DALŠÍ SLOVO'}
+      <div class="slots-row ${isHebrew ? 'hebrew-text' : ''}">
+        ${(typeof scrambleTiles!=='undefined'?scrambleTiles:[]).map((t, i) => `<div class="letter-slot ${(typeof scrambleIsWordMode!=='undefined'&&scrambleIsWordMode)?'word-slot':''} ${i<(typeof scramblePlaced!=='undefined'?scramblePlaced.length:0)?'filled':''}">${i<(typeof scramblePlaced!=='undefined'?scramblePlaced.length:0)?scramblePlaced[i]:'_'}</div>`).join('')}
       </div>
+      ${!(typeof scrambleDone!=='undefined'&&scrambleDone) ? `
+        <div class="letters-row ${isHebrew ? 'hebrew-text' : ''}">
+          ${(typeof scrambleTiles!=='undefined'?scrambleTiles:[]).map((t, idx) => `<div class="letter-tile ${(typeof scrambleIsWordMode!=='undefined'&&scrambleIsWordMode)?'word-tile':''} ${isHebrew ? 'hebrew' : ''} ${t.used?'used':''} ${t.isWrong?'wrong-temporary':''}" onpointerdown="event.preventDefault(); if(typeof clickScrambleTile==='function') clickScrambleTile(${idx})">${t.text}</div>`).join('')}
+        </div>
+      ` : `
+        ${w&&w.help ? `<div style="text-align:center;color:var(--col-active-tab);font-size:18px;margin-bottom:8px;font-weight:bold;">[ ${w.help} ]</div>` : ''}
+        <div class="action-btn ${(typeof scrambleHadMistake!=='undefined'&&scrambleHadMistake)?'red':'green'}" onclick="if(typeof initScramble==='function') { initScramble(); renderActiveGame(); }">
+          ${(typeof scrambleHadMistake!=='undefined'&&scrambleHadMistake) ? 'DOKONČENO S CHYBOU ➔ DALŠÍ' : 'SPRÁVNĚ! ➔ DALŠÍ SLOVO'}
+        </div>
+      `}
     `}
   `;
 }
@@ -820,17 +849,45 @@ function _renderGameCampaign(main) {
     }
   }
   else if (task.type === 'SCRAMBLE') {
-    html += `
-      <div class="prompt-box" style="color:inherit;">Slož: <b>${typeof cleanCzechTranslation==='function'?cleanCzechTranslation(task.data.answer):task.data.answer}</b></div>
-      <div class="slots-row ${isHebrew ? 'hebrew-text' : ''}">
-        ${(task.tiles||[]).map((t, i) => `<div class="letter-slot ${task.isWordMode?'word-slot':''} ${i<(task.placed?task.placed.length:0)?'filled':''}">${i<(task.placed?task.placed.length:0)?task.placed[i]:'_'}</div>`).join('')}
-      </div>
-    `;
-    if (typeof cmpState !== 'undefined' && cmpState !== 'EVAL') {
-      html += `<div class="letters-row">${(task.tiles||[]).map((t, i) => `<div class="letter-tile ${task.isWordMode?'word-tile':''} ${isHebrew ? 'hebrew' : ''} ${t.used?'used':''} ${t.isWrong?'wrong-temporary':''}" onpointerdown="event.preventDefault(); if(typeof clickCmpScrambleTile==='function') clickCmpScrambleTile(${i})">${t.text}</div>`).join('')}</div>`;
+    if (task.isHard) {
+      const isEval = (typeof cmpState !== 'undefined' && cmpState === 'EVAL');
+      html += `
+        <div style="text-align:center;margin-bottom:6px;"><span style="background:rgba(249,115,22,0.18);border:1px solid var(--col-orange);color:var(--col-orange);padding:3px 10px;border-radius:12px;font-size:12px;font-weight:bold;">🔥 TĚŽKÉ SKLÁDÁNÍ</span></div>
+        <div class="prompt-box" style="color:inherit;">Slož: <b>${typeof cleanCzechTranslation==='function'?cleanCzechTranslation(task.data.answer):task.data.answer}</b></div>
+        <div class="hard-answer-box ${isHebrew ? 'hebrew-text' : ''} ${isEval ? (task.hadMistake ? 'err' : 'ok') : ''}">
+          ${(task.placed && task.placed.length > 0)
+            ? task.placed.map((txt, pIdx) => `<div class="letter-tile ${task.isWordMode?'word-tile':''} ${isHebrew ? 'hebrew' : ''} hard-chip-placed" onclick="if(typeof removeCmpScramblePlaced==='function') removeCmpScramblePlaced(${pIdx})">${txt}</div>`).join('')
+            : `<span style="color:var(--col-text-muted);font-size:13px;font-family:Roboto,sans-serif;direction:ltr;">Klikej na kostičky níže (délka je skrytá)...</span>`}
+        </div>
+      `;
+      if (!isEval) {
+        html += `
+          <div class="letters-row ${isHebrew ? 'hebrew-text' : ''}">
+            ${(task.tiles||[]).map((t, i) => `<div class="letter-tile ${task.isWordMode?'word-tile':''} ${isHebrew ? 'hebrew' : ''} ${t.used?'used':''}" onpointerdown="event.preventDefault(); if(typeof clickCmpScrambleTile==='function') clickCmpScrambleTile(${i})">${t.text}</div>`).join('')}
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 2fr;gap:8px;margin-top:8px;">
+            <div class="action-btn" style="margin-top:0;background:var(--col-card-alt);" onclick="if(typeof clearCmpScramblePlaced==='function') clearCmpScramblePlaced()">🗑️ Smazat</div>
+            <div class="action-btn green" style="margin-top:0;${(!task.placed || task.placed.length===0)?'opacity:0.45;pointer-events:none;':''}" onclick="if(typeof checkCmpHardScramble==='function') checkCmpHardScramble()">ZKONTROLOVAT ✓</div>
+          </div>
+        `;
+      } else {
+        if (task.hadMistake) html += `<div style="text-align:center;color:var(--col-green);font-size:20px;font-weight:bold;margin:8px 0;" class="${isHebrew?'hebrew-text':''}">Správně: ${task.data.question.replace(/\s*\([^)]*\)/g, '').trim()}</div>`;
+        if (task.data.help) html += `<div style="text-align:center;color:var(--col-active-tab);font-weight:bold;margin:8px 0;">[ ${task.data.help} ]</div>`;
+        html += `<div class="action-btn ${task.hadMistake ? 'red' : 'green'}" style="margin-top:12px;" onclick="if(typeof nextCmpTask==='function') nextCmpTask()">DALŠÍ ➔</div>`;
+      }
     } else {
-      if (task.data.help) html += `<div style="text-align:center;color:var(--col-active-tab);font-weight:bold;margin:10px 0;">[ ${task.data.help} ]</div>`;
-      html += `<div class="action-btn green" style="margin-top:15px;" onclick="if(typeof nextCmpTask==='function') nextCmpTask()">DALŠÍ ➔</div>`;
+      html += `
+        <div class="prompt-box" style="color:inherit;">Slož: <b>${typeof cleanCzechTranslation==='function'?cleanCzechTranslation(task.data.answer):task.data.answer}</b></div>
+        <div class="slots-row ${isHebrew ? 'hebrew-text' : ''}">
+          ${(task.tiles||[]).map((t, i) => `<div class="letter-slot ${task.isWordMode?'word-slot':''} ${i<(task.placed?task.placed.length:0)?'filled':''}">${i<(task.placed?task.placed.length:0)?task.placed[i]:'_'}</div>`).join('')}
+        </div>
+      `;
+      if (typeof cmpState !== 'undefined' && cmpState !== 'EVAL') {
+        html += `<div class="letters-row ${isHebrew ? 'hebrew-text' : ''}">${(task.tiles||[]).map((t, i) => `<div class="letter-tile ${task.isWordMode?'word-tile':''} ${isHebrew ? 'hebrew' : ''} ${t.used?'used':''} ${t.isWrong?'wrong-temporary':''}" onpointerdown="event.preventDefault(); if(typeof clickCmpScrambleTile==='function') clickCmpScrambleTile(${i})">${t.text}</div>`).join('')}</div>`;
+      } else {
+        if (task.data.help) html += `<div style="text-align:center;color:var(--col-active-tab);font-weight:bold;margin:10px 0;">[ ${task.data.help} ]</div>`;
+        html += `<div class="action-btn green" style="margin-top:15px;" onclick="if(typeof nextCmpTask==='function') nextCmpTask()">DALŠÍ ➔</div>`;
+      }
     }
   }
   main.innerHTML = html;

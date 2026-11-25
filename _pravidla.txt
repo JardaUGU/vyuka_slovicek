@@ -12,6 +12,7 @@ PRAVIDLA PRO ÚPRAVU KÓDU A CHOVÁNÍ APLIKACE
 2. HERNÍ LOGIKA (game_*.js):
    - "Řada na čas" (SEQ) NESMÍ používat FIFO! Tlačítka se míchají jen jednou na začátku (s mezerami v pořadí), po kliknutí se doplní nové slovo přímo do uvolněného slotu a na konci sloty mizí.
    - Skládání (Scramble) MUSÍ před rozpadem na kostičky odstranit závorky z textu (jak v běžné hře, tak v Kampani a Chytrém tréninku). Po složení všech slov bloku (např. 15) se hra musí ukončit obrazovkou Dokončeno (nesmí jet do nekonečna).
+   - Podporuje také režim Těžké skládání (isHard): bez nápovědných políček délky (_ _ _), s 2–3 falešnými kostičkami navíc (buildScrambleDistractors), možností vracet vložené kostičky kliknutím a ručním vyhodnocením tlačítkem ZKONTROLOVAT ✓.
    - Had (Snake) NESMÍ započítávat čas do studyTimeru. Životy hada jsou značeny ikonou 🐍, zatímco ❤️ jsou nevyužitá srdíčka z lekce Kampaně a 🪙 jsou mince. Na startu při stisku opačného směru se had otočí a rozjede. Po vypršení štítu, pauze (⚙️ Výbava) nebo po smrti zůstává otevřené jednotné okno Výbavy hada, dokud hráč neklikne na pokračování; smyčka (runSnakeLoop) se po návratu znovu nastartuje. Nejdelší dosažený had (maxSnake) se ukládá do profilu pouze při čisté hře bez použití štítu a dokoupených životů.
    - Padající slova (Arcade) musí padat plynule bez ohledu na stav proměnné isTimerPaused.
    - Střelba na terč (Target - game_target.js): Zobrazuje až 8 cizích slov po obvodu a české slovo v kruhu uprostřed. Při tažení kruhu se vykresluje SVG laserová čára ze středu. Zásah se vyhodnocuje okamžitě při dotyku úzkého středu puku (poloměr 14px, aby hráč nezavadil o okolní slova) s terčem, bez čekání na puštění tlačítka/prstu. Slova v sadě (max 15) se v rámci jednoho kola NEOPAKUJÍ.
@@ -20,7 +21,7 @@ PRAVIDLA PRO ÚPRAVU KÓDU A CHOVÁNÍ APLIKACE
    - Zlomky se vykreslují přes CSS flexbox vertikálně (čitatel, čára, jmenovatel). Mínusy a plusy ve výrazu se MUSÍ nahrazovat mezerami PŘED vygenerováním HTML zlomku (jinak se rozbije CSS "inline-flex"). Formát [a/b] v textu úloh převádí funkce formatPromptText() na vertikální zlomek.
    - Při stisku klávesnice v matematice se aktualizuje pouze div "#math-keyboard-input" (nesmí se volat celé renderActiveGame, jinak skáče obrazovka).
    - Tlačítko mazání na klávesnici funguje jako Backspace (⌫ - maže poslední znak, má pevnou hnědou barvu #b45309 čitelnou i v Matrix skinu).
-   - V krokových zlomcích se chybné nebo nekrácené matematické mezivýsledky vždy zapisují do historie s komentářem (nepoužívat blokující alert; alert se používá jen u syntakticky neplatného zápisu)
+   - V krokových zlomcích se chybné nebo nekrácené matematické mezivýsledky vždy zapisují do historie s komentářem ( nepoužívat blokující alert; alert se používá jen u syntakticky neplatného zápisu)
 
 4. OBCHOD, SÉRIE A NAVIGACE (main.js, game_core.js):
    - Zmrazení série (Streak Freeze) se reálně odečítá z inventáře uživatele za každý vynechaný den (jak na frontendu v main.js, tak na backendu v kod.gs ve funkci updateUserStreakInSheet).
@@ -28,17 +29,22 @@ PRAVIDLA PRO ÚPRAVU KÓDU A CHOVÁNÍ APLIKACE
   - Tlačítko Zpět (goBack) musí vždy zastavit i časovače Řady na čas (seqTimerInterval, seqInactivityTimer) a v případě předčasného odchodu z Hada v Kampani proplatit nevyužitá ❤️ na mince (cashOutSnakeLessonHearts).
    - Přepínání obrazovek a zavírání prompt() skryje systémovou klávesnici na Androidu (hideSystemKeyboard).
    - Úvodní obrazovka výběru uživatele (SELECT_USER) se vždy vykresluje ve výchozím skinu (default), aby následující žák neviděl skin předchozího uživatele.
+   - Z AVATAR_SHOP vrací goBack() zpět na SHOP a ruší neuložený náhled panáčka (cancelAvatarPreview).
+   - Přihlášení k zamčenému profilu (selectUser) i nastavení PINu (setUserPIN) používají vnořený HTML modal (openPinModal) s přepínačem 👁️ (podpora libovolných znaků i emotikonů) a okamžitým uzamčením/rozostřením <input> při zavření (zabraňuje zaseknutí klávesnice na Androidu).
+   - Ověření PINu i zobrazení ikony 🔒 vždy upřednostňují hodnotu z cloudu (u.pin !== undefined), i když je prázdná (po zrušení PINu se vymaže starý PIN v localStorage).
 
 5. ZOBRAZENÍ A OBRAZOVKY (ui_menus.js, ui_games.js):
 5.1. Globální rozložení (Header a Footer)
    - Horní lišta (Header): zleva tlačítko Zpět (<), drobečková navigace (odznaky: Uživatel -> Předmět -> Skupina), zprava přepínač automatického čtení (🔊 Auto / 🔇 Vyp), box denního času studia (do splnění cíle běžný, po splnění žlutý "★ BONUS: +mm:ss", při neaktivitě >15s oranžový s ikonou pauzy ⏸️), tlačítko ruční synchronizace (🔄).
    - Spodní lišta (Footer): vlevo "Žák: Jméno", uprostřed stav systému ("OK: X úloh" nebo "Offline", kliknutí vynutí tvrdý reload), vpravo denní cíl ("X / 15 min ⏱️").
+   - Přepínač automatického čtení (.tts-toggle-btn) má white-space: nowrap; flex-shrink: 0;, aby se na úzkých displejích nezalamoval na 2 řádky.
 
 5.2. Výběr uživatele (SELECT_USER)
    - Dvousloupcová mřížka uživatelů.
    - Dlaždice uživatele a Průkaz studenta (SHOP) zobrazují stav série a po kliknutí (resp. přímo v Průkazu) vykreslují 7denní historii série (🔥 splněno, 🧊 zachráněno zmrazením, 💔 vynecháno, ⏳ dnešek rozpracován) včetně informace o počtu dostupných zmrazení.
    - Dlaždice uživatele navíc zobrazuje aktuální úroveň a týdenní XP (⚡ Lv.X · 🏆 Y XP) a klikatelný stav série (📅 otevírá modal se 7denní historií série). Pod mřížkou uživatelů je Týdenní rodinná liga (renderWeeklyLeaderboardBox), seřazená od pondělí do neděle podle týdenních XP.
    - Kliknutí na zamčeného uživatele vyžádá PIN.
+   - Na každé dlaždici zobrazuje také vektorového SVG panáčka (renderAvatarSVG), vždy ve výchozím skinu (default).
 
 5.3. Výběr předmětu (SELECT_SUBJECT)
    - Nahoře lišta filtru ročníku ("Všechny ročníky" vs. "Jen má třída").
@@ -50,7 +56,10 @@ PRAVIDLA PRO ÚPRAVU KÓDU A CHOVÁNÍ APLIKACE
    - Pod Průkazem studenta zobrazuje 7denní historii série (🔥 splněno, 🧊 zmrazeno, 💔 vynecháno, ⏳ dnešek, <1m pro aktivity pod 1 minutu), kartu Úroveň a XP (postup do další úrovně a bonus série v %) a Týdenní rodinnou ligu. V sekci Vzhledy se nejprve zobrazí "👁️ Náhled" a po otevření "Zrušit náhled" a "Koupit (X 🪙)".
    - Sekce Ochrana profilu: nastavení nebo zrušení číselného PINu (ukládá se do sloupce PIN v Google Sheets s apostrofem proti umazání nul).
    - Sekce Zmrazení série: zobrazení počtu kusů a tlačítko nákupu (20 💰).
+   - Nahoře obsahuje dlaždici 👕 Šatník panáčka (přechod na AVATAR_SHOP).
    - Sekce Vzhledy: seznam skinů, tlačítko "👁️ Náhled" (po jeho otevření "Zrušit náhled" a "Koupit (X 💰)"), dále "Nasadit" nebo štítek "✅ Aktivní".
+5.4.1. Šatník panáčka (AVATAR_SHOP)
+   - Zobrazuje velký živý náhled SVG panáčka a 6 kategorií (Postava, Čepice, Brýle, Oblek, Doplněk, Pozadí). Zamčené položky lze nejprve vyzkoušet (👁️ Zkusit) a následně koupit za mince (🪙) a rovnou nasadit.
 
 5.5. Kampaň / Cesta (CAMPAIGN_HUB)
    - U jazykových kampaní zobrazuje nahoře ukazatel úrovně CEFR (A1, A2, B1, B2) s bargrafem celkového postupu kurzem.
@@ -68,10 +77,12 @@ PRAVIDLA PRO ÚPRAVU KÓDU A CHOVÁNÍ APLIKACE
    - Nahoře vždy bargraf postupu aktuální úlohy (nebo série správných odpovědí u matematiky / počet srdíček ❤️ u kampaně a příběhů). U časových her (Řada na čas, Střelba) je pod bargrafem obousměrný ukazatel tempa (Pacer) porovnávající mezičas s rekordem.
    - Uprostřed zadání úlohy (prompt-box) s ikonou reproduktoru 🔊 (kromě českých kontrolních otázek v příbězích a matematiky).
    - Dole ovládací prvky podle typu hry (u krokové matematiky 5sloupcová klávesnice ukotvená dole přes position: sticky a nad ní scrollovací historie kroků).
+   - Box zadání s ikonou reproduktoru (.prompt-box:has(.audio-btn)) má po stranách vnitřní okraj 46px a svisle vycentrovanou ikonu 🔊, aby se ikona nepřekrývala s dlouhým textem.
 
 6. ARCHITEKTURA SOUBORŮ A SYNCHRONIZACE:
-   - main.js: globální stav, časovač, ekonomika, správa uživatelů, skinů a vizuálních efektů (konfety, plovoucí body).
-   - api_sync.js: komunikace s Google Sheets. Načítá a ukládá čas, sérii (streak) a datum posledního splnění (`streakLastDate`) pro všechny profily (bere maximum mezi localStorage a cloudem). Posílá celkový denní čas v minutách při intervalu 30s, při goBack() a při minimalizaci/opuštení okna (`visibilitychange`). Při návratu do okna automaticky provede tichou synchronizaci (`syncDataQuietly`). synchronizuje pro všechny profily kromě času také sérii (syncAllUsersStreakFromCloud) a XP (syncAllUsersXpFromCloud); sendTimeHeartbeatToGoogle posílá clientDate a používá keepalive: true.
+   - main.js: globální stav, časovač, ekonomika, správa uživatelů, skinů a vizuálních efektů (konfety, plovoucí body). Náročnost úrovní (getLevelInfo) roste po 250 × level XP (Lv. 1→2 = 250 XP, Lv. 2→3 = 500 XP...).
+   - api_sync.js: komunikace s Google Sheets. Načítá a ukládá čas, sérii (streak) a datum posledního splnění (`streakLastDate`) pro všechny profily (bere maximum mezi localStorage a cloudem). Posílá celkový denní čas v minutách při intervalu 30s, při goBack() a při minimalizaci/opuštení okna (`visibilitychange`). Při návratu do okna automaticky provede tichou synchronizaci (`syncDataQuietly`). synchronizuje pro všechny profily kromě času také sérii (syncAllUsersStreakFromCloud) a XP (syncAllUsersXpFromCloud); sendTimeHeartbeatToGoogle posílá clientDate a používá keepalive: true. 
+   - Synchronizuje navíc i PIN (user_pin_...), odemčené předměty a výbavu SVG panáčka (syncAllUsersAvatarFromCloud). Při chybové odpovědi serveru (status: "error") nepřepisuje funkční lokální cache profilů.
    - audio_tts.js: zvukové efekty a syntéza řeči (TTS).
    - game_core.js: přepínání her, ukládání hvězd a mistrovství (včetně kvízů), funkce goBack().funkce addReward přičítá XP (count * 10 * sériový násobič), spouští neblokující banner při Level Upu (showLevelUpToast) a posílá minutes s přesností .toFixed(2).
    - game_modes.js, game_math.js, game_snake.js, game_arcade.js, game_pexeso.js, game_target.js, game_campaign.js, game_story.js: izolované herní logiky.
@@ -100,6 +111,7 @@ PRAVIDLA PRO ÚPRAVU KÓDU A CHOVÁNÍ APLIKACE
      b) Po písmenech (letter-mode): kratší výrazy se rozpadnou na jednotlivé znaky/grafémy (Intl.Segmenter kvůli hebrejštině a diakritice).
    - Hráč kliká na zamíchané kostičky v přesném pořadí. Chybné kliknutí přehraje chybový tón, dočasně zablokuje a červeně zatřese chybnou kostičkou (isWrong = true, odblokuje se až při hledání daného znaku) a označí úlohu jako chybovou (scrambleHadMistake = true).
    - Po složení celého výrazu se slovo přečte (TTS). Pokud bylo složeno bez jediné chyby, hráč získá hvězdu. Po vyčerpání balíčku (např. 15 slov) hra končí obrazovkou "Skládání dokončeno!".
+   - V horní liště má přepínač obtížnosti Lehké / 🔥 Těžké. V režimu 🔥 Těžké se délka cíle skrývá, přidávají se 2–3 falešná písmena/slova, vložené dílky lze kliknutím odebrat (nebo smazat přes 🗑️ Smazat) a odpověď se vyhodnocuje po stisku ZKONTROLOVAT ✓.
 
 7.4. Pexeso (PEXESO - game_pexeso.js)
    - Před hrou výběr velikosti: 6 karet (3 dvojice), 8 karet (4 dvojice), 12 karet (6 dvojic), 16 karet (8 dvojic). V minihře kampaně a z bloku zkoušení fixně 6 dvojic.
@@ -135,10 +147,13 @@ PRAVIDLA PRO ÚPRAVU KÓDU A CHOVÁNÍ APLIKACE
    - Řada na čas (SEQ): Určeno pro položky typu "RADA" (kroky oddělené "|"). Anti-FIFO algoritmus nasazuje do 4 tlačítek první položku a 3 náhodné položky z blízké budoucnosti (indexy 1 až 6). Po kliknutí se slovo přečte a přímo na uvolněné tlačítko se nasadí nejnižší dosud nevyložená položka. Při chybě nebo nečinnosti > 3s se aktivuje žlutá nápověda (.hint).
    - Střelba na terč (TARGET): Vylosuje sadu max 15 unikátních krátkých slov z lekce (bez opakování). Na obvodu je 8 terčů, uprostřed puk s českým překladem. Hráč přetahuje puk na správný terč (s vizuální laserovou čárou). Při zásahu se slovo přečte (TTS) a na obvod se doplní další slovo ze sady (nikdy se nelosuje stejný slot dvakrát po sobě). Při chybě terč zčervená a přičte se penalizace +2 s. Po dohrání může hráč zopakovat přesně stejnou sadu slov pro překonání rekordu, nebo vylosovat jiná slova z lekce.
    - Mezičasy a rekordy (Pacer): Obě hry ukládají nejlepší čas sady do localStorage. Při opakování sady se v okamžiku každého zásahu vypočítá mezičas vůči rekordu (očekávaný čas = rekord * hotovo / celkem) a zobrazí se v obousměrném bargrafu (zeleně náskok v sekundách, červeně ztráta; plná šířka odpovídá 25 % rekordu). Za překonání existujícího rekordu získá hráč odměnu +1 💰 a zobrazí se, o kolik sekund se zlepšil.
+   - V bonusové minihře Střelba po Kampani nebo Chytrém tréninku (isCampaignMinigame === true) se rekord sady ani Pacer neukládají a neporovnávají, protože se pokaždé losuje náhodná směs slov; rekordy běží pouze v klasické Střelbě ze SELECT_GAME.
 
 7.9. Spirálová výuka / Kampaň (CAMPAIGN - game_campaign.js)
    - Spouští se z mapy (CAMPAIGN_HUB) pro předměty obsahující v názvu "cesta", "postupn" nebo "inteligentn".
    - Automatický výběr lekce: najde první lekci (počínaje nastaveným Start_Předmět uživatele), ve které je celkové zvládnutí (SLOVO i KVIZ) < 85 %.
+   - Každá správná odpověď v kvízu i bezchybné složení slova průběžně připisují XP (addReward(1)).
+   - Až 2 položky skládání v lekci (přednostně se znalostí >= 1 ★ a délkou >= 2 dílků) se přepínají na Těžké skládání (assignHardScrambles). Při chybě v Těžkém skládání se zobrazí správná odpověď a na konec vlny se zařadí opravné klasické skládání (isHard: false).
    - Sestavení tréninkové fronty (max 40 úloh) v pevném pedagogickém pořadí:
      1) Opakování (qRevision): přednostně až 8 nedokončených položek (SLOVO i KVIZ s < 2 ★) od nejstarší nehotové lekce (od Start_Předmět výše) s výběrem konkrétního chybějícího typu úlohy, aby se starší lekce postupně dočistily na 100 %; pokud jsou všechny na 100 %, zařadí 3 náhodná starší slova.
      2) Aktuální lekce: max 8 slovíček (přednost 0 ★ před 1 ★) a max 6 kvízů (přednost < 2 ★). Každá položka může v jednom spuštění kampaně postoupit max o +1 ★ za směr (cmpCapOneLevelPerSession), aby nešla lekce přeskočit jediným průchodem.
@@ -164,7 +179,8 @@ PRAVIDLA PRO ÚPRAVU KÓDU A CHOVÁNÍ APLIKACE
 
 7.12. Chytrý trénink pro běžné lekce (SMART_MIX - game_campaign.js)
    - Spouští se tlačítkem „🧠 SPUSTIT CHYTRÝ TRÉNINK“ na obrazovce výběru her (SELECT_GAME).
-   - Výběr položek a nekonečné opakování: vybere až 10 položek s předností < 2 ★ a v případě potřeby doplní do 10 náhodnými zvládnutými položkami z lekce
+   - Výběr položek a nekonečné opakování: Vybírá až 10 trénovatelných položek (SLOVO / KVIZ): pokud jsou v lekci nedokončené/chybné položky (< 2 ★), zařadí je přednostně a doplní do 10 zvládnutými položkami z lekce (forcePractice, bez smazání jejich 2 ★ v cloudu). Pokud mají všechny 2 ★, vybere 10 náhodných a resetuje jim mastery na 0 ★.
+   - Stejně jako v Kampani připisuje XP průběžně (addReward(1)) a až 2 skládání v lekci přepne na Těžké skládání.
    - Třífázová pedagogická vlna (Spaced Repetition + Anti-clustering):
      1. Vlna 1 (Poznávání): Kvízy s gramatikou (KVIZ) a pasivní porozumění Cizí ➔ CZ (QUIZ_IN, z toho 35 % jako čistý audio poslech 🎧).
      2. Vlna 2 (Aktivní překlad): Výběr ze 4 možností CZ ➔ Cizí (QUIZ_OUT).
@@ -175,7 +191,9 @@ PRAVIDLA PRO ÚPRAVU KÓDU A CHOVÁNÍ APLIKACE
    - Chybné úlohy se zařazují na konec aktuální vlny (`requeueFailedTask`) a na konci tréninku se zobrazí přehled chyb ("Dnešní chytáky"). Po dokončení vrací hráče do SELECT_GAME.
 
 8. STRUKTURA DAT V GOOGLE SHEETS (kod.gs):
-   - List "Uzivatele": Jmeno | Trida | DenniCilMinut | Streak | StreakLastDate | Zlataky | Item_Zmrazeni | Start_Angli... | Skiny | AktivniSkin | PIN | MaxSnake (sloupce od 7. dál se hledají a vytvářejí dynamicky podle názvu hlavičky přes ensureColumn).
+   - List "Uzivatele": Jmeno | Trida | DenniCilMinut | Streak | StreakLastDate | Zlataky | Item_Zmrazeni | Start_Angli... | Skiny | AktivniSkin | PIN | MaxSnake (sloupce od 7. dál se hledají a vytvářejí dynamicky podle názvu hlavičky přes ensureColumn). AvatarItemy (seznam odemčených částí panáčka), AvatarVybava (řetězec slot=id;...).
+handleUserActions podporuje i akce buy_avatar_item a equip_avatar.
+parseModularUsers vrací u položek inventáře oba klíče (Zmrazeni i zmrazeni), aby se předešlo neshodě velikosti písmen.
    - List "Uzivatele": přidat popis dynamického sloupce StreakFreezeDates (čárkou oddělená data YYYY-MM-DD za posledních 30 dní, kdy bylo spotřebováno zmrazení) a v doGet předávání dailyHistory (mapa minut za posledních 10 dní z listu Aktivita).
    - List "Pokrok": Uzivatel | Predmet | Lekce | Tema | Polozka | Uroven (0-2) | Datum | Smer (DIR_OUT, DIR_IN, STORY).
    - List "Aktivita": Datum | Uzivatel | Predmet | Sekce | Minuty (celkový denní čas zařízení) | Hvezdy. Backend z tohoto listu bere vždy MAXIMUM dosažených denních minut uživatele (nikoliv součet!) a při překročení DenniCilMinut aktualizuje Streak v listu Uzivatele (při vynechání dne reálně odečte Item_Zmrazeni v tabulce).
