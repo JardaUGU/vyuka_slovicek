@@ -22,8 +22,8 @@ let snakeStatusMsg = "";
 let snakeShieldLetters = 0;
 let snakeTouchStartX = 0, snakeTouchStartY = 0;
 let isSnakeWaitingForInput = true;
-let snakeUsedBoosts = false; // Sleduje, zda hráč použil štít nebo dokoupil životy (pro férový rekord)
-let snakeLessonHearts = 0; // Nevyužitá ❤️ z lekce Kampaně
+let snakeUsedBoosts = false;
+let snakeLessonHearts = 0;
 
 window.cashOutSnakeLessonHearts = function() {
   if (snakeLessonHearts > 0) {
@@ -38,7 +38,7 @@ window.buySnakeLifeWithCoins = function(livesToAdd, cost, e) {
   if (e) { e.preventDefault(); e.stopPropagation(); }
   if (typeof currentUser === "undefined" || !currentUser) return;
   const coins = getUserCoins(currentUser.name);
-  if (coins < cost) { alert(`Potřebuješ ${cost} 🪙!`); return; }
+  if (coins < cost) { alert(`Potřebuješ ${cost} mincí!`); return; }
   addCoins(currentUser.name, -cost);
   snakeLives += livesToAdd;
   snakeUsedBoosts = true;
@@ -62,7 +62,7 @@ window.buySnakeShieldWithCoins = function(e) {
   if (e) { e.preventDefault(); e.stopPropagation(); }
   if (typeof currentUser === "undefined" || !currentUser) return;
   const coins = getUserCoins(currentUser.name);
-  if (coins < 1) { alert("Potřebuješ alespoň 1 🪙!"); return; }
+  if (coins < 1) { alert("Potřebuješ alespoň 1 minci!"); return; }
   if (snakeShieldLetters > 0) return;
   addCoins(currentUser.name, -1);
   snakeShieldLetters = 20;
@@ -112,7 +112,7 @@ function resizeSnakeCanvas() {
   if (wrap && cvs) {
     const size = Math.max(260, wrap.clientWidth || 320);
     cvs.width = size;
-    cvs.height = size; 
+    cvs.height = size;
     snakeCellSize = size / snakeGridSize;
     drawSnake();
   }
@@ -122,7 +122,7 @@ function startSnakeGame() {
   if (typeof stopArcadeLoop === "function") stopArcadeLoop();
   stopSnakeLoop();
   if (typeof isCampaignMinigame !== "undefined") isCampaignMinigame = false;
-  
+
   const vItems = getVocabItems();
   snakeDeck = vItems.filter(it => {
     let clean = it.question.replace(/\s*\([^)]*\)/g, '').replace(/^(der|die|das|ein|eine|el|la|los|las|un|una)\s+/i, '').trim();
@@ -146,9 +146,9 @@ function startSnakeGame() {
   selectedGame = "SNAKE";
 
   snakeBody = [
-    { x: Math.floor(snakeGridSize/2), y: Math.floor(snakeGridSize/2) },
-    { x: Math.floor(snakeGridSize/2) - 1, y: Math.floor(snakeGridSize/2) },
-    { x: Math.floor(snakeGridSize/2) - 2, y: Math.floor(snakeGridSize/2) }
+    { x: Math.floor(snakeGridSize / 2), y: Math.floor(snakeGridSize / 2) },
+    { x: Math.floor(snakeGridSize / 2) - 1, y: Math.floor(snakeGridSize / 2) },
+    { x: Math.floor(snakeGridSize / 2) - 2, y: Math.floor(snakeGridSize / 2) }
   ];
   snakeDir = { x: 1, y: 0 };
   snakeNextDir = { x: 1, y: 0 };
@@ -157,7 +157,7 @@ function startSnakeGame() {
   setupNextSnakeWord();
   setScreen("PLAYING");
   runSnakeLoop();
-  
+
   window.addEventListener('resize', resizeSnakeCanvas);
   setTimeout(() => {
     resizeSnakeCanvas();
@@ -196,9 +196,9 @@ function startCampaignSnake(heartsFromLesson = 0) {
   selectedGame = "SNAKE";
 
   snakeBody = [
-    { x: Math.floor(snakeGridSize/2), y: Math.floor(snakeGridSize/2) },
-    { x: Math.floor(snakeGridSize/2) - 1, y: Math.floor(snakeGridSize/2) },
-    { x: Math.floor(snakeGridSize/2) - 2, y: Math.floor(snakeGridSize/2) }
+    { x: Math.floor(snakeGridSize / 2), y: Math.floor(snakeGridSize / 2) },
+    { x: Math.floor(snakeGridSize / 2) - 1, y: Math.floor(snakeGridSize / 2) },
+    { x: Math.floor(snakeGridSize / 2) - 2, y: Math.floor(snakeGridSize / 2) }
   ];
   snakeDir = { x: 1, y: 0 };
   snakeNextDir = { x: 1, y: 0 };
@@ -207,7 +207,7 @@ function startCampaignSnake(heartsFromLesson = 0) {
   setupNextSnakeWord();
   setScreen("PLAYING");
   runSnakeLoop();
-  
+
   window.addEventListener('resize', resizeSnakeCanvas);
   setTimeout(() => {
     resizeSnakeCanvas();
@@ -217,16 +217,16 @@ function startCampaignSnake(heartsFromLesson = 0) {
 
 function resetSnakeToCenter(msg) {
   snakeBody = [
-    { x: Math.floor(snakeGridSize/2), y: Math.floor(snakeGridSize/2) },
-    { x: Math.floor(snakeGridSize/2) - 1, y: Math.floor(snakeGridSize/2) },
-    { x: Math.floor(snakeGridSize/2) - 2, y: Math.floor(snakeGridSize/2) }
+    { x: Math.floor(snakeGridSize / 2), y: Math.floor(snakeGridSize / 2) },
+    { x: Math.floor(snakeGridSize / 2) - 1, y: Math.floor(snakeGridSize / 2) },
+    { x: Math.floor(snakeGridSize / 2) - 2, y: Math.floor(snakeGridSize / 2) }
   ];
   snakeDir = { x: 1, y: 0 };
   snakeNextDir = { x: 1, y: 0 };
   isSnakeWaitingForInput = true;
   snakeState = "WAITING";
   snakeStatusMsg = msg;
-  
+
   if (typeof renderActiveGame === "function") renderActiveGame();
   setTimeout(resizeSnakeCanvas, 10);
   runSnakeLoop();
@@ -349,8 +349,7 @@ function ensureTargetFoodsExist() {
 
 function getRandomFreeGridPos(occupied) {
   const head = snakeBody.length > 0 ? snakeBody[0] : null;
-  
-  // Zakázaná zóna: 6 políček v aktuálním směru před hlavou hada
+
   const dangerZone = new Set();
   if (head && (snakeDir.x !== 0 || snakeDir.y !== 0)) {
     for (let step = 1; step <= 6; step++) {
@@ -368,7 +367,7 @@ function getRandomFreeGridPos(occupied) {
     if (!occupied.has(key) && !dangerZone.has(key)) return { x, y };
     tries++;
   }
-  
+
   for (let x = 1; x < snakeGridSize - 1; x++) {
     for (let y = 1; y < snakeGridSize - 1; y++) {
       let key = `${x},${y}`;
@@ -383,7 +382,7 @@ function runSnakeLoop() {
   snakeInterval = setInterval(() => {
     if (typeof currentScreen !== 'undefined' && currentScreen !== "PLAYING") return;
     if (typeof selectedGame !== 'undefined' && selectedGame !== "SNAKE") return;
-    
+
     if (!isSnakeWaitingForInput && snakeState === "PLAYING") {
       updateSnake();
     }
@@ -394,26 +393,26 @@ function runSnakeLoop() {
 function setSnakeDirection(dx, dy) {
   if (snakeState === "PRE_START" || snakeState === "EQUIP_PAUSE" || snakeState === "SHIELD_EXPIRED_PAUSE" || snakeState === "GAMEOVER") return;
   if (typeof registerUserAction === "function") registerUserAction();
-  
+
   if ((snakeDir.x !== 0 && snakeDir.x === -dx) || (snakeDir.y !== 0 && snakeDir.y === -dy)) {
-      if (isSnakeWaitingForInput) {
-          snakeBody.reverse();
-          snakeDir = { x: dx, y: dy };
-      } else {
-          snakeStatusMsg = "⚠️ Nemůžeš jet dozadu!";
-          if (typeof renderActiveGame === "function") renderActiveGame();
-          return;
-      }
-  }
-  
-  snakeNextDir = { x: dx, y: dy };
-  
-  if (isSnakeWaitingForInput && (dx !== 0 || dy !== 0)) {
-      isSnakeWaitingForInput = false;
-      snakeState = "PLAYING";
-      snakeStatusMsg = "";
+    if (isSnakeWaitingForInput) {
+      snakeBody.reverse();
+      snakeDir = { x: dx, y: dy };
+    } else {
+      snakeStatusMsg = "⚠️ Nemůžeš jet dozadu!";
       if (typeof renderActiveGame === "function") renderActiveGame();
-      resizeSnakeCanvas();
+      return;
+    }
+  }
+
+  snakeNextDir = { x: dx, y: dy };
+
+  if (isSnakeWaitingForInput && (dx !== 0 || dy !== 0)) {
+    isSnakeWaitingForInput = false;
+    snakeState = "PLAYING";
+    snakeStatusMsg = "";
+    if (typeof renderActiveGame === "function") renderActiveGame();
+    resizeSnakeCanvas();
   }
 }
 
@@ -435,7 +434,7 @@ function updateSnake() {
 
   if (nextX < 0) nextX = snakeGridSize - 1;
   else if (nextX >= snakeGridSize) nextX = 0;
-  
+
   if (nextY < 0) nextY = snakeGridSize - 1;
   else if (nextY >= snakeGridSize) nextY = 0;
 
@@ -460,12 +459,12 @@ function updateSnake() {
       snakeFoods.splice(foodIdx, 1);
       snakeCurrentIdx++;
       snakeBody.unshift(head);
-      
+
       const lenEl = document.getElementById("snake-length-ui");
       if (lenEl) lenEl.innerText = snakeBody.length;
 
       updateSnakeSlotsDisplay();
-      
+
       let isWordDone = (snakeCurrentIdx >= snakeTargetLetters.length);
 
       if (snakeShieldLetters > 0) {
@@ -475,9 +474,9 @@ function updateSnake() {
 
         if (snakeShieldLetters === 0) {
           if (isWordDone) {
-             handleSnakeWordComplete(); 
+            handleSnakeWordComplete();
           } else {
-             handleShieldExpired();
+            handleShieldExpired();
           }
           return;
         }
@@ -497,7 +496,7 @@ function updateSnake() {
         isSnakeWaitingForInput = true;
         if (typeof renderActiveGame === "function") renderActiveGame();
         resizeSnakeCanvas();
-        return; 
+        return;
       } else {
         handleSnakeDeath(`Špatné písmeno [ ${eaten.char} ]! Hledáš [ ${targetChar} ]`);
         return;
@@ -519,7 +518,6 @@ function handleShieldExpired() {
 }
 
 function handleSnakeWordComplete() {
-   // Rekord délky hada se ukládá POUZE tehdy, pokud hráč nepoužil štít ani si nepřikoupil životy!
   if (!snakeUsedBoosts && typeof saveSnakeRecord === "function") {
     saveSnakeRecord(snakeBody.length);
   }
@@ -540,17 +538,16 @@ function handleSnakeWordComplete() {
 }
 
 function handleSnakeDeath(reason) {
- // Rekord délky hada se ukládá POUZE tehdy, pokud hráč nepoužil štít ani si nepřikoupil životy!
   if (!snakeUsedBoosts && typeof saveSnakeRecord === "function") {
     saveSnakeRecord(snakeBody.length);
   }
   if (typeof sndErr === "function") sndErr();
   snakeLives--;
-  
+
   if (snakeLives <= 0) {
     snakeState = "GAMEOVER";
     snakeStatusMsg = reason;
-    stopSnakeLoop(); 
+    stopSnakeLoop();
     if (typeof renderActiveGame === "function") renderActiveGame();
   } else {
     isSnakeWaitingForInput = true;
@@ -620,7 +617,7 @@ function drawSnake() {
       let eyeSize = Math.max(2, snakeCellSize * 0.15);
       let offset1 = snakeCellSize * 0.25;
       let offset2 = snakeCellSize * 0.75;
-      
+
       if (snakeDir.x === 1) {
         ctx.fillRect(px + offset2, py + offset1, eyeSize, eyeSize); ctx.fillRect(px + offset2, py + offset2, eyeSize, eyeSize);
       } else if (snakeDir.x === -1) {
@@ -660,7 +657,7 @@ function attachSnakeTouchHandlers() {
   const container = document.querySelector(".snake-container");
   if (!container) return;
 
- const isButtonTarget = (el) => el && !!(el.closest && el.closest("button, .action-btn, .snake-shield-btn"));
+  const isButtonTarget = (el) => el && !!(el.closest && el.closest("button, .action-btn, .snake-shield-btn"));
   container.addEventListener("touchstart", (e) => {
     if (isButtonTarget(e.target)) return;
     if (e.cancelable) e.preventDefault();

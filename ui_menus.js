@@ -4,37 +4,37 @@
 
 function renderScreen() {
   try {
-    if (typeof updateFooter === 'function') updateFooter(); 
-    if (typeof updateStudyTimerUI === 'function') updateStudyTimerUI(); 
+    if (typeof updateFooter === 'function') updateFooter();
+    if (typeof updateStudyTimerUI === 'function') updateStudyTimerUI();
     if (typeof updateTTSBtnUI === "function") updateTTSBtnUI();
-    
+
     const main = document.getElementById("main-content");
-    const bUser = document.getElementById("badge-user"); 
-    const bSubj = document.getElementById("badge-subj"); 
+    const bUser = document.getElementById("badge-user");
+    const bSubj = document.getElementById("badge-subj");
     const bGroup = document.getElementById("badge-group");
-    
-    // Tlačítko uživatele v horní liště (odkaz do Předmětů)
+
     if (bUser) {
       bUser.innerText = currentUser ? currentUser.name : "Uživatel";
       bUser.onclick = () => {
-         if (currentUser) setScreen('SELECT_SUBJECT');
-         else setScreen('SELECT_USER');
+        if (currentUser) setScreen('SELECT_SUBJECT');
+        else setScreen('SELECT_USER');
       };
     }
 
-    // ==========================================
-    // HLAVNÍ SMĚROVAČ (ROUTER) OBRAZOVEK
-    // ==========================================
     if (currentScreen === "SELECT_USER" || !currentUser) {
-   document.body.setAttribute('data-theme', 'default');
- } else if (!(currentScreen === "SHOP" && typeof previewingSkin !== 'undefined' && previewingSkin)) {
-   document.body.setAttribute('data-theme', currentUser.activeTheme || 'default');
- }
+      document.body.setAttribute('data-theme', 'default');
+    } else if (!(currentScreen === "SHOP" && typeof previewingSkin !== 'undefined' && previewingSkin)) {
+      document.body.setAttribute('data-theme', currentUser.activeTheme || 'default');
+    }
+
     if (currentScreen === "SELECT_USER" || !currentUser) {
       _renderSelectUser(main, bSubj, bGroup);
     }
     else if (currentScreen === "SELECT_SUBJECT") {
       _renderSelectSubject(main, bSubj, bGroup);
+    }
+    else if (currentScreen === "ADVENT") {
+      if (typeof renderAdventScreen === "function") renderAdventScreen(main, bSubj, bGroup);
     }
     else if (currentScreen === "SHOP") {
       _renderShop(main, bSubj, bGroup);
@@ -69,66 +69,113 @@ function renderScreen() {
   }
 }
 
-// -------------------------------------------------------------
-// JEDNOTLIVÉ OBRAZOVKY MENU (KOMPONENTY)
-// -------------------------------------------------------------
+function _buildUserCardHtml(u, rankIdx) {
+  const g = parseInt(u.grade) || 2;
+  const localSec = typeof loadUserStudyTime === 'function' ? loadUserStudyTime(u.name) : 0;
+  const cloudSec = (typeof appData !== 'undefined' && appData.syncDate === getTodayDateStr()) ? Math.round(Number(u.todayMinutes || 0) * 60) : 0;
+  const uSec = Math.max(localSec, cloudSec);
+
+  const uMin = Math.floor(uSec / 60);
+  const targetM = u.targetMinutes || 15;
+  const isDone = uMin >= targetM;
+  const st = (typeof getUserStreakStatus === 'function') ? getUserStreakStatus(u.name) : { effectiveStreak: (u.streak || 0), state: 'NONE', rawStreak: (u.streak || 0) };
+  let streakLabel = `🔥 Série: ${st.effectiveStreak} dní`;
+  if (st.state === 'FREEZABLE') streakLabel = `🧊 Série: ${st.effectiveStreak} dní (zachraň!)`;
+  else if (st.state === 'BROKEN') streakLabel = `💔 Série: 0 (bylo ${st.rawStreak})`;
+
+  const coins = Number(u.coins || 0);
+  const freezes = typeof getUserItemCount === 'function' ? getUserItemCount(u.name, "Zmrazeni") : 0;
+  const hasPin = !!(u.pin !== undefined ? u.pin : localStorage.getItem(`user_pin_${u.name.toLowerCase().trim()}`));
+  const themesArr = typeof getUserUnlockedThemes === 'function' ? getUserUnlockedThemes(u.name) : [];
+  const unlockedSkins = themesArr.filter(t => t !== 'default').map(t => {
+    const s = typeof APP_SKINS !== 'undefined' ? APP_SKINS.find(x => x.id === t) : null;
+    return s ? s.name.split(' ')[0] : t;
+  }).join(' ');
+
+  const uLvl = (typeof getLevelInfo === 'function' && typeof getUserXp === 'function')
+    ? getLevelInfo(getUserXp(u.name))
+    : { level: 1, totalXp: 0, pct: 0 };
+  const uWeekXp = (typeof getUserWeeklyXp === 'function') ? getUserWeeklyXp(u.name) : 0;
+
+  let podiumCls = "";
+  let rankBadge = `<span class="podium-rank-badge">#${rankIdx + 1}</span>`;
+  let avSize = 58;
+  if (rankIdx === 0) { podiumCls = "podium-1"; rankBadge = `<span class="podium-rank-badge gold">🥇 1. místo</span>`; avSize = 72; }
+  else if (rankIdx === 1) { podiumCls = "podium-2"; rankBadge = `<span class="podium-rank-badge silver">🥈 2. místo</span>`; avSize = 62; }
+  else if (rankIdx === 2) { podiumCls = "podium-3"; rankBadge = `<span class="podium-rank-badge bronze">🥉 3. místo</span>`; avSize = 62; }
+
+  const coinSvg = typeof coinIcon === 'function' ? coinIcon(14) : '🪙';
+
+  return `
+    <div class="tile ${podiumCls}" style="${isDone && rankIdx > 2 ? 'border-color:var(--col-yellow);' : ''} position:relative;" onclick="if(typeof selectUser === 'function') selectUser('${u.name.replace(/'/g, "\\'")}', ${g}, ${targetM})">
+      <div style="position:absolute; top:7px; left:7px;">${rankBadge}</div>
+      ${hasPin ? `<div style="position:absolute; top:7px; right:8px; font-size:15px;">🔒</div>` : ''}
+      <div style="margin-top:14px; margin-bottom:4px;">${typeof renderAvatarSVG === 'function' ? renderAvatarSVG(u.name, avSize) : ''}</div>
+      <h2>${u.name}</h2>
+      <p>${g >= 10 && g < 90 ? `${g - 9}. ročník SŠ` : (g <= 9 ? `${g}. tř.` : 'Dospělý')}</p>
+      <p style="color:var(--col-orange);margin-top:4px;cursor:pointer;text-decoration:underline dotted;" onclick="openStreakModal('${u.name.replace(/'/g, "\\'")}', event)">${streakLabel} 📅</p>
+      <p style="color:${isDone ? 'var(--col-yellow)' : 'var(--col-text-muted)'};margin-top:2px;font-weight:bold;">⏱️ Dnes: ${uMin}/${targetM} min ${isDone ? '★' : ''}</p>
+      <div class="user-xp-box">
+        <div>🏆 Týden: <b style="color:var(--col-yellow);">${uWeekXp} XP</b></div>
+        <div style="color:var(--col-active-tab);">⚡ Lv.${uLvl.level} · Celkem: <b>${uLvl.totalXp} XP</b></div>
+        <div class="bargraph-track" style="height:4px;margin-top:3px;"><div class="bargraph-fill" style="width:${uLvl.pct}%;background:linear-gradient(90deg,#3b82f6,#a855f7);"></div></div>
+      </div>
+      <p style="color:var(--col-text-muted);margin-top:5px;font-size:12px;background:rgba(0,0,0,0.2);padding:3px 7px;border-radius:6px;min-height:22px;">
+        ${coinSvg} ${coins} | 🧊 ${freezes}x | 🐍 ${u.maxSnake || 0}
+        ${unlockedSkins ? `<br>🎨 ${unlockedSkins}` : ''}
+      </p>
+    </div>
+  `;
+}
 
 function _renderSelectUser(main, bSubj, bGroup) {
-  if (bSubj) bSubj.style.display = "none"; 
+  if (bSubj) bSubj.style.display = "none";
   if (bGroup) bGroup.style.display = "none";
-  
+
   const uList = typeof appData !== 'undefined' && appData.users ? appData.users : [];
   if (uList.length === 0) {
     main.innerHTML = `<div style="text-align:center;padding:30px;"><p style="margin-bottom:15px;">Načítám profily z tabulky...</p></div>`;
     return;
   }
-  
-  main.innerHTML = `
-    <h2 style="font-size:18px;margin-bottom:12px;text-align:center;color:var(--col-yellow);">Kdo se jde učit?</h2>
-    <div class="grid-2">
-      ${uList.map(u => {
-        const g = parseInt(u.grade) || 2;
-        const localSec = typeof loadUserStudyTime === 'function' ? loadUserStudyTime(u.name) : 0;
-        const cloudSec = (typeof appData !== 'undefined' && appData.syncDate === getTodayDateStr()) ? Math.round(Number(u.todayMinutes || 0) * 60) : 0;
-        const uSec = Math.max(localSec, cloudSec);
-        
-        const uMin = Math.floor(uSec / 60); const targetM = u.targetMinutes || 15; const isDone = uMin >= targetM;
-        const st = (typeof getUserStreakStatus === 'function') ? getUserStreakStatus(u.name) : { effectiveStreak: (u.streak || 0), state: 'NONE', rawStreak: (u.streak || 0) };
-        let streakLabel = `🔥 Série: ${st.effectiveStreak} dní`;
-        if (st.state === 'FREEZABLE') streakLabel = `🧊 Série: ${st.effectiveStreak} dní (zachraň!)`;
-        else if (st.state === 'BROKEN') streakLabel = `💔 Série: 0 (bylo ${st.rawStreak})`;
-        const coins = Number(u.coins || 0); const freezes = typeof getUserItemCount === 'function' ? getUserItemCount(u.name, "Zmrazeni") : 0;
-        const hasPin = !!(u.pin !== undefined ? u.pin : localStorage.getItem(`user_pin_${u.name.toLowerCase().trim()}`));
-        let themesArr = typeof getUserUnlockedThemes === 'function' ? getUserUnlockedThemes(u.name) : [];
-        const unlockedSkins = themesArr.filter(t => t !== 'default').map(t => { const s = typeof APP_SKINS !== 'undefined' ? APP_SKINS.find(x => x.id === t) : null; return s ? s.name.split(' ')[0] : t; }).join(' ');
-        
-        const uLvl = (typeof getLevelInfo === 'function' && typeof getUserXp === 'function') ? getLevelInfo(getUserXp(u.name)) : { level: 1, totalXp: 0 };
-        const uWeekXp = (typeof getUserWeeklyXp === 'function') ? getUserWeeklyXp(u.name) : 0;
-        
-        return `
-          <div class="tile" style="${isDone ? 'border-color:var(--col-yellow);' : ''} position:relative;" onclick="if(typeof selectUser === 'function') selectUser('${u.name.replace(/'/g, "\\'")}', ${g}, ${targetM})">
-            ${hasPin ? `<div style="position:absolute; top:8px; right:8px; font-size:16px;">🔒</div>` : ''}
-            <div style="margin-bottom:4px;">${typeof renderAvatarSVG === 'function' ? renderAvatarSVG(u.name, 62) : ''}</div>
-            <h2>${u.name}</h2><p>${g >= 10 && g < 90 ? `${g-9}. ročník SŠ` : (g<=9 ? `${g}. tř.` : 'Dospělý')}</p>
-            <p style="color:var(--col-orange);margin-top:4px;cursor:pointer;text-decoration:underline dotted;" onclick="openStreakModal('${u.name.replace(/'/g, "\\'")}', event)">${streakLabel} 📅</p>
-            <p style="color:${isDone ? 'var(--col-yellow)' : 'var(--col-text-muted)'};margin-top:2px;font-weight:bold;">⏱️ Dnes: ${uMin}/${targetM} min ${isDone?'★':''}</p>
-            <p style="color:var(--col-active-tab);margin-top:2px;font-size:12px;font-weight:bold;">⚡ Lv.${uLvl.level} · 🏆 ${uWeekXp} XP</p>
-            <p style="color:var(--col-text-muted);margin-top:4px;font-size:12px;background:rgba(0,0,0,0.2);padding:2px 6px;border-radius:6px;min-height:22px;">
-              💰 ${coins} | 🧊 ${freezes}x | 🐍 ${u.maxSnake || 0}
-              ${unlockedSkins ? `<br>🎨 ${unlockedSkins}` : ''}
-            </p>
-          </div>
-        `;
-      }).join('')}
-    </div>
-    ${typeof renderWeeklyLeaderboardBox === 'function' ? renderWeeklyLeaderboardBox() : ''}
-  `;
+
+  const rankedUsers = [...uList].sort((a, b) => {
+    const wa = typeof getUserWeeklyXp === 'function' ? getUserWeeklyXp(a.name) : 0;
+    const wb = typeof getUserWeeklyXp === 'function' ? getUserWeeklyXp(b.name) : 0;
+    if (wb !== wa) return wb - wa;
+    const xa = typeof getUserXp === 'function' ? getUserXp(a.name) : 0;
+    const xb = typeof getUserXp === 'function' ? getUserXp(b.name) : 0;
+    if (xb !== xa) return xb - xa;
+    return a.name.localeCompare(b.name, 'cs');
+  });
+
+  let html = `<h2 style="font-size:18px;margin-bottom:12px;text-align:center;color:var(--col-yellow);">🏆 Kdo se jde učit?</h2>`;
+
+  html += `<div class="podium-first-wrap">${_buildUserCardHtml(rankedUsers[0], 0)}</div>`;
+
+  if (rankedUsers.length >= 2) {
+    html += `<div class="grid-2" style="margin-top:10px;">`;
+    html += _buildUserCardHtml(rankedUsers[1], 1);
+    if (rankedUsers.length >= 3) {
+      html += _buildUserCardHtml(rankedUsers[2], 2);
+    }
+    html += `</div>`;
+  }
+
+  if (rankedUsers.length > 3) {
+    html += `<div class="podium-rest-divider">Další soutěžící</div>`;
+    html += `<div class="grid-2">`;
+    html += rankedUsers.slice(3).map((u, i) => _buildUserCardHtml(u, i + 3)).join('');
+    html += `</div>`;
+  }
+
+  html += (typeof renderWeeklyLeaderboardBox === 'function' ? renderWeeklyLeaderboardBox() : '');
+  main.innerHTML = html;
 }
 
 function _renderSelectSubject(main, bSubj, bGroup) {
-  if (bSubj) bSubj.style.display = "none"; 
+  if (bSubj) bSubj.style.display = "none";
   if (bGroup) bGroup.style.display = "none";
-  
+
   const userG = parseInt(currentUser.grade) || 2;
   const subjs = {};
   (appData.items || []).forEach(it => { if (typeof isItemAllowedForGrade === 'function' && isItemAllowedForGrade(it, userG)) subjs[it.subject] = (subjs[it.subject] || 0) + 1; });
@@ -138,6 +185,48 @@ function _renderSelectSubject(main, bSubj, bGroup) {
   const unlocked = typeof getUserUnlockedThemes === 'function' ? getUserUnlockedThemes(currentUser.name) : [];
   const skinCount = unlocked.length;
 
+  const xpTotal = typeof getUserXp === 'function' ? getUserXp(currentUser.name) : 0;
+  const xpWeek = typeof getUserWeeklyXp === 'function' ? getUserWeeklyXp(currentUser.name) : 0;
+  const lvlInfo = typeof getLevelInfo === 'function' ? getLevelInfo(xpTotal) : { level: 1, currentLevelXp: 0, nextLevelXp: 250, pct: 0, totalXp: 0 };
+  const coinSvg = typeof coinIcon === 'function' ? coinIcon(16) : '🪙';
+
+  let adventTileHtml = "";
+  if (typeof getAdventContext === "function") {
+    const advCtx = getAdventContext();
+    if (advCtx.isDecember || advCtx.isCountdown) {
+      const advSt = getUserAdventState(currentUser.name);
+      const canOpen = typeof canClaimAdventWindow === "function" && canClaimAdventWindow(currentUser.name);
+      let advSub = "";
+      if (!advCtx.isDecember) {
+        const dLeft = Math.max(1, 31 - advCtx.day);
+        advSub = `Začíná 1. 12. (za ${dLeft} ${dLeft === 1 ? 'den' : (dLeft < 5 ? 'dny' : 'dní')})`;
+      } else if (canOpen) {
+        advSub = `<span style="color:var(--col-yellow);font-weight:bold;">🎁 Dnešní okénko připraveno k otevření!</span>`;
+      } else if (advSt.lastDate === advCtx.todayStr) {
+        advSub = `✅ Dnes otevřeno (${advSt.days.length}/24)`;
+      } else if (advSt.days.length >= 24) {
+        advSub = `🎉 Všech 24 okének otevřeno!`;
+      } else {
+        advSub = `Splň denní limit a otevři 1 okénko (${advSt.days.length}/24)`;
+      }
+
+      adventTileHtml = `
+        <div class="tile" style="background:linear-gradient(135deg, #14532d, #7f1d1d); border:2px solid ${canOpen ? 'var(--col-yellow)' : '#ef4444'}; margin-bottom:10px; padding:11px 14px; cursor:pointer;" onclick="setScreen('ADVENT')">
+          <div style="display:flex;align-items:center;justify-content:space-between;width:100%;">
+            <div style="display:flex;align-items:center;gap:12px;">
+              <span style="font-size:30px;">🎄</span>
+              <div style="text-align:left;">
+                <h2 style="color:var(--col-yellow);margin-bottom:2px;font-size:17px;">Adventní kalendář</h2>
+                <p style="color:#fef9c3;font-size:12px;">${advSub}</p>
+              </div>
+            </div>
+            <span style="font-size:20px;color:var(--col-yellow);font-weight:bold;">${canOpen ? '🎁' : '➔'}</span>
+          </div>
+        </div>
+      `;
+    }
+  }
+
   let html = `
     ${userG >= 90 ? `
       <div class="filter-bar">
@@ -145,21 +234,33 @@ function _renderSelectSubject(main, bSubj, bGroup) {
       </div>
     ` : ''}
 
-    <div class="tile" style="border-color:var(--col-yellow);margin-bottom:10px;padding:12px 14px;cursor:pointer;" onclick="if(typeof setScreen==='function') setScreen('SHOP')">
+    <div class="tile" style="border-color:var(--col-yellow);margin-bottom:10px;padding:12px 14px;cursor:pointer;align-items:stretch;" onclick="if(typeof setScreen==='function') setScreen('SHOP')">
       <div style="display:flex;align-items:center;justify-content:space-between;width:100%;">
         <div style="display:flex;align-items:center;gap:12px;">
-          <span style="font-size:32px;">🛒</span>
+          ${typeof renderAvatarSVG === 'function' ? renderAvatarSVG(currentUser.name, 46) : '<span style="font-size:32px;">🛒</span>'}
           <div style="text-align:left;">
-            <h2 style="color:var(--col-yellow);margin-bottom:2px;font-size:18px;">Obchod, Vzhledy a Profil</h2>
-            <p style="color:var(--col-text-muted);font-size:12px;">Společný obchod pro všechny předměty</p>
+            <h2 style="color:var(--col-yellow);margin-bottom:2px;font-size:17px;">Obchod, Vzhledy a Profil</h2>
+            <p style="color:var(--col-text-muted);font-size:12px;">⚡ Lv.${lvlInfo.level} · Celkem: <b style="color:var(--col-text);">${lvlInfo.totalXp} XP</b> · 🏆 Týden: <b style="color:var(--col-yellow);">${xpWeek} XP</b></p>
           </div>
         </div>
         <div style="text-align:right;">
-          <div style="color:var(--col-yellow);font-size:18px;font-weight:bold;">${coins} 🪙</div>
+          <div style="color:var(--col-yellow);font-size:18px;font-weight:bold;">${coins} ${coinSvg}</div>
           <div style="color:var(--col-active-tab);font-size:12px;margin-top:2px;">🧊 ${freezes}x | 🎨 ${skinCount}</div>
         </div>
       </div>
+      <div style="margin-top:8px;">
+        <div class="bargraph-track" style="height:6px;">
+          <div class="bargraph-fill" style="width:${lvlInfo.pct}%;background:linear-gradient(90deg,#3b82f6,#a855f7);"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--col-text-muted);margin-top:3px;">
+          <span>Postup do Lv.${lvlInfo.level + 1}: ${lvlInfo.currentLevelXp} / ${lvlInfo.nextLevelXp} XP</span>
+          <span>${lvlInfo.pct} %</span>
+        </div>
+      </div>
     </div>
+
+    ${adventTileHtml}
+
     <div class="grid-2">
       ${!subjs["Matematika"] ? `
         <div class="tile" style="border-color:var(--col-active-tab);" onclick="if(typeof chooseSubject === 'function') chooseSubject('Matematika')">
@@ -167,7 +268,7 @@ function _renderSelectSubject(main, bSubj, bGroup) {
         </div>
       ` : ''}
   `;
-  
+
   Object.keys(subjs).forEach(s => {
     const sLow = s.toLowerCase();
     const isCesta = sLow.includes("cesta") || sLow.includes("postupn") || sLow.includes("inteligentn");
@@ -176,7 +277,7 @@ function _renderSelectSubject(main, bSubj, bGroup) {
     const ikn = isCesta ? '🚀 ' : (isMat ? '🔢 ' : '');
     html += `<div class="tile" style="${stl}" onclick="if(typeof chooseSubject==='function') chooseSubject('${s.replace(/'/g, "\\'")}')"><h2>${ikn}${s}</h2><p>${isMat ? 'Dril + ' + subjs[s] + ' úloh' : subjs[s] + ' úloh'}</p></div>`;
   });
-  
+
   html += `</div>`;
   main.innerHTML = html;
 }
@@ -184,11 +285,12 @@ function _renderSelectSubject(main, bSubj, bGroup) {
 function _renderShop(main, bSubj, bGroup) {
   if (bSubj) { bSubj.style.display = "flex"; bSubj.innerText = "🛒 Obchod a Profil"; }
   if (bGroup) bGroup.style.display = "none";
-  
+
   const freezes = typeof getUserItemCount === 'function' ? getUserItemCount(currentUser.name, "Zmrazeni") : 0;
-  const unlockedThemes = typeof getUserUnlockedThemes === 'function' ? getUserUnlockedThemes(currentUser.name) : []; 
+  const unlockedThemes = typeof getUserUnlockedThemes === 'function' ? getUserUnlockedThemes(currentUser.name) : [];
   const activeTheme = typeof getUserActiveTheme === 'function' ? getUserActiveTheme(currentUser.name) : 'default';
-  
+  const coinSvg = typeof coinIcon === 'function' ? coinIcon(15) : '🪙';
+
   const uKey = currentUser.name.toLowerCase().trim();
   const u = (appData.users || []).find(x => x.name.toLowerCase().trim() === uKey);
   const hasPin = !!(u && u.pin) || !!localStorage.getItem(`user_pin_${uKey}`);
@@ -196,22 +298,22 @@ function _renderShop(main, bSubj, bGroup) {
   let masteredSet = new Set();
   let storiesSet = new Set();
   const prog = (appData.progress && appData.progress[uKey]) ? appData.progress[uKey] : {};
-  
+
   for (const key in prog) {
-      if (key.includes("STORY")) {
-          if (Number(prog[key]) >= 1) storiesSet.add(key);
-      } else {
-          if (Number(prog[key]) >= 2) masteredSet.add(key);
-      }
+    if (key.includes("STORY")) {
+      if (Number(prog[key]) >= 1) storiesSet.add(key);
+    } else {
+      if (Number(prog[key]) >= 2) masteredSet.add(key);
+    }
   }
   for (let i = 0; i < localStorage.length; i++) {
-      const lKey = localStorage.key(i);
-      if (lKey.startsWith(`story_done_${uKey}`)) storiesSet.add(lKey);
+    const lKey = localStorage.key(i);
+    if (lKey.startsWith(`story_done_${uKey}`)) storiesSet.add(lKey);
   }
 
   main.innerHTML = `
     <div style="padding:4px;">
-    <div class="tile" style="border-color:var(--col-active-tab); flex-direction:row; justify-content:space-between; padding:12px 14px; margin-bottom:15px;" onclick="setScreen('AVATAR_SHOP')">
+      <div class="tile" style="border-color:var(--col-active-tab); flex-direction:row; justify-content:space-between; padding:12px 14px; margin-bottom:15px;" onclick="setScreen('AVATAR_SHOP')">
         <div style="display:flex; align-items:center; gap:12px;">
           ${typeof renderAvatarSVG === 'function' ? renderAvatarSVG(currentUser.name, 64) : ''}
           <div style="text-align:left;">
@@ -221,6 +323,9 @@ function _renderShop(main, bSubj, bGroup) {
         </div>
         <span style="font-size:20px; color:var(--col-active-tab); font-weight:bold;">➔</span>
       </div>
+
+      ${typeof renderXpLevelCard === 'function' ? renderXpLevelCard(currentUser.name) : ''}
+
       <div style="background:var(--col-card); border:1px solid var(--col-card-border); border-radius:12px; padding:15px; margin-bottom:15px; text-align:center;">
          <h2 style="color:var(--col-active-tab); font-size:19px; margin-bottom:12px;">🎓 Průkaz studenta</h2>
          <div style="display:flex; justify-content:space-around; align-items:center;">
@@ -239,7 +344,6 @@ function _renderShop(main, bSubj, bGroup) {
          </div>
       </div>
       ${typeof renderStreakHistoryBox === 'function' ? renderStreakHistoryBox(currentUser.name) : ''}
-      ${typeof renderXpLevelCard === 'function' ? renderXpLevelCard(currentUser.name) : ''}
       ${typeof renderWeeklyLeaderboardBox === 'function' ? renderWeeklyLeaderboardBox() : ''}
 
       <div style="background:var(--col-card);border:1px solid var(--col-card-border);border-radius:12px;padding:14px;margin-bottom:15px;display:flex;justify-content:space-between;align-items:center;">
@@ -252,7 +356,7 @@ function _renderShop(main, bSubj, bGroup) {
           <div><b style="font-size:16px;">🧊 Zmrazení série</b><p style="font-size:12px;color:var(--col-text-muted);margin-top:2px;">Ochrání tvou sérii, když vynecháš den.</p></div>
           <span style="font-size:15px;color:var(--col-active-tab);font-weight:bold;margin-left:8px;">Máš: ${freezes}x</span>
         </div>
-        <button class="action-btn" style="padding:10px;font-size:15px;width:100%;margin-top:6px;" onclick="if(typeof buyFreeze==='function') buyFreeze()">Koupit zmrazení (Cena: 20 🪙)</button>
+        <button class="action-btn" style="padding:10px;font-size:15px;width:100%;margin-top:6px;" onclick="if(typeof buyFreeze==='function') buyFreeze()">Koupit zmrazení (Cena: 20 ${coinSvg})</button>
       </div>
 
       <div style="background:var(--col-card);border:1px solid var(--col-card-border);border-radius:12px;padding:14px;margin-bottom:15px;">
@@ -260,14 +364,14 @@ function _renderShop(main, bSubj, bGroup) {
           ${typeof APP_SKINS !== 'undefined' ? APP_SKINS.map(skin => {
             const isUnlocked = unlockedThemes.includes(skin.id); const isActive = activeTheme === skin.id; const isPreview = typeof previewingSkin !== 'undefined' && previewingSkin === skin.id;
             return `
-              <div style="display:flex;flex-direction:column;background:var(--col-bg);padding:10px 12px;border-radius:8px;border:1px solid ${isActive?'var(--col-active-tab)':'var(--col-card-border)'};">
+              <div style="display:flex;flex-direction:column;background:var(--col-bg);padding:10px 12px;border-radius:8px;border:1px solid ${isActive ? 'var(--col-active-tab)' : 'var(--col-card-border)'};">
                 <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
                   <div><b style="color:var(--col-yellow);font-size:15px;">${skin.name}</b><p style="font-size:12px;color:var(--col-text-muted);margin-top:2px;">${skin.desc}</p></div>
                   <div style="display:flex;gap:6px;flex-wrap:wrap;">
-                    ${isActive ? `<span style="color:var(--col-green);font-size:12px;font-weight:bold;padding:6px 10px;background:rgba(34,197,94,0.1);border-radius:6px;border:1px solid var(--col-green);">✅ Aktivní</span>` 
-                      : isUnlocked ? `<button class="toggle-btn on" style="font-size:13px;padding:6px 14px;" onclick="if(typeof equipSkin==='function') equipSkin('${skin.id}')">Nasadit</button>` 
+                    ${isActive ? `<span style="color:var(--col-green);font-size:12px;font-weight:bold;padding:6px 10px;background:rgba(34,197,94,0.1);border-radius:6px;border:1px solid var(--col-green);">✅ Aktivní</span>`
+                      : isUnlocked ? `<button class="toggle-btn on" style="font-size:13px;padding:6px 14px;" onclick="if(typeof equipSkin==='function') equipSkin('${skin.id}')">Nasadit</button>`
                       : (isPreview ? `<button class="toggle-btn" style="font-size:12px;padding:4px 8px;" onclick="if(typeof cancelPreview==='function') cancelPreview()">Zrušit náhled</button>
-                                      <button class="toggle-btn on" style="font-size:13px;padding:6px 10px;" onclick="if(typeof buySkin==='function') buySkin('${skin.id}', ${skin.cost})">Koupit (${skin.cost} 🪙)</button>` 
+                                      <button class="toggle-btn on" style="font-size:13px;padding:6px 10px;" onclick="if(typeof buySkin==='function') buySkin('${skin.id}', ${skin.cost})">Koupit (${skin.cost} ${coinSvg})</button>`
                       : `<button class="toggle-btn" style="font-size:12px;padding:6px 10px;border-color:var(--col-active-tab);" onclick="if(typeof previewSkin==='function') previewSkin('${skin.id}')">👁️ Náhled</button>`)}
                   </div>
                 </div>
@@ -284,7 +388,7 @@ function _renderShop(main, bSubj, bGroup) {
 function _renderSelectGroup(main, bSubj, bGroup) {
   if (bSubj) { bSubj.style.display = "flex"; bSubj.innerText = selectedSubject; }
   if (bGroup) bGroup.style.display = "none";
-  
+
   let html = "";
 
   if (selectedSubject === "Matematika") {
@@ -300,8 +404,8 @@ function _renderSelectGroup(main, bSubj, bGroup) {
       <h2 style="font-size:18px;margin-bottom:10px;text-align:center;color:var(--col-yellow);">Nekonečný trénink:</h2>
       <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:18px;">
         ${ops.map(o => `
-          <div class="tile" style="flex-direction:row;justify-content:space-between;padding:12px;text-align:left; ${o.id.startsWith('EQ_')||o.id==='EXPR_QUADRATIC'||o.id==='FRACTIONS_STEP' ? 'border-color:var(--col-green);' : ''}" onclick="if(typeof startMathPractice==='function') startMathPractice('${o.id}', '${o.title}')">
-            <div><h2 style="${o.id.startsWith('EQ_')||o.id==='EXPR_QUADRATIC'||o.id==='FRACTIONS_STEP' ? 'color:var(--col-green);' : ''}">${o.title}</h2><p>${o.desc}</p></div>
+          <div class="tile" style="flex-direction:row;justify-content:space-between;padding:12px;text-align:left; ${o.id.startsWith('EQ_') || o.id === 'EXPR_QUADRATIC' || o.id === 'FRACTIONS_STEP' ? 'border-color:var(--col-green);' : ''}" onclick="if(typeof startMathPractice==='function') startMathPractice('${o.id}', '${o.title}')">
+            <div><h2 style="${o.id.startsWith('EQ_') || o.id === 'EXPR_QUADRATIC' || o.id === 'FRACTIONS_STEP' ? 'color:var(--col-green);' : ''}">${o.title}</h2><p>${o.desc}</p></div>
             <span style="color:var(--col-active-tab);font-weight:bold;font-size:20px;">➔</span>
           </div>
         `).join('')}
@@ -320,8 +424,8 @@ function _renderSelectGroup(main, bSubj, bGroup) {
     html += `
       <h2 style="font-size:18px;margin-bottom:10px;text-align:center;color:var(--col-yellow);">${selectedSubject === "Matematika" ? "Úlohy a testy z tabulky:" : "Výběr lekce / tématu:"}</h2>
       <div class="filter-bar">
-        <button class="toggle-btn ${typeof viewMode !== 'undefined' && viewMode==='LESSONS'?'on':''}" onclick="if(typeof viewMode !== 'undefined') { viewMode='LESSONS'; renderScreen(); }">Lekce</button>
-        <button class="toggle-btn ${typeof viewMode !== 'undefined' && viewMode==='TOPICS'?'on':''}" onclick="if(typeof viewMode !== 'undefined') { viewMode='TOPICS'; renderScreen(); }">Témata</button>
+        <button class="toggle-btn ${typeof viewMode !== 'undefined' && viewMode === 'LESSONS' ? 'on' : ''}" onclick="if(typeof viewMode !== 'undefined') { viewMode='LESSONS'; renderScreen(); }">Lekce</button>
+        <button class="toggle-btn ${typeof viewMode !== 'undefined' && viewMode === 'TOPICS' ? 'on' : ''}" onclick="if(typeof viewMode !== 'undefined') { viewMode='TOPICS'; renderScreen(); }">Témata</button>
       </div>
       <div style="display:flex;flex-direction:column;gap:8px;">
         ${Object.values(groupsMap).map(g => {
@@ -345,12 +449,12 @@ function _renderSelectGroup(main, bSubj, bGroup) {
 function _renderCampaignHub(main, bSubj, bGroup) {
   if (bSubj) { bSubj.style.display = "flex"; bSubj.innerText = selectedSubject; }
   if (bGroup) bGroup.style.display = "none";
-  
+
   const vItems = typeof getVocabItems === 'function' ? getVocabItems() : [];
   let lessons = [...new Set(vItems.map(it => it.lesson))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
 
   let userMinLvl = 1;
-  const subjNorm = selectedSubject.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z]/g, ""); 
+  const subjNorm = selectedSubject.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z]/g, "");
   if (currentUser && currentUser.startLevels) {
     for (let k in currentUser.startLevels) { if (subjNorm.includes(k) || k.includes(subjNorm)) { userMinLvl = Number(currentUser.startLevels[k]) || 1; break; } }
   }
@@ -379,23 +483,23 @@ function _renderCampaignHub(main, bSubj, bGroup) {
     }
     currentLessonIndex = i;
   }
-  
+
   let cefrHtml = "";
   if (/angli|nemc|spanel|franc|ital/i.test(subjNorm)) {
-     const cefrPct = Math.min(100, Math.max(0, Math.round((currentLessonIndex / Math.max(1, lessons.length - 1)) * 100)));
-     cefrHtml = `
-       <div style="width: 100%; max-width: 320px; margin: 5px auto 14px auto;">
-         <div style="display:flex; justify-content:space-between; font-size:11px; margin-bottom:5px; font-weight:bold;">
-            <span style="color:${cefrPct<25?'var(--col-text)':'var(--col-text-muted)'};">A1</span>
-            <span style="color:${cefrPct>=25&&cefrPct<50?'var(--col-text)':'var(--col-text-muted)'};">A2</span>
-            <span style="color:${cefrPct>=50&&cefrPct<75?'var(--col-text)':'var(--col-text-muted)'};">B1</span>
-            <span style="color:${cefrPct>=75?'var(--col-text)':'var(--col-text-muted)'};">B2</span>
-         </div>
-         <div class="bargraph-track" style="height:6px; border-radius:3px;">
-           <div class="bargraph-fill" style="width:${cefrPct}%; background:linear-gradient(90deg, #3b82f6, #8b5cf6);"></div>
-         </div>
-       </div>
-     `;
+    const cefrPct = Math.min(100, Math.max(0, Math.round((currentLessonIndex / Math.max(1, lessons.length - 1)) * 100)));
+    cefrHtml = `
+      <div style="width: 100%; max-width: 320px; margin: 5px auto 14px auto;">
+        <div style="display:flex; justify-content:space-between; font-size:11px; margin-bottom:5px; font-weight:bold;">
+           <span style="color:${cefrPct < 25 ? 'var(--col-text)' : 'var(--col-text-muted)'};">A1</span>
+           <span style="color:${cefrPct >= 25 && cefrPct < 50 ? 'var(--col-text)' : 'var(--col-text-muted)'};">A2</span>
+           <span style="color:${cefrPct >= 50 && cefrPct < 75 ? 'var(--col-text)' : 'var(--col-text-muted)'};">B1</span>
+           <span style="color:${cefrPct >= 75 ? 'var(--col-text)' : 'var(--col-text-muted)'};">B2</span>
+        </div>
+        <div class="bargraph-track" style="height:6px; border-radius:3px;">
+          <div class="bargraph-fill" style="width:${cefrPct}%; background:linear-gradient(90deg, #3b82f6, #8b5cf6);"></div>
+        </div>
+      </div>
+    `;
   }
 
   const activeLessonName = lessons[currentLessonIndex] || "";
@@ -415,41 +519,41 @@ function _renderCampaignHub(main, bSubj, bGroup) {
 
   let storiesByLesson = {};
   const userG = parseInt(currentUser.grade) || 2;
-  let allSubjectItems = (appData.items || []).filter(it => it.subject === selectedSubject && (typeof isItemAllowedForGrade==='function' ? isItemAllowedForGrade(it, userG) : true));
+  let allSubjectItems = (appData.items || []).filter(it => it.subject === selectedSubject && (typeof isItemAllowedForGrade === 'function' ? isItemAllowedForGrade(it, userG) : true));
   allSubjectItems.forEach(it => {
-      if (it.type && it.type.toUpperCase().includes('PRIBEH')) {
-          let t = it.topic || 'Příběh';
-          if (!storiesByLesson[it.lesson]) storiesByLesson[it.lesson] = [];
-          if (!storiesByLesson[it.lesson].some(s => s.title === t)) {
-              let sItems = allSubjectItems.filter(x => x.topic === t && x.type.toUpperCase().includes('PRIBEH'));
-              storiesByLesson[it.lesson].push({ title: t, items: sItems });
-          }
+    if (it.type && it.type.toUpperCase().includes('PRIBEH')) {
+      let t = it.topic || 'Příběh';
+      if (!storiesByLesson[it.lesson]) storiesByLesson[it.lesson] = [];
+      if (!storiesByLesson[it.lesson].some(s => s.title === t)) {
+        let sItems = allSubjectItems.filter(x => x.topic === t && x.type.toUpperCase().includes('PRIBEH'));
+        storiesByLesson[it.lesson].push({ title: t, items: sItems });
       }
+    }
   });
 
-  const offsetsX = [0, -35, -70, -90, -50, 10, 60, 85, 45, -15, -60, -85, -35, 25, 75, 95, 55, 0, -45, -80]; 
-  const offsetsY = [120, 150, 110, 140, 160, 115, 135, 155, 125, 145]; 
-  const MAP_WIDTH = 340; const CENTER_X = MAP_WIDTH / 2; const PADDING_TOP = 40; 
-  
+  const offsetsX = [0, -35, -70, -90, -50, 10, 60, 85, 45, -15, -60, -85, -35, 25, 75, 95, 55, 0, -45, -80];
+  const offsetsY = [120, 150, 110, 140, 160, 115, 135, 155, 125, 145];
+  const MAP_WIDTH = 340; const CENTER_X = MAP_WIDTH / 2; const PADDING_TOP = 40;
+
   let nodeYPositions = []; let currentY = PADDING_TOP;
   for (let i = 0; i < lessons.length; i++) {
-     nodeYPositions.push(currentY);
-     currentY += offsetsY[i % offsetsY.length]; 
+    nodeYPositions.push(currentY);
+    currentY += offsetsY[i % offsetsY.length];
   }
-  let svgHeight = currentY + 30; 
+  let svgHeight = currentY + 30;
   let pathStringAll = ""; let pathStringDone = ""; let mapNodesHtml = "";
-  
+
   lessons.forEach((l, i) => {
     let isCompleted = i < currentLessonIndex;
     let isActive = i === currentLessonIndex;
     let isLocked = i > currentLessonIndex;
     let pct = lessonPcts[i] || 0;
-    
+
     let cx = CENTER_X + offsetsX[i % offsetsX.length]; let cy = nodeYPositions[i];
     let cmd = i === 0 ? "M" : "L";
     pathStringAll += `${cmd} ${cx} ${cy} `;
     if (i <= currentLessonIndex) pathStringDone += `${cmd} ${cx} ${cy} `;
-    
+
     let nodeClass = isActive ? "active" : (isCompleted ? "completed" : "locked");
     let icon = isActive ? "▶️" : (isCompleted ? "⭐" : "🔒");
     let labelText = (isActive || isCompleted) ? `${l} · ${pct} %` : l;
@@ -467,18 +571,18 @@ function _renderCampaignHub(main, bSubj, bGroup) {
         </svg>
       `;
     }
-    
+
     let storyHtml = "";
     if (storiesByLesson[l]) {
-       storiesByLesson[l].forEach((story, sIdx) => {
-           let isDone = (typeof isStoryCompleted === "function") && isStoryCompleted(story.title, story.items);
-           let storyClass = isDone ? "done" : ""; let storyIcon = isDone ? "📖" : "🎁";
-           let storySide = cx <= CENTER_X ? `left: 100%; margin-left: 14px;` : `right: 100%; margin-right: 14px;`;
-           let clickAction = isLocked 
-             ? `event.stopPropagation(); alert('Tento příběh se odemkne, až se dostaneš do této lekce.');` 
-             : `event.stopPropagation(); if(typeof startStory==='function') startStory('${story.title.replace(/'/g, "\\'")}');`;
-           storyHtml += `<div class="map-story-btn ${storyClass}" style="position: absolute; ${storySide} top: 50%; transform: translateY(-50%); z-index: 10;" onpointerdown="event.stopPropagation();" onclick="${clickAction}" title="${story.title}">${storyIcon}</div>`;
-       });
+      storiesByLesson[l].forEach((story) => {
+        let isDone = (typeof isStoryCompleted === "function") && isStoryCompleted(story.title, story.items);
+        let storyClass = isDone ? "done" : ""; let storyIcon = isDone ? "📖" : "🎁";
+        let storySide = cx <= CENTER_X ? `left: 100%; margin-left: 14px;` : `right: 100%; margin-right: 14px;`;
+        let clickAction = isLocked
+          ? `event.stopPropagation(); alert('Tento příběh se odemkne, až se dostaneš do této lekce.');`
+          : `event.stopPropagation(); if(typeof startStory==='function') startStory('${story.title.replace(/'/g, "\\'")}');`;
+        storyHtml += `<div class="map-story-btn ${storyClass}" style="position: absolute; ${storySide} top: 50%; transform: translateY(-50%); z-index: 10;" onpointerdown="event.stopPropagation();" onclick="${clickAction}" title="${story.title}">${storyIcon}</div>`;
+      });
     }
 
     let clickAction = "";
@@ -502,23 +606,23 @@ function _renderCampaignHub(main, bSubj, bGroup) {
        ${mapNodesHtml}
     </div>
   `;
-  
+
   setTimeout(() => {
-     const activeNode = document.getElementById('active-lesson-node');
-     if (activeNode) activeNode.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const activeNode = document.getElementById('active-lesson-node');
+    if (activeNode) activeNode.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }, 100);
 }
 
 function _renderSelectGame(main, bSubj, bGroup) {
   if (bSubj) { bSubj.style.display = "flex"; }
   if (bGroup) { bGroup.style.display = "flex"; bGroup.innerText = selectedGroupKey; }
-  
+
   const vItems = typeof getVocabItems === 'function' ? getVocabItems() : [];
   const qItems = typeof getQuizItems === 'function' ? getQuizItems() : [];
   const sItems = typeof getSeqItems === 'function' ? getSeqItems() : [];
   const quickMode = typeof getQuickChoiceMode === 'function' ? getQuickChoiceMode() : null;
   let html = "";
-  
+
   if (vItems.length > 0 || qItems.length > 0) {
     html += `
       <div class="action-btn" style="background:linear-gradient(135deg, #8b5cf6, #3b82f6); border-color:#c4b5fd; margin-bottom:5px; padding:16px; font-size:20px; box-shadow: 0 4px 15px rgba(139, 92, 246, 0.4);" onclick="if(typeof startSmartMix==='function') startSmartMix()">
@@ -527,7 +631,6 @@ function _renderSelectGame(main, bSubj, bGroup) {
     `;
   }
 
-  // --- SEKCE 1: STUDIUM ---
   html += `
     <div style="margin: 18px 0 10px 0; border-bottom: 2px solid var(--col-card-border); padding-bottom: 5px;">
       <h3 style="color:var(--col-active-tab); font-size:16px; text-transform:uppercase; letter-spacing:1px;">📚 Studium</h3>
@@ -538,7 +641,7 @@ function _renderSelectGame(main, bSubj, bGroup) {
     html += `
       <div class="tile" onclick="if(typeof startGame==='function') startGame('CARDS')"><h2>1. Karty</h2><p>Čtení (${vItems.length})</p></div>
       <div class="tile" style="border-color:var(--col-green);" onclick="if(typeof startGame==='function') startGame('ADAPTIVE')">
-        <h2 style="color:var(--col-green);">2. Zkoušení</h2><p>${typeof testingDirection!=='undefined' && testingDirection==='DIR_OUT'?'🇨🇿 ➔ Cizí':'Cizí ➔ 🇨🇿'}</p>
+        <h2 style="color:var(--col-green);">2. Zkoušení</h2><p>${typeof testingDirection !== 'undefined' && testingDirection === 'DIR_OUT' ? '🇨🇿 ➔ Cizí' : 'Cizí ➔ 🇨🇿'}</p>
       </div>
       <div class="tile" onclick="if(typeof startGame==='function') startGame('SCRAMBLE')"><h2>3. Skládání</h2><p>Pravopis</p></div>
     `;
@@ -551,7 +654,6 @@ function _renderSelectGame(main, bSubj, bGroup) {
   }
   html += `</div>`;
 
-  // --- SEKCE 2: HRY ---
   html += `
     <div style="margin: 22px 0 10px 0; border-bottom: 2px solid var(--col-card-border); padding-bottom: 5px;">
       <h3 style="color:var(--col-yellow); font-size:16px; text-transform:uppercase; letter-spacing:1px;">🎮 Hry</h3>
@@ -664,25 +766,6 @@ function renderStreakHistoryBox(userName) {
   `;
 }
 
-window.openStreakModal = function(userName, e) {
-  if (e) e.stopPropagation();
-  const existing = document.getElementById("streak-modal-overlay");
-  if (existing) existing.remove();
-
-  const overlay = document.createElement("div");
-  overlay.id = "streak-modal-overlay";
-  overlay.className = "streak-modal-backdrop";
-  overlay.onclick = () => overlay.remove();
-
-  overlay.innerHTML = `
-    <div class="streak-modal-card" onclick="event.stopPropagation()">
-      <h3 style="text-align:center; color:var(--col-yellow); margin-bottom:10px;">Přehled série: ${userName}</h3>
-      ${renderStreakHistoryBox(userName)}
-      <div class="action-btn" style="margin-top:4px; padding:10px;" onclick="document.getElementById('streak-modal-overlay').remove()">Zavřít</div>
-    </div>
-  `;
-  document.body.appendChild(overlay);
-};
 function renderXpLevelCard(userName) {
   if (typeof getUserXp !== "function" || typeof getLevelInfo !== "function") return "";
   const info = getLevelInfo(getUserXp(userName));
@@ -695,15 +778,17 @@ function renderXpLevelCard(userName) {
 
   return `
     <div style="background:var(--col-card); border:1px solid var(--col-card-border); border-radius:12px; padding:12px; margin-bottom:15px;">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px; margin-bottom:6px;">
         <b style="font-size:16px; color:var(--col-active-tab);">⚡ Úroveň ${info.level}</b>
-        <span style="font-size:12px; color:var(--col-yellow); font-weight:bold;">Celkem: ${info.totalXp} XP | Týden: ${wXp} XP</span>
+        <span style="font-size:12px; color:var(--col-text); font-weight:bold;">
+          Celkem XP: <b style="color:var(--col-active-tab);">${info.totalXp}</b> &nbsp;|&nbsp; Týdenní (Po–Ne): <b style="color:var(--col-yellow);">${wXp}</b>
+        </span>
       </div>
       <div class="bargraph-track" style="height:10px;">
         <div class="bargraph-fill" style="width:${info.pct}%; background:linear-gradient(90deg, #3b82f6, #a855f7);"></div>
       </div>
       <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--col-text-muted); margin-top:5px;">
-        <span>Do další úrovně: ${info.currentLevelXp} / ${info.nextLevelXp} XP</span>
+        <span>Do úrovně ${info.level + 1}: ${info.currentLevelXp} / ${info.nextLevelXp} XP</span>
         <span>${info.pct} %</span>
       </div>
       <div style="font-size:11px; color:var(--col-text-muted); margin-top:6px; text-align:center;">${bonusText}</div>
@@ -719,8 +804,8 @@ function renderWeeklyLeaderboardBox() {
     const totalXp = getUserXp(u.name);
     const lvl = getLevelInfo(totalXp).level;
     const wXp = getUserWeeklyXp(u.name);
-    return { name: u.name, level: lvl, weeklyXp: wXp };
-  }).sort((a, b) => b.weeklyXp - a.weeklyXp);
+    return { name: u.name, level: lvl, weeklyXp: wXp, totalXp: totalXp };
+  }).sort((a, b) => (b.weeklyXp - a.weeklyXp) || (b.totalXp - a.totalXp));
 
   const maxW = Math.max(1, ranked[0].weeklyXp);
   const medals = ['🥇', '🥈', '🥉'];
@@ -743,7 +828,7 @@ function renderWeeklyLeaderboardBox() {
                   ${typeof renderAvatarSVG === 'function' ? renderAvatarSVG(r.name, 26) : ''}
                   <b>${r.name}</b> <span style="font-size:11px; color:var(--col-active-tab);">Lv.${r.level}</span>
                 </span>
-                <b style="color:var(--col-yellow);">${r.weeklyXp} XP</b>
+                <span><b style="color:var(--col-yellow);">${r.weeklyXp} XP</b> <span style="font-size:10px;color:var(--col-text-muted);">(${r.totalXp})</span></span>
               </div>
               <div class="bargraph-track" style="height:5px;">
                 <div class="bargraph-fill" style="width:${pct}%; background:${idx === 0 ? 'linear-gradient(90deg, #facc15, #f97316)' : 'linear-gradient(90deg, var(--col-active-tab), var(--col-green))'};"></div>
@@ -756,144 +841,6 @@ function renderWeeklyLeaderboardBox() {
   `;
 }
 
-let _avSvgUid = 0;
-
-function renderAvatarSVG(userName, size = 72, overrideEquip = null) {
-  const eq = overrideEquip || (typeof getUserAvatarEquip === 'function' ? getUserAvatarEquip(userName) : { base: 'base_boy', bg: 'bg_space', outfit: 'outfit_tee' });
-  const uid = ++_avSvgUid;
-
-  // 1. Pozadí
-  let bgSvg = `<rect width="120" height="120" fill="#0f172a"/><circle cx="24" cy="26" r="1.5" fill="#facc15"/><circle cx="95" cy="28" r="1.8" fill="#fff"/><circle cx="88" cy="65" r="1.2" fill="#93c5fd"/><circle cx="22" cy="72" r="1.2" fill="#fff"/>`;
-  let borderCol = '#38bdf8';
-  if (eq.bg === 'bg_forest') {
-    bgSvg = `<rect width="120" height="120" fill="#064e3b"/><circle cx="60" cy="128" r="58" fill="#15803d"/><circle cx="20" cy="115" r="35" fill="#166534"/>`;
-    borderCol = '#4ade80';
-  } else if (eq.bg === 'bg_lava') {
-    bgSvg = `<rect width="120" height="120" fill="#450a0a"/><circle cx="60" cy="125" r="55" fill="#991b1b"/><circle cx="30" cy="30" r="2" fill="#fb923c"/><circle cx="92" cy="45" r="2.2" fill="#facc15"/>`;
-    borderCol = '#f97316';
-  } else if (eq.bg === 'bg_gold') {
-    bgSvg = `<rect width="120" height="120" fill="#422006"/><circle cx="60" cy="60" r="46" fill="#713f12"/><circle cx="26" cy="26" r="2.5" fill="#fef08a"/><circle cx="94" cy="30" r="2" fill="#fde047"/>`;
-    borderCol = '#facc15';
-  }
-
-  // 2. Plášť za tělem
-  const backCape = (eq.outfit === 'outfit_cape') ? `<path d="M 34 74 L 14 120 L 106 120 L 86 74 Z" fill="#dc2626"/>` : '';
-
-  // 3. Oblečení
-  let outfitSvg = `<path d="M 30 120 C 30 82, 38 74, 60 74 C 82 74, 90 82, 90 120 Z" fill="#0284c7"/><path d="M 48 74 Q 60 84 72 74" fill="none" stroke="#bae6fd" stroke-width="3"/>`;
-  if (eq.outfit === 'outfit_bolt') {
-    outfitSvg = `<path d="M 30 120 C 30 82, 38 74, 60 74 C 82 74, 90 82, 90 120 Z" fill="#1e293b"/><polygon points="62,82 52,99 60,99 56,113 69,95 61,95" fill="#facc15"/>`;
-  } else if (eq.outfit === 'outfit_hoodie') {
-    outfitSvg = `<path d="M 30 120 C 30 82, 38 74, 60 74 C 82 74, 90 82, 90 120 Z" fill="#16a34a"/><path d="M 44 75 Q 60 88 76 75" fill="none" stroke="#86efac" stroke-width="4"/><line x1="53" y1="81" x2="53" y2="96" stroke="#fff" stroke-width="2"/><line x1="67" y1="81" x2="67" y2="96" stroke="#fff" stroke-width="2"/>`;
-  } else if (eq.outfit === 'outfit_armor') {
-    outfitSvg = `<path d="M 30 120 C 30 82, 38 74, 60 74 C 82 74, 90 82, 90 120 Z" fill="#64748b"/><circle cx="34" cy="85" r="10" fill="#94a3b8" stroke="#cbd5e1" stroke-width="2"/><circle cx="86" cy="85" r="10" fill="#94a3b8" stroke="#cbd5e1" stroke-width="2"/><path d="M 44 76 L 60 94 L 76 76" fill="none" stroke="#facc15" stroke-width="2.5"/>`;
-  } else if (eq.outfit === 'outfit_cape') {
-    outfitSvg = `<path d="M 30 120 C 30 82, 38 74, 60 74 C 82 74, 90 82, 90 120 Z" fill="#2563eb"/><polygon points="60,83 63,91 71,91 65,96 67,104 60,99 53,104 55,96 49,91 57,91" fill="#facc15"/>`;
-  }
-
-  // 4. Hlava / Postava
-  let headSvg = '';
-  if (eq.base === 'base_girl') {
-    headSvg = `
-      <rect x="53" y="64" width="14" height="13" fill="#fdba74"/>
-      <path d="M 33 48 C 33 22, 87 22, 87 48 L 89 76 L 76 76 L 76 56 L 44 56 L 44 76 L 31 76 Z" fill="#92400e"/>
-      <circle cx="60" cy="48" r="22" fill="#fed7aa"/>
-      <path d="M 38 42 Q 48 25 62 32 Q 74 25 82 42 Q 72 20 46 24 Z" fill="#92400e"/>
-      <circle cx="51" cy="47" r="3" fill="#0f172a"/><circle cx="69" cy="47" r="3" fill="#0f172a"/>
-      <circle cx="52" cy="46" r="1" fill="#fff"/><circle cx="70" cy="46" r="1" fill="#fff"/>
-      <path d="M 52 57 Q 60 63 68 57" fill="none" stroke="#9a3412" stroke-width="2.5" stroke-linecap="round"/>
-    `;
-  } else if (eq.base === 'base_cat') {
-    headSvg = `
-      <rect x="53" y="64" width="14" height="13" fill="#fb923c"/>
-      <polygon points="39,38 40,17 54,29" fill="#fb923c"/><polygon points="42,35 43,22 51,29" fill="#fda4af"/>
-      <polygon points="81,38 80,17 66,29" fill="#fb923c"/><polygon points="78,35 77,22 69,29" fill="#fda4af"/>
-      <circle cx="60" cy="48" r="22" fill="#fb923c"/>
-      <circle cx="51" cy="47" r="3.2" fill="#0f172a"/><circle cx="69" cy="47" r="3.2" fill="#0f172a"/>
-      <polygon points="57,52 63,52 60,56" fill="#be123c"/>
-      <path d="M 54 58 Q 60 62 66 58" fill="none" stroke="#7c2d12" stroke-width="2" stroke-linecap="round"/>
-      <line x1="34" y1="50" x2="45" y2="52" stroke="#7c2d12" stroke-width="1.5"/><line x1="34" y1="56" x2="45" y2="55" stroke="#7c2d12" stroke-width="1.5"/>
-      <line x1="86" y1="50" x2="75" y2="52" stroke="#7c2d12" stroke-width="1.5"/><line x1="86" y1="56" x2="75" y2="55" stroke="#7c2d12" stroke-width="1.5"/>
-    `;
-  } else if (eq.base === 'base_robot') {
-    headSvg = `
-      <rect x="54" y="65" width="12" height="12" fill="#64748b"/>
-      <line x1="60" y1="13" x2="60" y2="26" stroke="#cbd5e1" stroke-width="3"/><circle cx="60" cy="12" r="4" fill="#38bdf8"/>
-      <rect x="36" y="25" width="48" height="44" rx="10" fill="#94a3b8" stroke="#cbd5e1" stroke-width="2"/>
-      <rect x="43" y="39" width="34" height="15" rx="5" fill="#0f172a"/>
-      <circle cx="51" cy="47" r="3.5" fill="#38bdf8"/><circle cx="69" cy="47" r="3.5" fill="#38bdf8"/>
-      <rect x="49" y="59" width="22" height="5" rx="2" fill="#475569"/>
-    `;
-  } else if (eq.base === 'base_alien') {
-    headSvg = `
-      <rect x="54" y="65" width="12" height="12" fill="#22c55e"/>
-      <line x1="47" y1="29" x2="41" y2="15" stroke="#4ade80" stroke-width="3"/><circle cx="40" cy="14" r="4" fill="#a855f7"/>
-      <line x1="73" y1="29" x2="79" y2="15" stroke="#4ade80" stroke-width="3"/><circle cx="80" cy="14" r="4" fill="#a855f7"/>
-      <circle cx="60" cy="48" r="22" fill="#4ade80"/>
-      <ellipse cx="51" cy="47" rx="4.5" ry="6" fill="#0f172a"/><ellipse cx="69" cy="47" rx="4.5" ry="6" fill="#0f172a"/>
-      <circle cx="52" cy="45" r="1.5" fill="#fff"/><circle cx="70" cy="45" r="1.5" fill="#fff"/>
-      <path d="M 54 59 Q 60 63 66 59" fill="none" stroke="#14532d" stroke-width="2" stroke-linecap="round"/>
-    `;
-  } else {
-    headSvg = `
-      <rect x="53" y="64" width="14" height="13" fill="#fdba74"/>
-      <circle cx="60" cy="48" r="22" fill="#fed7aa"/>
-      <path d="M 38 42 C 38 22, 82 22, 82 42 Q 70 31 60 34 Q 49 31 38 42 Z" fill="#78350f"/>
-      <circle cx="51" cy="47" r="3" fill="#0f172a"/><circle cx="69" cy="47" r="3" fill="#0f172a"/>
-      <circle cx="52" cy="46" r="1" fill="#fff"/><circle cx="70" cy="46" r="1" fill="#fff"/>
-      <path d="M 52 57 Q 60 63 68 57" fill="none" stroke="#9a3412" stroke-width="2.5" stroke-linecap="round"/>
-    `;
-  }
-
-  // 5. Brýle
-  let glassesSvg = '';
-  if (eq.glasses === 'gl_nerd') {
-    glassesSvg = `<circle cx="51" cy="47" r="7" fill="rgba(255,255,255,0.2)" stroke="#1e293b" stroke-width="2.2"/><circle cx="69" cy="47" r="7" fill="rgba(255,255,255,0.2)" stroke="#1e293b" stroke-width="2.2"/><line x1="58" y1="47" x2="62" y2="47" stroke="#1e293b" stroke-width="2.2"/>`;
-  } else if (eq.glasses === 'gl_sun') {
-    glassesSvg = `<rect x="42" y="42" width="16" height="11" rx="3" fill="#09090b"/><rect x="62" y="42" width="16" height="11" rx="3" fill="#09090b"/><line x1="58" y1="46" x2="62" y2="46" stroke="#09090b" stroke-width="2.5"/><line x1="45" y1="44" x2="49" y2="50" stroke="rgba(255,255,255,0.45)" stroke-width="1.8"/><line x1="65" y1="44" x2="69" y2="50" stroke="rgba(255,255,255,0.45)" stroke-width="1.8"/>`;
-  } else if (eq.glasses === 'gl_pirate') {
-    glassesSvg = `<line x1="38" y1="38" x2="82" y2="52" stroke="#09090b" stroke-width="2.2"/><circle cx="51" cy="47" r="7.5" fill="#09090b" stroke="#475569" stroke-width="1.5"/>`;
-  } else if (eq.glasses === 'gl_visor') {
-    glassesSvg = `<rect x="40" y="42" width="40" height="10" rx="4" fill="rgba(6,182,212,0.8)" stroke="#f43f5e" stroke-width="2"/>`;
-  }
-
-  // 6. Čepice
-  let hatSvg = '';
-  if (eq.hat === 'hat_cap') {
-    hatSvg = `<path d="M 37 33 C 37 15, 83 15, 83 33 Z" fill="#ef4444"/><path d="M 55 30 L 92 32 L 84 36 L 55 34 Z" fill="#b91c1c"/>`;
-  } else if (eq.hat === 'hat_headphones') {
-    hatSvg = `<path d="M 35 47 C 35 16, 85 16, 85 47" fill="none" stroke="#1e293b" stroke-width="5"/><rect x="30" y="40" width="8" height="15" rx="4" fill="#38bdf8" stroke="#0f172a" stroke-width="1.5"/><rect x="82" y="40" width="8" height="15" rx="4" fill="#38bdf8" stroke="#0f172a" stroke-width="1.5"/>`;
-  } else if (eq.hat === 'hat_viking') {
-    hatSvg = `<path d="M 38 33 C 38 15, 82 15, 82 33 Z" fill="#94a3b8"/><rect x="37" y="29" width="46" height="5" rx="2" fill="#facc15"/><path d="M 38 28 Q 22 20 26 7 Q 32 17 42 23 Z" fill="#f8fafc"/><path d="M 82 28 Q 98 20 94 7 Q 88 17 78 23 Z" fill="#f8fafc"/>`;
-  } else if (eq.hat === 'hat_wizard') {
-    hatSvg = `<ellipse cx="60" cy="31" rx="30" ry="6" fill="#581c87"/><polygon points="41,30 79,30 62,3" fill="#7e22ce"/><polygon points="60,13 62,18 67,18 63,21 64,26 60,23 56,26 57,21 53,18 58,18" fill="#facc15"/>`;
-  } else if (eq.hat === 'hat_crown') {
-    hatSvg = `<path d="M 40 29 L 38 11 L 50 20 L 60 7 L 70 20 L 82 11 L 80 29 Z" fill="#facc15" stroke="#b45309" stroke-width="1.5"/><circle cx="60" cy="21" r="2.5" fill="#ef4444"/><circle cx="48" cy="23" r="2" fill="#3b82f6"/><circle cx="72" cy="23" r="2" fill="#3b82f6"/>`;
-  }
-
-  // 7. Doplněk / Mazlíček
-  let petSvg = '';
-  if (eq.pet === 'pet_ball') {
-    petSvg = `<circle cx="96" cy="96" r="13" fill="#fff" stroke="#0f172a" stroke-width="2"/><polygon points="96,90 101,94 99,100 93,100 91,94" fill="#0f172a"/>`;
-  } else if (eq.pet === 'pet_sword') {
-    petSvg = `<polygon points="96,55 101,62 101,94 91,94 91,62" fill="#e2e8f0" stroke="#475569" stroke-width="1.5"/><rect x="86" y="93" width="20" height="4" rx="2" fill="#facc15"/><rect x="94" y="97" width="4" height="12" fill="#78350f"/>`;
-  } else if (eq.pet === 'pet_wand') {
-    petSvg = `<line x1="94" y1="108" x2="100" y2="75" stroke="#92400e" stroke-width="3.5" stroke-linecap="round"/><polygon points="100,63 103,70 110,70 104,74 106,81 100,77 94,81 96,74 90,70 97,70" fill="#facc15"/>`;
-  } else if (eq.pet === 'pet_rocket') {
-    petSvg = `<path d="M 96 68 C 103 77, 103 93, 100 98 L 92 98 C 89 93, 89 77, 96 68 Z" fill="#ef4444" stroke="#fff" stroke-width="1.5"/><circle cx="96" cy="83" r="3.5" fill="#38bdf8"/><polygon points="92,98 100,98 96,109" fill="#facc15"/>`;
-  } else if (eq.pet === 'pet_dragon') {
-    petSvg = `<path d="M 84 94 Q 76 80 88 83 Z" fill="#f97316"/><ellipse cx="97" cy="98" rx="11" ry="12" fill="#22c55e"/><circle cx="97" cy="82" r="9" fill="#4ade80"/><polygon points="91,74 93,67 96,74" fill="#facc15"/><polygon points="99,74 102,67 104,74" fill="#facc15"/><circle cx="94" cy="81" r="1.8" fill="#0f172a"/><circle cx="100" cy="81" r="1.8" fill="#0f172a"/>`;
-  }
-
-  return `
-    <svg width="${size}" height="${size}" viewBox="0 0 120 120" style="display:inline-block; vertical-align:middle; flex-shrink:0;">
-      <defs><clipPath id="avc-${uid}"><circle cx="60" cy="60" r="56"/></clipPath></defs>
-      <g clip-path="url(#avc-${uid})">${bgSvg}${backCape}${outfitSvg}${headSvg}${glassesSvg}${hatSvg}${petSvg}</g>
-      <circle cx="60" cy="60" r="56" fill="none" stroke="${borderCol}" stroke-width="4"/>
-    </svg>
-  `;
-}
-
 function _renderAvatarShop(main, bSubj, bGroup) {
   if (bSubj) { bSubj.style.display = "flex"; bSubj.innerText = "👕 Šatník panáčka"; }
   if (bGroup) bGroup.style.display = "none";
@@ -903,6 +850,7 @@ function _renderAvatarShop(main, bSubj, bGroup) {
   const realEquip = getUserAvatarEquip(currentUser.name);
   const displayEquip = avatarPreviewEquip || realEquip;
   const activeTab = typeof avatarShopTab !== 'undefined' ? avatarShopTab : 'hat';
+  const coinSvg = typeof coinIcon === 'function' ? coinIcon(15) : '🪙';
 
   const catItems = AVATAR_ITEMS.filter(it => it.slot === activeTab);
   const canRemove = ['hat', 'glasses', 'pet'].includes(activeTab);
@@ -913,7 +861,7 @@ function _renderAvatarShop(main, bSubj, bGroup) {
         ${renderAvatarSVG(currentUser.name, 108, displayEquip)}
         <div style="flex:1;">
           <h2 style="color:var(--col-active-tab); font-size:18px; margin-bottom:4px;">${currentUser.name}</h2>
-          <p style="font-size:15px; color:var(--col-yellow); font-weight:bold; margin-bottom:6px;">Máš: ${coins} 🪙</p>
+          <p style="font-size:15px; color:var(--col-yellow); font-weight:bold; margin-bottom:6px;">Máš: ${coins} ${coinSvg}</p>
           ${avatarPreviewEquip ? `<p style="font-size:12px; color:var(--col-orange); font-weight:bold;">👁️ Režim náhledu</p>` : `<p style="font-size:12px; color:var(--col-text-muted);">Vyber kategorii a nakombinuj styl!</p>`}
         </div>
       </div>
@@ -943,7 +891,7 @@ function _renderAvatarShop(main, bSubj, bGroup) {
                   : isOwned ? `<button class="toggle-btn on" style="font-size:12px;" onclick="equipAvatarItem('${it.slot}', '${it.id}')">Nasadit</button>`
                   : `
                     <button class="toggle-btn" style="font-size:12px;" onclick="previewAvatarItem('${it.slot}', '${it.id}')">👁️ Zkusit</button>
-                    <button class="toggle-btn on" style="font-size:12px; ${coins < it.cost ? 'opacity:0.4;' : ''}" onclick="buyAvatarItem('${it.id}')">Koupit (${it.cost} 🪙)</button>
+                    <button class="toggle-btn on" style="font-size:12px; ${coins < it.cost ? 'opacity:0.4;' : ''}" onclick="buyAvatarItem('${it.id}')">Koupit (${it.cost} ${coinSvg})</button>
                   `}
               </div>
             </div>
