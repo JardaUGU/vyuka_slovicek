@@ -53,6 +53,19 @@ function syncAllUsersStreakFromCloud(usersArr) {
   });
 }
 
+function pushLocalXpToCloud(userName, totalXp, weeklyXp, mondayStr) {
+  if (!userName || totalXp <= 0) return;
+  try {
+    const fd = new URLSearchParams();
+    fd.append("action", "sync_xp");
+    fd.append("user", userName);
+    fd.append("totalXp", String(totalXp));
+    fd.append("weeklyXp", String(weeklyXp));
+    fd.append("weeklyStart", mondayStr || "");
+    fetch(API_URL, { method: "POST", mode: "no-cors", body: fd, keepalive: true });
+  } catch (e) {}
+}
+
 function syncAllUsersXpFromCloud(usersArr) {
   if (!Array.isArray(usersArr)) return;
   const monStr = typeof getMondayDateStrClient === "function" ? getMondayDateStrClient() : "";
@@ -73,6 +86,11 @@ function syncAllUsersXpFromCloud(usersArr) {
     localStorage.setItem(`weekly_xp_${uKey}`, String(bestW));
     if (monStr) localStorage.setItem(`weekly_xp_start_${uKey}`, monStr);
     u.weeklyXp = bestW;
+
+    // Pokud má toto zařízení víc XP než Google Sheets, okamžitě je do tabulky dosynchronizuje
+    if (localXp > cloudXp || (localStart === monStr && localW > cloudW)) {
+      pushLocalXpToCloud(u.name, bestXp, bestW, monStr);
+    }
   });
 }
 
@@ -91,6 +109,34 @@ function syncAllUsersAvatarFromCloud(usersArr) {
     const lastLocalTs = Number(localStorage.getItem(`av_ts_${uKey}`) || 0);
     if (u.avatarEquipStr && (Date.now() - lastLocalTs > 10000)) {
       localStorage.setItem(`av_equip_${uKey}`, u.avatarEquipStr);
+    }
+  });
+}
+
+function syncAllUsersAdventFromCloud(usersArr) {
+  if (!Array.isArray(usersArr)) return;
+  const curYear = new Date().getFullYear();
+  usersArr.forEach(u => {
+    if (!u || !u.name) return;
+    const uKey = u.name.toLowerCase().trim();
+    let localObj = { year: curYear, days: [] };
+    try {
+      const raw = JSON.parse(localStorage.getItem(`advent_days_${uKey}`) || 'null');
+      if (raw && raw.year === curYear && Array.isArray(raw.days)) localObj = raw;
+    } catch (e) {}
+
+    const cloudDays = (u.adventYear === curYear && Array.isArray(u.adventDays)) ? u.adventDays : [];
+    const mergedDays = [...new Set([...localObj.days, ...cloudDays])].map(Number).filter(n => n >= 1 && n <= 24).sort((a, b) => a - b);
+    localStorage.setItem(`advent_days_${uKey}`, JSON.stringify({ year: curYear, days: mergedDays }));
+    u.adventYear = curYear;
+    u.adventDays = mergedDays;
+
+    const localLast = localStorage.getItem(`advent_last_${uKey}`) || "";
+    const cloudLast = String(u.adventLastDate || '').slice(0, 10);
+    const bestLast = (cloudLast >= localLast) ? cloudLast : localLast;
+    if (bestLast) {
+      localStorage.setItem(`advent_last_${uKey}`, bestLast);
+      u.adventLastDate = bestLast;
     }
   });
 }
@@ -128,6 +174,7 @@ async function syncDataQuietly() {
       syncAllUsersStreakFromCloud(appData.users);
       syncAllUsersXpFromCloud(appData.users);
       syncAllUsersAvatarFromCloud(appData.users);
+      syncAllUsersAdventFromCloud(appData.users);
 
       if (currentUser && appData.users) {
         const foundU = appData.users.find(u => u.name.toLowerCase().trim() === currentUser.name.toLowerCase().trim());
@@ -136,6 +183,8 @@ async function syncDataQuietly() {
           currentUser.grade = parseInt(foundU.grade) || 2;
           currentUser.coins = Number(foundU.coins || 0);
           currentUser.inventory = foundU.inventory || {};
+          currentUser.xp = Number(foundU.xp || 0);
+          currentUser.weeklyXp = Number(foundU.weeklyXp || 0);
           let cloudThemes = Array.isArray(foundU.unlockedThemes) ? foundU.unlockedThemes : (typeof foundU.unlockedThemes === 'string' ? foundU.unlockedThemes.split(',').map(s => s.trim().toLowerCase()) : []);
           let mergedThemes = [...new Set(['default', ...cloudThemes, ...getUserUnlockedThemes(currentUser.name)])];
           saveUserUnlockedThemes(currentUser.name, mergedThemes);
@@ -168,12 +217,15 @@ async function syncData() {
       syncAllUsersStreakFromCloud(appData.users);
       syncAllUsersXpFromCloud(appData.users);
       syncAllUsersAvatarFromCloud(appData.users);
+      syncAllUsersAdventFromCloud(appData.users);
 
       if (currentUser && appData.users) {
         const foundU = appData.users.find(u => u.name.toLowerCase().trim() === currentUser.name.toLowerCase().trim());
         if (foundU) {
           currentUser.coins = Number(foundU.coins || 0);
           currentUser.inventory = foundU.inventory || {};
+          currentUser.xp = Number(foundU.xp || 0);
+          currentUser.weeklyXp = Number(foundU.weeklyXp || 0);
           let mergedThemes = getUserUnlockedThemes(currentUser.name);
           saveUserUnlockedThemes(currentUser.name, mergedThemes);
           currentUser.unlockedThemes = mergedThemes;
@@ -196,6 +248,9 @@ function sendTimeHeartbeatToGoogle() {
     fd.append("subject", typeof selectedSubject !== 'undefined' && selectedSubject ? selectedSubject : "Výuka");
     fd.append("section", "Časomíra");
     fd.append("stars", 0);
+    if (typeof getUserXp === "function") fd.append("totalXp", getUserXp(currentUser.name));
+    if (typeof getUserWeeklyXp === "function") fd.append("weeklyXp", getUserWeeklyXp(currentUser.name));
+    if (typeof getMondayDateStrClient === "function") fd.append("weeklyStart", getMondayDateStrClient());
     fd.append("minutes", (todaySecondsStudied / 60).toFixed(2));
     fd.append("clientDate", getTodayDateStr());
     fetch(API_URL, { method: "POST", mode: "no-cors", body: fd, keepalive: true });
@@ -206,14 +261,14 @@ async function saveWordMasteryToGoogle(itemQuestion, masteryLevel, direction) {
   if (!currentUser) return;
   try {
     const uKey = currentUser.name.toLowerCase().trim();
-    const compKey = `${typeof selectedSubject!=='undefined'?selectedSubject:''}:::${itemQuestion}:::${direction}`;
+    const compKey = `${typeof selectedSubject !== 'undefined' ? selectedSubject : ''}:::${itemQuestion}:::${direction}`;
     if (!appData.progress) appData.progress = {};
     if (!appData.progress[uKey]) appData.progress[uKey] = {};
     appData.progress[uKey][compKey] = masteryLevel;
     localStorage.setItem("app_data", JSON.stringify(appData));
     const fd = new URLSearchParams();
     fd.append("action", "save_mastery"); fd.append("user", currentUser.name);
-    fd.append("subject", typeof selectedSubject!=='undefined'?selectedSubject:''); fd.append("foreign", itemQuestion);
+    fd.append("subject", typeof selectedSubject !== 'undefined' ? selectedSubject : ''); fd.append("foreign", itemQuestion);
     fd.append("mastery", masteryLevel); fd.append("direction", direction);
     fetch(API_URL, { method: "POST", mode: "no-cors", body: fd });
   } catch(e) {}
