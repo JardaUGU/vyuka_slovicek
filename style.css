@@ -342,3 +342,46 @@ footer { height: 32px; background-color: var(--col-card); border-top: 1px solid 
 .hard-answer-box.ok { border-style: solid; border-color: var(--col-green); background: var(--col-success-bg); }
 .hard-answer-box.err { border-style: solid; border-color: var(--col-red); background: rgba(239, 68, 68, 0.14); }
 .hard-chip-placed { border-color: var(--col-yellow); background: var(--col-card); }
+
+/* =========================================================
+   ADVENTNÍ KALENDÁŘ
+   ========================================================= */
+.advent-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+.advent-door {
+  background: var(--col-card);
+  border: 2px solid var(--col-card-border);
+  border-radius: 10px;
+  padding: 10px 4px;
+  text-align: center;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 70px;
+  transition: transform 0.1s;
+}
+.advent-door:active { transform: scale(0.95); }
+.advent-num { font-size: 20px; font-weight: bold; color: var(--col-text); line-height: 1.1; }
+.advent-sub { font-size: 11px; margin-top: 4px; color: var(--col-text-muted); font-weight: bold; }
+.advent-door.opened { background: var(--col-success-bg); border-color: var(--col-green); cursor: default; }
+.advent-door.opened .advent-num { color: var(--col-green); }
+.advent-door.opened .advent-sub { color: var(--col-green); }
+.advent-door.ready {
+  background: linear-gradient(135deg, #7f1d1d, #991b1b);
+  border-color: var(--col-yellow);
+  box-shadow: 0 0 12px rgba(250, 204, 21, 0.4);
+  animation: pulseAdvent 1.4s infinite alternate;
+}
+.advent-door.ready .advent-num { color: var(--col-yellow); }
+.advent-door.ready .advent-sub { color: #fef08a; }
+.advent-door.locked { opacity: 0.45; }
+.advent-door.missed { border-style: dashed; border-color: var(--col-orange); }
+@keyframes pulseAdvent {
+  from { transform: scale(1); }
+  to { transform: scale(1.03); }
+}
