@@ -19,6 +19,7 @@ function syncAllUsersTimeFromCloud(usersArr) {
     if (typeof updateStudyTimerUI === "function") updateStudyTimerUI();
   }
 }
+
 function syncAllUsersStreakFromCloud(usersArr) {
   if (!Array.isArray(usersArr)) return;
   usersArr.forEach(u => {
@@ -74,6 +75,7 @@ function syncAllUsersXpFromCloud(usersArr) {
     u.weeklyXp = bestW;
   });
 }
+
 function syncAllUsersAvatarFromCloud(usersArr) {
   if (!Array.isArray(usersArr)) return;
   usersArr.forEach(u => {
@@ -92,22 +94,23 @@ function syncAllUsersAvatarFromCloud(usersArr) {
     }
   });
 }
+
 async function loadData() {
   checkDateRollover();
   if (currentUser) {
     todaySecondsStudied = loadUserStudyTime(currentUser.name);
-    lastCloudSyncSec = todaySecondsStudied; 
+    lastCloudSyncSec = todaySecondsStudied;
   }
-  
+
   const cached = localStorage.getItem("app_data");
   if (cached) {
     try {
       appData = JSON.parse(cached);
-      if (!appData.items) appData.items = []; 
+      if (!appData.items) appData.items = [];
       if (typeof renderScreen === "function") renderScreen();
     } catch(e) { if (typeof renderScreen === "function") renderScreen(); }
   } else { if (typeof renderScreen === "function") renderScreen(); }
-  
+
   syncDataQuietly();
 }
 
@@ -115,13 +118,12 @@ async function syncDataQuietly() {
   try {
     const res = await fetch(API_URL + '?t=' + Date.now() + '&clientDate=' + getTodayDateStr());
     const json = await res.json();
-    
-    if (json && json.items) {
-      json.syncDate = getTodayDateStr(); 
-      appData = json; 
+
+    if (json && json.status !== "error" && Array.isArray(json.items)) {
+      json.syncDate = getTodayDateStr();
+      appData = json;
       localStorage.setItem("app_data", JSON.stringify(json));
-      
-      // DŮLEŽITÉ (BUGFIX): Aktualizace času z cloudu pro VŠECHNY profily
+
       syncAllUsersTimeFromCloud(appData.users);
       syncAllUsersStreakFromCloud(appData.users);
       syncAllUsersXpFromCloud(appData.users);
@@ -130,14 +132,14 @@ async function syncDataQuietly() {
       if (currentUser && appData.users) {
         const foundU = appData.users.find(u => u.name.toLowerCase().trim() === currentUser.name.toLowerCase().trim());
         if (foundU) {
-          currentUser.targetMinutes = foundU.targetMinutes || 15; 
+          currentUser.targetMinutes = foundU.targetMinutes || 15;
           currentUser.grade = parseInt(foundU.grade) || 2;
-          currentUser.coins = Number(foundU.coins || 0); 
+          currentUser.coins = Number(foundU.coins || 0);
           currentUser.inventory = foundU.inventory || {};
           let cloudThemes = Array.isArray(foundU.unlockedThemes) ? foundU.unlockedThemes : (typeof foundU.unlockedThemes === 'string' ? foundU.unlockedThemes.split(',').map(s => s.trim().toLowerCase()) : []);
           let mergedThemes = [...new Set(['default', ...cloudThemes, ...getUserUnlockedThemes(currentUser.name)])];
           saveUserUnlockedThemes(currentUser.name, mergedThemes);
-          currentUser.unlockedThemes = mergedThemes; 
+          currentUser.unlockedThemes = mergedThemes;
           currentUser.activeTheme = getUserActiveTheme(currentUser.name);
           currentUser.startLevels = foundU.startLevels || {};
           localStorage.setItem("cur_user", JSON.stringify(currentUser));
@@ -156,13 +158,12 @@ async function syncData() {
     const res = await fetch(fetchUrl);
     const json = await res.json();
 
-    if (json && json.items) {
-      json.syncDate = getTodayDateStr(); 
-      appData = json; 
+    if (json && json.status !== "error" && Array.isArray(json.items)) {
+      json.syncDate = getTodayDateStr();
+      appData = json;
       localStorage.setItem("app_data", JSON.stringify(json));
       if (statusEl) statusEl.innerText = `OK: ${appData.items.length} úloh`;
 
-      // DŮLEŽITÉ (BUGFIX): Aktualizace času z cloudu pro VŠECHNY profily i při ruční aktualizaci 🔄
       syncAllUsersTimeFromCloud(appData.users);
       syncAllUsersStreakFromCloud(appData.users);
       syncAllUsersXpFromCloud(appData.users);
@@ -171,14 +172,14 @@ async function syncData() {
       if (currentUser && appData.users) {
         const foundU = appData.users.find(u => u.name.toLowerCase().trim() === currentUser.name.toLowerCase().trim());
         if (foundU) {
-          currentUser.coins = Number(foundU.coins || 0); 
+          currentUser.coins = Number(foundU.coins || 0);
           currentUser.inventory = foundU.inventory || {};
-          let mergedThemes = getUserUnlockedThemes(currentUser.name); 
+          let mergedThemes = getUserUnlockedThemes(currentUser.name);
           saveUserUnlockedThemes(currentUser.name, mergedThemes);
-          currentUser.unlockedThemes = mergedThemes; 
+          currentUser.unlockedThemes = mergedThemes;
           currentUser.activeTheme = getUserActiveTheme(currentUser.name);
-          localStorage.setItem("cur_user", JSON.stringify(currentUser)); 
-          if(typeof applyAppSkin === 'function') applyAppSkin(currentUser.activeTheme);
+          localStorage.setItem("cur_user", JSON.stringify(currentUser));
+          if (typeof applyAppSkin === 'function') applyAppSkin(currentUser.activeTheme);
         }
       }
     }
@@ -186,17 +187,16 @@ async function syncData() {
   if (typeof renderScreen === "function") renderScreen();
 }
 
-// DŮLEŽITÉ (BUGFIX): Posílá celkový odstudovaný čas (funguje jak z časovače, tak při odchodu tlačítkem Zpět)
 function sendTimeHeartbeatToGoogle() {
   if (!currentUser || todaySecondsStudied <= 0) return;
   try {
-    const fd = new URLSearchParams(); 
-    fd.append("action", "log_activity"); 
+    const fd = new URLSearchParams();
+    fd.append("action", "log_activity");
     fd.append("user", currentUser.name);
-    fd.append("subject", typeof selectedSubject !== 'undefined' && selectedSubject ? selectedSubject : "Výuka"); 
+    fd.append("subject", typeof selectedSubject !== 'undefined' && selectedSubject ? selectedSubject : "Výuka");
     fd.append("section", "Časomíra");
-    fd.append("stars", 0); 
-    fd.append("minutes", (todaySecondsStudied / 60).toFixed(2)); 
+    fd.append("stars", 0);
+    fd.append("minutes", (todaySecondsStudied / 60).toFixed(2));
     fd.append("clientDate", getTodayDateStr());
     fetch(API_URL, { method: "POST", mode: "no-cors", body: fd, keepalive: true });
   } catch(e) {}
