@@ -33,6 +33,9 @@ function renderScreen() {
     else if (currentScreen === "SELECT_SUBJECT") {
       _renderSelectSubject(main, bSubj, bGroup);
     }
+    else if (currentScreen === "ADVENT") {
+      if (typeof renderAdventScreen === "function") renderAdventScreen(main, bSubj, bGroup);
+    }
     else if (currentScreen === "SHOP") {
       _renderShop(main, bSubj, bGroup);
     }
@@ -147,10 +150,8 @@ function _renderSelectUser(main, bSubj, bGroup) {
 
   let html = `<h2 style="font-size:18px;margin-bottom:12px;text-align:center;color:var(--col-yellow);">🏆 Kdo se jde učit?</h2>`;
 
-  // 1. místo nahoře uprostřed
   html += `<div class="podium-first-wrap">${_buildUserCardHtml(rankedUsers[0], 0)}</div>`;
 
-  // 2. a 3. místo pod ním vedle sebe
   if (rankedUsers.length >= 2) {
     html += `<div class="grid-2" style="margin-top:10px;">`;
     html += _buildUserCardHtml(rankedUsers[1], 1);
@@ -160,7 +161,6 @@ function _renderSelectUser(main, bSubj, bGroup) {
     html += `</div>`;
   }
 
-  // Mezera a ostatní soutěžící
   if (rankedUsers.length > 3) {
     html += `<div class="podium-rest-divider">Další soutěžící</div>`;
     html += `<div class="grid-2">`;
@@ -189,6 +189,43 @@ function _renderSelectSubject(main, bSubj, bGroup) {
   const xpWeek = typeof getUserWeeklyXp === 'function' ? getUserWeeklyXp(currentUser.name) : 0;
   const lvlInfo = typeof getLevelInfo === 'function' ? getLevelInfo(xpTotal) : { level: 1, currentLevelXp: 0, nextLevelXp: 250, pct: 0, totalXp: 0 };
   const coinSvg = typeof coinIcon === 'function' ? coinIcon(16) : '🪙';
+
+  let adventTileHtml = "";
+  if (typeof getAdventContext === "function") {
+    const advCtx = getAdventContext();
+    if (advCtx.isDecember || advCtx.isCountdown) {
+      const advSt = getUserAdventState(currentUser.name);
+      const canOpen = typeof canClaimAdventWindow === "function" && canClaimAdventWindow(currentUser.name);
+      let advSub = "";
+      if (!advCtx.isDecember) {
+        const dLeft = Math.max(1, 31 - advCtx.day);
+        advSub = `Začíná 1. 12. (za ${dLeft} ${dLeft === 1 ? 'den' : (dLeft < 5 ? 'dny' : 'dní')})`;
+      } else if (canOpen) {
+        advSub = `<span style="color:var(--col-yellow);font-weight:bold;">🎁 Dnešní okénko připraveno k otevření!</span>`;
+      } else if (advSt.lastDate === advCtx.todayStr) {
+        advSub = `✅ Dnes otevřeno (${advSt.days.length}/24)`;
+      } else if (advSt.days.length >= 24) {
+        advSub = `🎉 Všech 24 okének otevřeno!`;
+      } else {
+        advSub = `Splň denní limit a otevři 1 okénko (${advSt.days.length}/24)`;
+      }
+
+      adventTileHtml = `
+        <div class="tile" style="background:linear-gradient(135deg, #14532d, #7f1d1d); border:2px solid ${canOpen ? 'var(--col-yellow)' : '#ef4444'}; margin-bottom:10px; padding:11px 14px; cursor:pointer;" onclick="setScreen('ADVENT')">
+          <div style="display:flex;align-items:center;justify-content:space-between;width:100%;">
+            <div style="display:flex;align-items:center;gap:12px;">
+              <span style="font-size:30px;">🎄</span>
+              <div style="text-align:left;">
+                <h2 style="color:var(--col-yellow);margin-bottom:2px;font-size:17px;">Adventní kalendář</h2>
+                <p style="color:#fef9c3;font-size:12px;">${advSub}</p>
+              </div>
+            </div>
+            <span style="font-size:20px;color:var(--col-yellow);font-weight:bold;">${canOpen ? '🎁' : '➔'}</span>
+          </div>
+        </div>
+      `;
+    }
+  }
 
   let html = `
     ${userG >= 90 ? `
@@ -221,6 +258,9 @@ function _renderSelectSubject(main, bSubj, bGroup) {
         </div>
       </div>
     </div>
+
+    ${adventTileHtml}
+
     <div class="grid-2">
       ${!subjs["Matematika"] ? `
         <div class="tile" style="border-color:var(--col-active-tab);" onclick="if(typeof chooseSubject === 'function') chooseSubject('Matematika')">
