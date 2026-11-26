@@ -38,7 +38,7 @@ window.buySnakeLifeWithCoins = function(livesToAdd, cost, e) {
   if (e) { e.preventDefault(); e.stopPropagation(); }
   if (typeof currentUser === "undefined" || !currentUser) return;
   const coins = getUserCoins(currentUser.name);
-  if (coins < cost) { alert(`Potřebuješ ${cost} 🪙!`); return; }
+  if (coins < cost) { alert(\`Potřebuješ \${cost} mincí!\`); }
   addCoins(currentUser.name, -cost);
   snakeLives += livesToAdd;
   snakeUsedBoosts = true;
@@ -62,7 +62,7 @@ window.buySnakeShieldWithCoins = function(e) {
   if (e) { e.preventDefault(); e.stopPropagation(); }
   if (typeof currentUser === "undefined" || !currentUser) return;
   const coins = getUserCoins(currentUser.name);
-  if (coins < 1) { alert("Potřebuješ alespoň 1 🪙!"); return; }
+  if (coins < 1) { alert("Potřebuješ alespoň 1 minci!"); }
   if (snakeShieldLetters > 0) return;
   addCoins(currentUser.name, -1);
   snakeShieldLetters = 20;
