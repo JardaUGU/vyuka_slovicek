@@ -9,16 +9,22 @@ function addReward(count = 1, section = "Lekce") {
   const xpGain = Math.max(1, Math.round(count * 10 * xpInfo.multiplier));
   if (typeof addLocalXp === "function") addLocalXp(currentUser.name, xpGain);
   localStorage.setItem("cur_user", JSON.stringify(currentUser));
-  if(typeof updateFooter === 'function') updateFooter();
-  
-  if(typeof API_URL !== 'undefined') {
+  if (typeof updateFooter === 'function') updateFooter();
+
+  if (typeof API_URL !== 'undefined') {
     try {
       const fd = new URLSearchParams();
-      fd.append("action", "log_activity"); fd.append("user", currentUser.name);
-      fd.append("subject", selectedSubject); fd.append("section", section);
-      fd.append("stars", count); fd.append("xp", xpGain);
+      fd.append("action", "log_activity");
+      fd.append("user", currentUser.name);
+      fd.append("subject", selectedSubject);
+      fd.append("section", section);
+      fd.append("stars", count);
+      fd.append("xp", xpGain);
+      if (typeof getUserXp === "function") fd.append("totalXp", getUserXp(currentUser.name));
+      if (typeof getUserWeeklyXp === "function") fd.append("weeklyXp", getUserWeeklyXp(currentUser.name));
+      if (typeof getMondayDateStrClient === "function") fd.append("weeklyStart", getMondayDateStrClient());
       fd.append("minutes", (todaySecondsStudied / 60).toFixed(2));
-      fetch(API_URL, { method: "POST", mode: "no-cors", body: fd });
+      fetch(API_URL, { method: "POST", mode: "no-cors", body: fd, keepalive: true });
     } catch(e) {}
   }
 }
@@ -38,16 +44,15 @@ function getGroupMasteryPercent(groupItems, subjName) {
   const vList = groupItems.filter(it => it.type === "SLOVO");
   const qList = groupItems.filter(it => it.type === "KVIZ");
   if (vList.length === 0 && qList.length === 0) return 0;
-  
+
   let points = 0;
   let maxPoints = (vList.length * 4) + (qList.length * 2);
   vList.forEach(it => { points += getSavedMastery(it.question, "DIR_OUT") + getSavedMastery(it.question, "DIR_IN"); });
   qList.forEach(it => { points += getSavedMastery(it.question, "DIR_OUT"); });
-  
+
   return Math.min(100, Math.round((points / maxPoints) * 100));
 }
 
-// Opravené tlačítko ZPĚT, které plně respektuje, z jakého předmětu jsme přišli
 function goBack() {
   if (typeof seqTimerInterval !== "undefined" && seqTimerInterval) { clearInterval(seqTimerInterval); seqTimerInterval = null; }
   if (typeof seqInactivityTimer !== "undefined" && seqInactivityTimer) { clearTimeout(seqInactivityTimer); seqInactivityTimer = null; }
@@ -81,8 +86,8 @@ function goBack() {
     if (selectedSubject === "Matematika") setScreen("SELECT_MATH_OP");
     else setScreen("SELECT_GAME");
   }
-  else if (currentScreen === "SHOP") {
-    cancelPreview();
+  else if (currentScreen === "SHOP" || currentScreen === "ADVENT") {
+    if (typeof cancelPreview === "function") cancelPreview();
     setScreen("SELECT_SUBJECT");
   }
   else if (currentScreen === "AVATAR_SHOP") {
@@ -103,12 +108,12 @@ function goBack() {
   else if (currentScreen === "SELECT_SUBJECT") setScreen("SELECT_USER");
 }
 
-function startGame(game) { 
-  if (typeof stopArcadeLoop === "function") stopArcadeLoop(); 
+function startGame(game) {
+  if (typeof stopArcadeLoop === "function") stopArcadeLoop();
   if (typeof stopSnakeLoop === "function") stopSnakeLoop();
   if (typeof stopPexesoTimeout === "function") stopPexesoTimeout();
-  selectedGame = game; 
-  if (typeof isCampaignMinigame !== "undefined") isCampaignMinigame = false; 
-  if (typeof initGameState === "function") initGameState(); 
-  setScreen("PLAYING"); 
+  selectedGame = game;
+  if (typeof isCampaignMinigame !== "undefined") isCampaignMinigame = false;
+  if (typeof initGameState === "function") initGameState();
+  setScreen("PLAYING");
 }
