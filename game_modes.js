@@ -16,15 +16,13 @@ let seqTargetIdx = 0, seqHighestDeployed = 0, seqSlots = [], seqStartTime = 0, s
 
 function formatPromptText(text) {
   if (!text) return "";
-  // 1. Podpora žlutého zvýraznění přes hvězdičky *text*
   let t = text.replace(/\*([^*]+)\*/g, '<b style="color:var(--col-yellow);text-decoration:underline;">$1</b>');
-  
-  // 2. Podpora svislých zlomků: zápis [a/b] převede na krásný vertikální zlomek
+
   t = t.replace(/\[([^/\]]+)\/([^/\]]+)\]/g, (match, n, d) => {
-     return `<span style="display:inline-flex; flex-direction:column; text-align:center; vertical-align:middle; line-height:1.1; font-size:0.75em; margin: 0 4px;">
-               <span style="border-bottom:2px solid currentColor; padding:0 3px;">${n.trim()}</span>
-               <span style="padding:0 3px;">${d.trim()}</span>
-             </span>`;
+    return `<span style="display:inline-flex; flex-direction:column; text-align:center; vertical-align:middle; line-height:1.1; font-size:0.75em; margin: 0 4px;">
+              <span style="border-bottom:2px solid currentColor; padding:0 3px;">${n.trim()}</span>
+              <span style="padding:0 3px;">${d.trim()}</span>
+            </span>`;
   });
   return t;
 }
@@ -32,14 +30,14 @@ function formatPromptText(text) {
 function vCardNext() {
   const vItems = getVocabItems(); if (vItems.length === 0) return;
   vCardIdx = (vCardIdx + 1) % vItems.length;
-  if(typeof renderActiveGame === 'function') renderActiveGame();
+  if (typeof renderActiveGame === 'function') renderActiveGame();
   if (typeof isAutoTTS !== "undefined" && isAutoTTS && vItems.length > 0) speakWord(vItems[vCardIdx].question, selectedSubject);
 }
 
 function vCardPrev() {
   const vItems = getVocabItems(); if (vItems.length === 0) return;
   vCardIdx = (vCardIdx + vItems.length - 1) % vItems.length;
-  if(typeof renderActiveGame === 'function') renderActiveGame();
+  if (typeof renderActiveGame === 'function') renderActiveGame();
   if (typeof isAutoTTS !== "undefined" && isAutoTTS && vItems.length > 0) speakWord(vItems[vCardIdx].question, selectedSubject);
 }
 
@@ -53,15 +51,13 @@ function initGameState() {
   if (vItems.length > 0) {
     vMastery = {};
     vItems.forEach((w, i) => { vMastery[i] = getSavedMastery(w.question, testingDirection); });
-    
+
     let unmastered = [];
     vItems.forEach((_, i) => { if ((vMastery[i] || 0) < 2) unmastered.push(i); });
 
     if (unmastered.length === 0) {
-      // VŠECHNA SLOVA UŽ MAJÍ 2 ★ -> Vybereme max 15 náhodných slov k přezkoušení
       isAdaptiveBatchMode = vItems.length > 15;
       adaptiveBatchIndices = vItems.map((_, i) => i).sort(() => Math.random() - 0.5).slice(0, 15);
-      // Nastavíme jim lokálně v relaci 1 ★, aby se z nich zkoušelo (při chybě v answerAdaptive spadnou v cloudu na 0 ★)
       adaptiveBatchIndices.forEach(i => { vMastery[i] = 1; });
     } else if (vItems.length > 15) {
       isAdaptiveBatchMode = true;
@@ -71,7 +67,7 @@ function initGameState() {
       let batchSize = Math.min(15, candidates.length);
       adaptiveBatchIndices = candidates.slice(0, batchSize);
     } else {
-      isAdaptiveBatchMode = false; 
+      isAdaptiveBatchMode = false;
       adaptiveBatchIndices = vItems.map((_, i) => i);
     }
 
@@ -110,20 +106,21 @@ function pickNextAdaptiveWord() {
   if (typeof testingDirection !== 'undefined' && testingDirection === "DIR_IN" && typeof isAutoTTS !== "undefined" && isAutoTTS && vCurrentWord !== -1) speakWord(vItems[vCurrentWord].question, selectedSubject);
 }
 
-function revealAdaptiveQuiz() { vQuizRevealed = true; if(typeof renderActiveGame === 'function') renderActiveGame(); if (typeof isAutoTTS !== "undefined" && isAutoTTS && vCurrentWord !== -1) speakWord(getVocabItems()[vCurrentWord].question, selectedSubject); }
+function revealAdaptiveQuiz() { vQuizRevealed = true; if (typeof renderActiveGame === 'function') renderActiveGame(); if (typeof isAutoTTS !== "undefined" && isAutoTTS && vCurrentWord !== -1) speakWord(getVocabItems()[vCurrentWord].question, selectedSubject); }
 function speakAdaptiveCurrent() { const vItems = getVocabItems(); if (vItems[vCurrentWord]) speakWord(vItems[vCurrentWord].question, selectedSubject); }
 
 function answerAdaptive(known) {
   const vItems = getVocabItems(); const w = vItems[vCurrentWord];
-  if (known) { sndOk(); addReward(1, typeof selectedGroupKey !== 'undefined' ? selectedGroupKey : ""); vMastery[vCurrentWord] = Math.min(2, (vMastery[vCurrentWord] || 0) + 1); saveWordMasteryToGoogle(w.question, vMastery[vCurrentWord], testingDirection); } 
+  if (known) { sndOk(); addReward(1, typeof selectedGroupKey !== 'undefined' ? selectedGroupKey : ""); vMastery[vCurrentWord] = Math.min(2, (vMastery[vCurrentWord] || 0) + 1); saveWordMasteryToGoogle(w.question, vMastery[vCurrentWord], testingDirection); }
   else { sndErr(); vMastery[vCurrentWord] = 0; saveWordMasteryToGoogle(w.question, 0, testingDirection); }
-  pickNextAdaptiveWord(); if(typeof renderActiveGame === 'function') renderActiveGame();
+  pickNextAdaptiveWord(); if (typeof renderActiveGame === 'function') renderActiveGame();
 }
 
 function startScrambleFromAdaptiveBatch() {
   selectedGame = "SCRAMBLE"; scrambleDeck = [...adaptiveBatchIndices].sort(() => Math.random() - 0.5); scrambleSolvedCount = 0;
   initScramble(); setScreen("PLAYING");
 }
+
 function toggleScrambleHardMode() {
   scrambleHardMode = !scrambleHardMode;
   scrambleDeck = [];
@@ -135,8 +132,10 @@ function toggleScrambleHardMode() {
 function buildScrambleDistractors(tokens, isWordMode, targetQuestion, poolItems, subjectName) {
   const extraCount = tokens.length >= 5 ? 3 : 2;
   const targetClean = String(targetQuestion || '').replace(/\s*\([^)]*\)/g, '').trim();
-  const distractors = [];
   const tokenSet = new Set(tokens);
+  const lang = typeof getTargetLang === 'function' ? getTargetLang(subjectName) : 'en-GB';
+  const isRussian = lang.startsWith('ru') || /[\u0400-\u04FF]/.test(targetClean);
+  const isHebrew = lang.startsWith('he') || /[\u0590-\u05FF]/.test(targetClean);
 
   if (isWordMode) {
     const poolWords = [];
@@ -147,12 +146,14 @@ function buildScrambleDistractors(tokens, isWordMode, targetQuestion, poolItems,
       const parts = raw.includes('-') ? raw.split('-').map(s => s.trim()) : raw.split(/\s+/);
       parts.forEach(w => { if (w && !tokenSet.has(w)) poolWords.push(w); });
     });
-    const lang = typeof getTargetLang === 'function' ? getTargetLang(subjectName) : 'en-GB';
+
     const fallbackWords = lang.startsWith('de')
       ? ['der', 'die', 'das', 'den', 'ein', 'eine', 'ist', 'sind', 'mit', 'und', 'nicht']
-      : (lang.startsWith('he')
+      : (isHebrew
         ? ['אֶת', 'לֹא', 'כִּי', 'עַל', 'אֶל']
-        : ['is', 'are', 'the', 'a', 'in', 'on', 'to', 'for', 'my', 'have', 'has', 'not']);
+        : (isRussian
+          ? ['я', 'ты', 'он', 'она', 'мы', 'они', 'это', 'не', 'да', 'нет', 'у', 'в', 'на', 'и']
+          : ['is', 'are', 'the', 'a', 'in', 'on', 'to', 'for', 'my', 'have', 'has', 'not']));
 
     const uniqueCandidates = [...new Set([...poolWords, ...fallbackWords])].filter(w => !tokenSet.has(w));
     uniqueCandidates.sort(() => Math.random() - 0.5);
@@ -165,17 +166,16 @@ function buildScrambleDistractors(tokens, isWordMode, targetQuestion, poolItems,
       if (raw === targetClean) return;
       getGraphemes(raw).forEach(ch => { if (ch && ch.trim() && !tokenSet.has(ch)) poolChars.push(ch); });
     });
-    const lang = typeof getTargetLang === 'function' ? getTargetLang(subjectName) : 'en-GB';
-    const fallbackAlpha = lang.startsWith('he')
+
+    const fallbackAlpha = isHebrew
       ? 'אבגדהוזחטיכלמנסעפצקרשת'.split('')
-      : 'eaositnrlduchmp'.split('');
+      : (isRussian
+        ? 'аоеинтрсвклмдпуябгзйчшщыэю'.split('')
+        : 'eaositnrlduchmp'.split(''));
 
     const uniqueChars = [...new Set([...poolChars, ...fallbackAlpha])].filter(ch => ch && ch.trim() && !tokenSet.has(ch));
     uniqueChars.sort(() => Math.random() - 0.5);
-    for (let i = 0; i < Math.min(extraCount, uniqueChars.length); i++) {
-      distractors.push(uniqueChars[i]);
-    }
-    return distractors;
+    return uniqueChars.slice(0, extraCount);
   }
 }
 
@@ -230,9 +230,9 @@ function initScramble() {
   vCurrentWord = scrambleDeck.pop();
   const w = vItems[vCurrentWord];
   scramblePlaced = []; scrambleHardPlacedIds = []; scrambleHadMistake = false; scrambleDone = false;
-  
+
   const raw = w.question.replace(/\s*\([^)]*\)/g, '').trim();
-  
+
   if (raw.split(/\s+/).length >= 3 || raw.length > 15) {
     scrambleIsWordMode = true;
     const tokens = raw.includes('-') ? raw.split('-').map(s => s.trim()) : raw.split(/\s+/);
@@ -252,11 +252,11 @@ let lastScrambleClickTime = 0;
 function clickScrambleTile(idx) {
   if (scrambleDone) return;
   const now = Date.now();
-  if (now - lastScrambleClickTime < 120) return; 
+  if (now - lastScrambleClickTime < 120) return;
   lastScrambleClickTime = now;
 
   const item = scrambleTiles[idx];
-  if (item.used || item.isWrong) return; 
+  if (item.used || item.isWrong) return;
 
   if (scrambleIsHard) {
     sndOk(false);
@@ -266,32 +266,32 @@ function clickScrambleTile(idx) {
     if (typeof renderActiveGame === 'function') renderActiveGame();
     return;
   }
-  
+
   const w = getVocabItems()[vCurrentWord];
   const cleanTarget = w.question.replace(/\s*\([^)]*\)/g, '').trim();
-  const target = scrambleIsWordMode ? (cleanTarget.includes('-') ? cleanTarget.split('-').map(s=>s.trim()) : cleanTarget.split(/\s+/)) : getGraphemes(cleanTarget);
+  const target = scrambleIsWordMode ? (cleanTarget.includes('-') ? cleanTarget.split('-').map(s => s.trim()) : cleanTarget.split(/\s+/)) : getGraphemes(cleanTarget);
 
   if (item.text === target[scramblePlaced.length]) {
-    sndOk(false); 
-    item.used = true; 
+    sndOk(false);
+    item.used = true;
     scramblePlaced.push(item.text);
-    
+
     if (scramblePlaced.length === target.length) {
       scrambleDone = true; scrambleSolvedCount++;
       if (!scrambleHadMistake) { addReward(1, typeof selectedGroupKey !== 'undefined' ? selectedGroupKey : ""); sndFanfare(); }
       if (typeof isAutoTTS !== "undefined" && isAutoTTS) speakWord(w.question, selectedSubject);
     } else {
       const nextExpected = target[scramblePlaced.length];
-      scrambleTiles.forEach(t => { 
-        if (t.text === nextExpected) t.isWrong = false; 
+      scrambleTiles.forEach(t => {
+        if (t.text === nextExpected) t.isWrong = false;
       });
     }
-  } else { 
-    sndErr(); 
+  } else {
+    sndErr();
     item.isWrong = true;
-    scrambleHadMistake = true; 
+    scrambleHadMistake = true;
   }
-  if(typeof renderActiveGame === 'function') renderActiveGame();
+  if (typeof renderActiveGame === 'function') renderActiveGame();
 }
 
 function clickQuizOpt(optIdx) {
@@ -299,13 +299,13 @@ function clickQuizOpt(optIdx) {
   const q = qActiveList[qCurStep]; const chosen = q.options[optIdx];
   qAnswered = true; qChosenOpt = chosen;
   if (chosen === q.answer) { sndOk(false); addReward(1, typeof selectedGroupKey !== 'undefined' ? selectedGroupKey : ""); } else sndErr();
-  if(typeof renderActiveGame === 'function') renderActiveGame();
+  if (typeof renderActiveGame === 'function') renderActiveGame();
 }
-function nextQuizStep() { qCurStep++; qAnswered = false; qChosenOpt = null; if(typeof renderActiveGame === 'function') renderActiveGame(); }
+function nextQuizStep() { qCurStep++; qAnswered = false; qChosenOpt = null; if (typeof renderActiveGame === 'function') renderActiveGame(); }
 
 function resetInactivityTimer() {
   if (seqInactivityTimer) clearTimeout(seqInactivityTimer);
-  seqInactivityTimer = setTimeout(() => { seqHintActive = true; if(typeof renderActiveGame === 'function') renderActiveGame(); }, 3000);
+  seqInactivityTimer = setTimeout(() => { seqHintActive = true; if (typeof renderActiveGame === 'function') renderActiveGame(); }, 3000);
 }
 
 let seqBestTime = null, seqPrevBestTime = null, seqLastFinalTime = null, seqIsNewRecord = false, seqLastSplitDiff = 0;
@@ -322,7 +322,7 @@ function renderSeqSplitPace() {
   if (!seqPrevBestTime || seqTargetIdx === 0) return;
   const paceText = document.getElementById("seq-pace-text");
   const paceBar = document.getElementById("seq-pace-bar");
-  const diff = seqLastSplitDiff; // Kladné = jsme v plusu (rychlejší)
+  const diff = seqLastSplitDiff;
   if (paceText) {
     paceText.innerText = diff >= 0 ? `⚡ +${diff.toFixed(1)}s v plusu` : `🐢 ${diff.toFixed(1)}s ztráta`;
     paceText.style.color = diff >= 0 ? "var(--col-green)" : "var(--col-red)";
@@ -399,11 +399,11 @@ function clickSeqSlot(slot) {
       for (let i = seqTargetIdx; i < itemsList.length; i++) { if (!seqSlots.includes(i)) { nextItem = i; break; } }
       seqSlots[slot] = nextItem; resetInactivityTimer();
     }
-    if(typeof renderActiveGame === 'function') renderActiveGame();
+    if (typeof renderActiveGame === 'function') renderActiveGame();
   } else {
     sndErr();
     if (btnEl) { btnEl.classList.add("wrong"); setTimeout(() => { if (btnEl) btnEl.classList.remove("wrong"); }, 250); }
-    seqHintActive = true; resetInactivityTimer(); 
-    if(typeof renderActiveGame === 'function') renderActiveGame();
+    seqHintActive = true; resetInactivityTimer();
+    if (typeof renderActiveGame === 'function') renderActiveGame();
   }
 }
