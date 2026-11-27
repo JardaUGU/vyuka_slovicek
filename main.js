@@ -1,5 +1,5 @@
 /**
- * HLAVNÍ JÁDRO APLIKACE (Globální stav, Navigace, Časomíra, PIN)
+ * HLAVNÍ JÁDRO APLIKACE (Globální stav, Navigace, Časomíra, PIN, Vázání předmětů)
  */
 
 const DEFAULT_API_URL = "https://script.google.com/macros/s/AKfycbxaxBIXP-ECpWstcqRDw8RuT_ds6UwcplU_3pZ9_-ksELN5FVeGt5EHjjexkJVmx1FR_w/exec";
@@ -18,9 +18,9 @@ if (urlParams.has('db')) {
 }
 
 const API_URL = localStorage.getItem('custom_api_url') || DEFAULT_API_URL;
-const APP_VERSION = "7.7";
+const APP_VERSION = "7.9";
 
-let appData = { users: [], progress: {}, items: [], syncDate: "" };
+let appData = { users: [], subjectBindings: {}, progress: {}, items: [], syncDate: "" };
 let currentUser = JSON.parse(localStorage.getItem("cur_user") || 'null');
 let viewMode = "LESSONS";
 
@@ -84,7 +84,23 @@ function getQuickChoiceMode() {
 }
 
 function isItemAllowedForGrade(it, userG) {
-  const subjLow = (it.subject || '').toLowerCase();
+  const uNameLow = (typeof currentUser !== 'undefined' && currentUser && currentUser.name)
+    ? currentUser.name.toLowerCase().trim()
+    : "";
+  const subjLow = (it.subject || '').toLowerCase().trim();
+
+  // 1. Vázání cesty / předmětu na konkrétní studenty (ostatní ji nevidí, ani v režimu Dospělý)
+  if (Array.isArray(it.allowedUsers) && it.allowedUsers.length > 0) {
+    if (!uNameLow || !it.allowedUsers.includes(uNameLow)) return false;
+  }
+  if (typeof appData !== 'undefined' && appData && appData.subjectBindings) {
+    const boundList = appData.subjectBindings[subjLow];
+    if (Array.isArray(boundList) && boundList.length > 0) {
+      if (!uNameLow || !boundList.includes(uNameLow)) return false;
+    }
+  }
+
+  // 2. Běžná pravidla podle typu předmětu a ročníku
   if (subjLow.includes('cesta') || subjLow.includes('postupn') || subjLow.includes('inteligentn')) return true;
   if (userG >= 90) return true;
   return (parseInt(it.minGrade) || 2) === userG;
@@ -183,7 +199,7 @@ function updateStudyTimerUI() {
   if (!box || !currentUser) return;
   const targetSec = (currentUser.targetMinutes || 15) * 60; const isGoalReached = todaySecondsStudied >= targetSec;
   const bonusSec = Math.max(0, todaySecondsStudied - targetSec);
-  const format = s => `${String(Math.floor(s / 60)).padStart(2,'0')}:${String(s % 60).padStart(2,'0')}`;
+  const format = s => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
   const spentMin = Math.floor(todaySecondsStudied / 60); const targetMin = currentUser.targetMinutes || 15;
 
   if (footerGoal) {
