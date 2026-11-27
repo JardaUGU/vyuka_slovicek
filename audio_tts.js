@@ -1,13 +1,11 @@
 /**
  * MODUL PRO ZVUKOVÉ EFEKTY A SYNTÉZU ŘEČI (TTS)
- * Čistá, stabilní verze s opraveným WebAudio cinkáním pro iPhone SE i 14 Pro
  */
 
 let isAutoTTS = localStorage.getItem("auto_tts") !== "false";
 let cachedVoices = [];
 let speakTimeoutId = null;
 
-// Globální reference zabraňuje smazání přehrávaného slova pamětí v Safari
 window._activeUtterance = null;
 
 function updateVoices() {
@@ -40,6 +38,7 @@ function getTargetLang(subjectName) {
     .toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   if (s.includes('angli') || s === 'en' || s.includes('inteligentn')) return 'en-GB';
   if (s.includes('nemc') || s === 'de') return 'de-DE';
+  if (s.includes('rust') || s.includes('rusk') || s === 'ru') return 'ru-RU';
   if (s.includes('hebr') || s === 'he') return 'he-IL';
   if (s.includes('spanel') || s === 'es') return 'es-ES';
   return 'cs-CZ';
@@ -64,13 +63,13 @@ function speakWord(text, subjectName) {
   speakTimeoutId = setTimeout(() => {
     let toSpeak = String(text).trim();
 
-    toSpeak = toSpeak.replace(/^[^:]{1,30}:\s*/, ''); // Odstranění jmen postav
-    toSpeak = toSpeak.replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, '').trim(); // Odstranění smajlíků
-    toSpeak = toSpeak.replace(/\s*\([^)]*\)/g, ''); // Odstranění závorek
+    toSpeak = toSpeak.replace(/^[^:]{1,30}:\s*/, '');
+    toSpeak = toSpeak.replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, '').trim();
+    toSpeak = toSpeak.replace(/\s*\([^)]*\)/g, '');
+    toSpeak = toSpeak.replace(/\u0301/g, ''); // Očištění přízvukové čárky u ruštiny
 
     toSpeak = toSpeak.replace(/\bNo\b/g, 'no').replace(/\bOh no\b/gi, 'oh nou');
 
-    // Oprava hebrejštiny (Boží jméno Adonaj + koncovka -av místo -aju u slov jako Elohav)
     const regexLadonaj = /\u05DC[\u0591-\u05C7]*\u05D9[\u0591-\u05C7]*\u05D4[\u0591-\u05C7]*\u05D5[\u0591-\u05C7]*\u05D4/g;
     const regexAdonaj = /\u05D9[\u0591-\u05C7]*\u05D4[\u0591-\u05C7]*\u05D5[\u0591-\u05C7]*\u05D4/g;
     toSpeak = toSpeak.replace(regexLadonaj, 'לַאדֹנָי').replace(regexAdonaj, 'אֲדֹנָי');
@@ -78,8 +77,9 @@ function speakWord(text, subjectName) {
     toSpeak = toSpeak.replace(/l'?(jahve|jahveh|yahweh|yahwe|jehova|jhvh|yhwh|jhwh|jvhv)/gi, "Ladonaj");
     toSpeak = toSpeak.replace(/(jahve|jahveh|yahweh|yahwe|jehova|jhvh|yhwh|jhwh|jvhv)/gi, "Adonaj");
 
+    const targetLang = getTargetLang(subjectName);
     if (/read\s*-\s*read\s*-\s*read/i.test(toSpeak)) toSpeak = "read, red, red";
-    else toSpeak = toSpeak.replace(/\//g, ' or ').replace(/\s*-\s*/g, ', ');
+    else toSpeak = toSpeak.replace(/\//g, targetLang.startsWith('en') ? ' or ' : ', ').replace(/\s*-\s*/g, ', ');
     if (/^\s*I\s*[.!?]?\s*$/i.test(toSpeak)) toSpeak = "eye";
 
     if (!toSpeak) return;
@@ -87,7 +87,6 @@ function speakWord(text, subjectName) {
     const u = new SpeechSynthesisUtterance(toSpeak);
     window._activeUtterance = u;
 
-    const targetLang = getTargetLang(subjectName);
     const langPrefix = targetLang.split('-')[0];
     u.lang = targetLang;
     u.rate = 0.88;
@@ -104,6 +103,7 @@ function speakWord(text, subjectName) {
           let bestNames = [];
           if (targetLang === 'en-GB') bestNames = ['daniel', 'oliver', 'serena', 'stephanie', 'arthur', 'martha', 'kate'];
           else if (targetLang === 'de-DE') bestNames = ['anna', 'petra', 'markus', 'yannick', 'helena', 'martin'];
+          else if (targetLang === 'ru-RU') bestNames = ['milena', 'yuri', 'katya', 'irina', 'pavel'];
           else if (targetLang === 'cs-CZ') bestNames = ['iveta', 'zuzana'];
           else if (targetLang === 'es-ES') bestNames = ['jorge', 'monica', 'carmen', 'diego'];
           else if (targetLang === 'he-IL') bestNames = ['carmit'];
@@ -138,9 +138,6 @@ function speakWord(text, subjectName) {
   }, 40);
 }
 
-// =========================================================================
-// OPRAVENÉ WEB AUDIO API CINKÁNÍ PRO iOS (iPhone 14 Pro i iPhone SE)
-// =========================================================================
 let audioCtx = null;
 let isAudioUnlocked = false;
 
@@ -152,7 +149,6 @@ function getAudioCtx() {
   return audioCtx;
 }
 
-// Volá se při jakémkoliv dotyku na obrazovku (odemkne zvukový čip v iPhonu)
 function unlockAudioForiOS() {
   try {
     const ctx = getAudioCtx();
@@ -182,7 +178,6 @@ function playTone(freq, type, duration) {
         const gain = ctx.createGain();
         osc.type = type;
         osc.frequency.setValueAtTime(freq, ctx.currentTime);
-        // Mírně vyšší hlasitost (0.18), aby bylo cinknutí na iPhonu jasně slyšet
         gain.gain.setValueAtTime(0.18, ctx.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
         osc.connect(gain);
@@ -192,8 +187,6 @@ function playTone(freq, type, duration) {
       } catch (e) {}
     };
 
-    // KRITICKÁ OPRAVA PRO iPHONE 14 PRO & SE:
-    // Pokud je AudioContext uspaný (suspended/interrupted), musíme počkat na dokončení resume()!
     if (ctx.state !== "running") {
       ctx.resume().then(startOscillator).catch(() => {});
     } else {
