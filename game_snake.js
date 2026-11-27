@@ -125,7 +125,7 @@ function startSnakeGame() {
 
   const vItems = getVocabItems();
   snakeDeck = vItems.filter(it => {
-    let clean = it.question.replace(/\s*\([^)]*\)/g, '').replace(/^(der|die|das|ein|eine|el|la|los|las|un|una)\s+/i, '').trim();
+    let clean = it.question.replace(/\s*\([^)]*\)/g, '').replace(/\u0301/g, '').replace(/^(der|die|das|ein|eine|el|la|los|las|un|una)\s+/i, '').trim();
     return clean.split(/\s+/).length === 1 && clean.length >= 2 && clean.length <= 10 && !clean.includes('.');
   }).sort(() => Math.random() - 0.5);
 
@@ -171,7 +171,7 @@ function startCampaignSnake(heartsFromLesson = 0) {
   isCampaignMinigame = true;
 
   snakeDeck = campaignMinigamePool.filter(it => {
-    let clean = it.question.replace(/\s*\([^)]*\)/g, '').replace(/^(der|die|das|ein|eine|el|la|los|las|un|una)\s+/i, '').trim();
+    let clean = it.question.replace(/\s*\([^)]*\)/g, '').replace(/\u0301/g, '').replace(/^(der|die|das|ein|eine|el|la|los|las|un|una)\s+/i, '').trim();
     return clean.split(/\s+/).length === 1 && clean.length >= 2 && clean.length <= 10 && !clean.includes('.');
   }).sort(() => Math.random() - 0.5);
 
@@ -236,14 +236,14 @@ function setupNextSnakeWord(isWordCompleted = false) {
   if (snakeDeck.length === 0) {
     const vItems = getVocabItems();
     snakeDeck = vItems.filter(it => {
-      let clean = it.question.replace(/\s*\([^)]*\)/g, '').replace(/^(der|die|das|ein|eine|el|la|los|las|un|una)\s+/i, '').trim();
+      let clean = it.question.replace(/\s*\([^)]*\)/g, '').replace(/\u0301/g, '').replace(/^(der|die|das|ein|eine|el|la|los|las|un|una)\s+/i, '').trim();
       return clean.split(/\s+/).length === 1 && clean.length >= 2 && clean.length <= 10 && !clean.includes('.');
     }).sort(() => Math.random() - 0.5);
   }
 
   const rawItem = snakeDeck.pop();
   if (!rawItem) return;
-  let cleanForeign = rawItem.question.replace(/\s*\([^)]*\)/g, '').replace(/^(der|die|das|ein|eine|el|la|los|las|un|una)\s+/i, '').trim().toUpperCase();
+  let cleanForeign = rawItem.question.replace(/\s*\([^)]*\)/g, '').replace(/\u0301/g, '').replace(/^(der|die|das|ein|eine|el|la|los|las|un|una)\s+/i, '').trim().toUpperCase();
 
   snakeCurrentWord = {
     raw: rawItem,
@@ -281,7 +281,15 @@ function spawnSnakeFood() {
 
   if (snakeLevel >= 2) {
     const distractorsCount = Math.min(3, snakeLevel - 1);
-    const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    const wordText = snakeCurrentWord ? snakeCurrentWord.cleanForeign : "";
+    const subjLang = typeof getTargetLang === "function" ? getTargetLang(typeof selectedSubject !== "undefined" ? selectedSubject : "") : "";
+    let alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    if (subjLang.startsWith("ru") || /[\u0400-\u04FF]/.test(wordText)) {
+      alphabet = "АБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЫЭЮЯ";
+    } else if (subjLang.startsWith("he") || /[\u0590-\u05FF]/.test(wordText)) {
+      alphabet = "אבגדהוזחטיכלמנסעפצקרשת";
+    }
+
     for (let d = 0; d < distractorsCount; d++) {
       let randChar = alphabet[Math.floor(Math.random() * alphabet.length)];
       let pos = getRandomFreeGridPos(occupied);
